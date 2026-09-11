@@ -25,3 +25,43 @@ export function timeAgo(timestamp: string | Date): string {
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
 }
+
+/**
+ * Validates that a string is a well-formed HTTP/HTTPS URL with a valid host,
+ * preventing javascript:, file:, data:, and malformed hosts.
+ */
+export function isValidHttpUrl(urlString: string): boolean {
+  try {
+    const trimmed = urlString.trim();
+    if (!trimmed) return false;
+    const url = new URL(trimmed);
+    const isHttp = url.protocol === "http:" || url.protocol === "https:";
+    const hasHost = Boolean(url.hostname) && (url.hostname === "localhost" || (url.hostname.includes(".") && !url.hostname.endsWith(".")));
+    return isHttp && hasHost;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Normalizes a URL for duplicate detection (lowercases hostname, trims trailing slash).
+ */
+export function normalizeUrl(urlString: string): string {
+  try {
+    const url = new URL(urlString.trim());
+    return (url.origin + url.pathname.replace(/\/+$/, "")).toLowerCase();
+  } catch {
+    return urlString.trim().toLowerCase().replace(/\/+$/, "");
+  }
+}
+
+/**
+ * Safely formats a rating number to 2 decimal places with null/NaN protection.
+ */
+export function formatRating(val?: number | null, fallback = 5.0): string {
+  if (typeof val !== "number" || !Number.isFinite(val)) {
+    return fallback.toFixed(2);
+  }
+  return val.toFixed(2);
+}
+

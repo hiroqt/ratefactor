@@ -2,16 +2,15 @@
 
 import React from "react";
 import { 
-  SlidersHorizontal, 
   LayoutGrid, 
   List, 
-  Sparkles, 
   Star, 
   Heart, 
   MessageSquare, 
   Clock, 
   Award,
-  Filter
+  Filter,
+  Columns
 } from "lucide-react";
 import { PortfolioCategory, SortOption } from "@/types/portfolio";
 import { cn } from "@/lib/utils";
@@ -24,8 +23,8 @@ interface FilterBarProps {
   selectedTech: string | null;
   onTechSelect: (tech: string | null) => void;
   availableTechs: string[];
-  viewMode: "grid" | "list";
-  onViewModeChange: (mode: "grid" | "list") => void;
+  viewMode: "grid" | "list" | "mosaic";
+  onViewModeChange: (mode: "grid" | "list" | "mosaic") => void;
   totalCount: number;
 }
 
@@ -35,6 +34,7 @@ const CATEGORIES: PortfolioCategory[] = [
   "Frontend",
   "Fullstack",
   "Design Engineer",
+  "Mobile",
   "AI / ML",
 ];
 
@@ -51,85 +51,106 @@ export function FilterBar({
   totalCount,
 }: FilterBarProps) {
   return (
-    <div className="space-y-3 py-4">
-      {/* Top Filter Row: Categories + View Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        {/* Category Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          {CATEGORIES.map((category) => (
-            <button
-              key={category}
-              type="button"
-              onClick={() => onCategoryChange(category)}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors cursor-pointer",
-                activeCategory === category
-                  ? "bg-surface-raised text-foreground border border-border-hover shadow-sm"
-                  : "text-muted hover:text-foreground hover:bg-surface/60"
-              )}
-            >
-              {category}
-            </button>
-          ))}
+    <div className="space-y-4 py-4 select-none">
+      {/* Top Filter Row: Category Tabs + View Switcher */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        {/* Category Tabs: clean Linear/GitHub segmented control (no sliding bouncy pills, no rounded-2xl) */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 lg:pb-0 scrollbar-none p-1 rounded-lg bg-slate-100 border border-slate-200">
+          {CATEGORIES.map((category) => {
+            const isActive = activeCategory === category;
+            return (
+              <button
+                key={category}
+                type="button"
+                onClick={() => onCategoryChange(category)}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors cursor-pointer",
+                  isActive
+                    ? "bg-white text-slate-900 font-semibold border border-slate-200 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                )}
+              >
+                {category}
+              </button>
+            );
+          })}
         </div>
 
-        {/* View Mode Switcher + Count */}
-        <div className="flex items-center gap-3 self-end sm:self-auto">
-          <span className="text-xs font-mono text-muted tabular-nums">
-            Showing <strong className="text-foreground">{totalCount}</strong> portfolios
+        {/* View Switcher + Total Counter */}
+        <div className="flex items-center gap-3 self-end lg:self-auto">
+          <span className="text-xs font-mono text-slate-500 tabular-nums">
+            Showing <strong className="text-slate-900 font-semibold">{totalCount}</strong> architectures
           </span>
 
-          <div className="flex items-center rounded-md bg-surface-raised p-0.5 border border-border">
+          <div className="flex items-center p-0.5 rounded-lg bg-slate-100 border border-slate-200">
             <button
               type="button"
-              onClick={() => onViewModeChange("grid")}
+              onClick={() => onViewModeChange("mosaic")}
               className={cn(
-                "p-1.5 rounded text-xs transition-colors",
-                viewMode === "grid"
-                  ? "bg-surface text-foreground shadow-sm"
-                  : "text-muted hover:text-foreground"
+                "p-1.5 px-2 rounded-md text-xs font-mono transition-colors flex items-center gap-1 cursor-pointer",
+                viewMode === "mosaic"
+                  ? "bg-white text-slate-900 font-semibold shadow-xs"
+                  : "text-slate-500 hover:text-slate-900"
               )}
-              aria-label="Grid view"
+              title="Editorial Mosaic layout"
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
+              <Columns className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline text-[11px]">Mosaic</span>
             </button>
+
             <button
               type="button"
               onClick={() => onViewModeChange("list")}
               className={cn(
-                "p-1.5 rounded text-xs transition-colors",
+                "p-1.5 px-2 rounded-md text-xs font-mono transition-colors flex items-center gap-1 cursor-pointer",
                 viewMode === "list"
-                  ? "bg-surface text-foreground shadow-sm"
-                  : "text-muted hover:text-foreground"
+                  ? "bg-white text-slate-900 font-semibold shadow-xs"
+                  : "text-slate-500 hover:text-slate-900"
               )}
-              aria-label="List view"
+              title="Streamlined List layout"
             >
               <List className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline text-[11px]">List</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onViewModeChange("grid")}
+              className={cn(
+                "p-1.5 px-2 rounded-md text-xs font-mono transition-colors flex items-center gap-1 cursor-pointer",
+                viewMode === "grid"
+                  ? "bg-white text-slate-900 font-semibold shadow-xs"
+                  : "text-slate-500 hover:text-slate-900"
+              )}
+              title="Compact Grid layout"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline text-[11px]">Grid</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Second Row: Sorting Options & Tech Stack Filter */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-border/40">
+      {/* Second Row: Sorting Criteria & Tech Stack Chips */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-2.5 border-t border-slate-200">
         
-        {/* Sort criteria */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
-          <span className="text-xs text-muted-dark mr-1 flex items-center gap-1 font-mono">
-            <Filter className="w-3 h-3" /> Sort:
+        {/* Sort Options with Normal Clean Buttons (no rounded-full pills, no random colors) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
+          <span className="text-xs text-slate-400 mr-1 flex items-center gap-1 font-mono">
+            <Filter className="w-3 h-3 text-slate-500" /> Sort:
           </span>
 
           <button
             type="button"
             onClick={() => onSortChange("highest_rated")}
             className={cn(
-              "px-2.5 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1",
+              "px-2.5 py-1 rounded-md text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer border",
               activeSort === "highest_rated"
-                ? "bg-brand-500/10 text-brand-400 border border-brand-500/30 font-medium"
-                : "text-muted hover:text-foreground"
+                ? "bg-slate-900 text-white border-slate-900 font-medium shadow-xs"
+                : "bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50"
             )}
           >
-            <Star className="w-3 h-3" />
+            <Star className={cn("w-3 h-3", activeSort === "highest_rated" ? "fill-amber-400 text-amber-400" : "text-amber-500")} />
             Highest Rated
           </button>
 
@@ -137,13 +158,13 @@ export function FilterBar({
             type="button"
             onClick={() => onSortChange("most_liked")}
             className={cn(
-              "px-2.5 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1",
+              "px-2.5 py-1 rounded-md text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer border",
               activeSort === "most_liked"
-                ? "bg-accent-rose/10 text-accent-rose border border-accent-rose/30 font-medium"
-                : "text-muted hover:text-foreground"
+                ? "bg-slate-900 text-white border-slate-900 font-medium shadow-xs"
+                : "bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50"
             )}
           >
-            <Heart className="w-3 h-3" />
+            <Heart className={cn("w-3 h-3", activeSort === "most_liked" ? "fill-rose-400 text-rose-400" : "text-rose-500")} />
             Most Liked
           </button>
 
@@ -151,27 +172,27 @@ export function FilterBar({
             type="button"
             onClick={() => onSortChange("most_discussed")}
             className={cn(
-              "px-2.5 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1",
+              "px-2.5 py-1 rounded-md text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer border",
               activeSort === "most_discussed"
-                ? "bg-surface-raised text-foreground border border-border font-medium"
-                : "text-muted hover:text-foreground"
+                ? "bg-slate-900 text-white border-slate-900 font-medium shadow-xs"
+                : "bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50"
             )}
           >
-            <MessageSquare className="w-3 h-3" />
-            Most Discussed
+            <MessageSquare className="w-3 h-3 text-slate-400" />
+            Discussions
           </button>
 
           <button
             type="button"
             onClick={() => onSortChange("latest")}
             className={cn(
-              "px-2.5 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1",
+              "px-2.5 py-1 rounded-md text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer border",
               activeSort === "latest"
-                ? "bg-surface-raised text-foreground border border-border font-medium"
-                : "text-muted hover:text-foreground"
+                ? "bg-slate-900 text-white border-slate-900 font-medium shadow-xs"
+                : "bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50"
             )}
           >
-            <Clock className="w-3 h-3" />
+            <Clock className="w-3 h-3 text-slate-400" />
             Latest
           </button>
 
@@ -179,30 +200,30 @@ export function FilterBar({
             type="button"
             onClick={() => onSortChange("showcase")}
             className={cn(
-              "px-2.5 py-1 rounded text-xs font-mono transition-colors flex items-center gap-1",
+              "px-2.5 py-1 rounded-md text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer border",
               activeSort === "showcase"
-                ? "bg-amber-500/10 text-amber-300 border border-amber-500/30 font-medium"
-                : "text-muted hover:text-foreground"
+                ? "bg-slate-900 text-white border-slate-900 font-medium shadow-xs"
+                : "bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50"
             )}
           >
-            <Award className="w-3 h-3" />
-            Showcases Only
+            <Award className="w-3 h-3 text-slate-400" />
+            Showcases
           </button>
         </div>
 
-        {/* Tech Stack Pills */}
-        <div className="flex items-center gap-1 overflow-x-auto text-[11px] font-mono">
-          <span className="text-muted-dark mr-1">Tech:</span>
+        {/* Tech Stack Chips */}
+        <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] font-mono scrollbar-none">
+          <span className="text-slate-400 mr-1">Tech:</span>
           {availableTechs.map((tech) => (
             <button
               key={tech}
               type="button"
               onClick={() => onTechSelect(selectedTech === tech ? null : tech)}
               className={cn(
-                "px-2 py-0.5 rounded border transition-colors",
+                "px-2 py-0.5 rounded-md border transition-colors cursor-pointer",
                 selectedTech === tech
-                  ? "bg-brand-500/20 text-brand-300 border-brand-500/50"
-                  : "bg-surface-raised border-border/60 text-muted hover:text-foreground"
+                  ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                  : "bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50"
               )}
             >
               {tech}
@@ -212,7 +233,7 @@ export function FilterBar({
             <button
               type="button"
               onClick={() => onTechSelect(null)}
-              className="text-[10px] text-accent-rose hover:underline ml-1"
+              className="text-[10px] text-slate-500 hover:text-slate-900 hover:underline ml-1 cursor-pointer"
             >
               Clear
             </button>

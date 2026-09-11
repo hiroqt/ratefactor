@@ -49,6 +49,7 @@ export interface Portfolio {
   likesCount: number;
   isLiked?: boolean;
   userRating?: number;
+  userRatingBreakdown?: RatingBreakdown;
   commentsCount: number;
   comments: CommentItem[];
   createdAt: string;
@@ -76,3 +77,5 @@ export type SortOption =
   | "most_discussed"
   | "latest"
   | "showcase";
+
+export * from "./profile";

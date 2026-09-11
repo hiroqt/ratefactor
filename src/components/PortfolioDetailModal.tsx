@@ -11,18 +11,19 @@ import {
   Send, 
   Trash2, 
   Flag, 
-  Award, 
   Flame, 
   CheckCircle2, 
-  ShieldCheck,
   Cpu,
   Layers,
   Zap,
-  BookOpen
+  BookOpen,
+  Sparkles
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Portfolio, CommentItem, RatingBreakdown } from "@/types/portfolio";
 import { RatingWidget } from "./RatingWidget";
-import { cn, formatNumber, timeAgo } from "@/lib/utils";
+import { cn, formatNumber, timeAgo, formatRating } from "@/lib/utils";
+import { trackEvent } from "@/lib/analytics";
 
 interface PortfolioDetailModalProps {
   portfolio: Portfolio | null;
@@ -48,7 +49,6 @@ export function PortfolioDetailModal({
   const [reportedComments, setReportedComments] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<"overview" | "reviews" | "discussion">("overview");
 
-  // Multi-criteria rating interactive state
   const [criteria, setCriteria] = useState<RatingBreakdown>({
     codeQuality: 5,
     performance: 5,
@@ -61,9 +61,17 @@ export function PortfolioDetailModal({
       setIsLiked(portfolio.isLiked || false);
       setLikesCount(portfolio.likesCount);
       setUserRating(portfolio.userRating || null);
-      if (portfolio.ratingBreakdown) {
+      if (portfolio.userRatingBreakdown) {
+        setCriteria(portfolio.userRatingBreakdown);
+      } else if (portfolio.ratingBreakdown) {
         setCriteria(portfolio.ratingBreakdown);
       }
+      setCommentText("");
+      trackEvent("portfolio_view", {
+        portfolioId: portfolio.id,
+        title: portfolio.title,
+        category: portfolio.category,
+      });
     }
   }, [portfolio]);
 
@@ -86,12 +94,19 @@ export function PortfolioDetailModal({
     const nextCount = nextState ? likesCount + 1 : Math.max(0, likesCount - 1);
     setLikesCount(nextCount);
     onLikeToggle(portfolio.id, nextState);
+    trackEvent("portfolio_like", {
+      portfolioId: portfolio.id,
+      liked: nextState,
+    });
   };
 
   const handleCommentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentText.trim()) return;
     onAddComment(portfolio.id, commentText.trim());
+    trackEvent("portfolio_comment", {
+      portfolioId: portfolio.id,
+    });
     setCommentText("");
   };
 
@@ -103,6 +118,11 @@ export function PortfolioDetailModal({
     );
     setUserRating(avg);
     onRatePortfolio(portfolio.id, avg, next);
+    trackEvent("portfolio_rate", {
+      portfolioId: portfolio.id,
+      rating: avg,
+      criterion: key,
+    });
   };
 
   const handleReportComment = (commentId: string) => {
@@ -110,24 +130,38 @@ export function PortfolioDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto">
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-background/80 backdrop-blur-sm transition-opacity" 
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2 sm:p-5 overflow-y-auto">
+      {/* Frosted Backdrop */}
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-md transition-opacity" 
         onClick={onClose}
       />
 
-      {/* Modal Container */}
-      <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-surface border border-border rounded-xl shadow-2xl overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-200">
-        
+      {/* Editorial Sheet Modal */}
+      <motion.div 
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="portfolio-modal-title"
+        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 15 }}
+        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+        className="relative w-full max-w-4xl max-h-[92vh] sm:max-h-[90vh] flex flex-col bg-white rounded-t-2xl sm:rounded-2xl border border-slate-200 shadow-2xl overflow-hidden z-10"
+      >
+        {/* Specular Edge */}
+        <div className="absolute top-0 inset-x-12 h-[1px] bg-gradient-to-r from-transparent via-slate-200 to-transparent pointer-events-none" />
+
         {/* Header Bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border/80 bg-surface-raised">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-mono text-muted uppercase tracking-wider">
-              Portfolio Inspection
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 bg-slate-50/80">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-mono text-slate-500 uppercase tracking-wider">
+              Architecture Analysis
             </span>
-            <span className="text-muted-dark">•</span>
-            <span className="text-xs font-mono text-brand-400">
+            <span className="text-slate-300">•</span>
+            <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200 font-medium">
               {portfolio.category}
             </span>
           </div>
@@ -135,7 +169,7 @@ export function PortfolioDetailModal({
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="p-1.5 rounded-md text-muted hover:text-foreground hover:bg-surface transition-colors"
+              className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-200 transition-colors cursor-pointer"
               aria-label="Close modal"
             >
               <X className="w-5 h-5" />
@@ -144,19 +178,19 @@ export function PortfolioDetailModal({
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
           
-          {/* Top Showcase Banner if present */}
+          {/* Top Showcase Spotlight Banner if present */}
           {portfolio.isShowcase && (
-            <div className="p-3.5 rounded-lg bg-brand-500/10 border border-brand-500/30 flex items-start gap-3">
-              <div className="p-1 rounded bg-brand-500/20 text-brand-400">
+            <div className="p-3.5 sm:p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
+              <div className="p-1.5 rounded-lg bg-amber-100 text-amber-700 flex-shrink-0">
                 <Flame className="w-4 h-4" />
               </div>
               <div className="text-xs">
-                <strong className="text-brand-300 font-semibold block">
-                  {portfolio.showcaseType === "daily" ? "Daily Showcase Spotlight" : "Weekly Showcase Winner"}
+                <strong className="text-amber-900 font-semibold text-sm block">
+                  {portfolio.showcaseType === "daily" ? "Daily Showcase Spotlight" : "Weekly Showcase Champion"}
                 </strong>
-                <p className="text-muted mt-0.5 leading-relaxed">
+                <p className="text-amber-800 mt-0.5 leading-relaxed">
                   {portfolio.showcaseReason}
                 </p>
               </div>
@@ -164,24 +198,24 @@ export function PortfolioDetailModal({
           )}
 
           {/* Project Title & Author Row */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
+              <h2 id="portfolio-modal-title" className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-900">
                 {portfolio.title}
               </h2>
-              <p className="text-sm text-muted mt-1 leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
                 {portfolio.tagline}
               </p>
             </div>
 
-            {/* Quick Action Links */}
-            <div className="flex items-center gap-2.5 flex-shrink-0">
+            {/* Action Links */}
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
               {portfolio.githubUrl && (
                 <a
                   href={portfolio.githubUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-surface-raised hover:bg-surface-overlay text-foreground border border-border hover:border-border-hover text-xs font-medium transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium border border-slate-200 transition-all cursor-pointer"
                 >
                   <Github className="w-4 h-4" />
                   <span>GitHub</span>
@@ -194,32 +228,32 @@ export function PortfolioDetailModal({
                   href={portfolio.portfolioUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-brand-500 hover:bg-brand-400 text-background text-xs font-semibold shadow-sm transition-all hover:shadow-glow"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold shadow-xs transition-all"
                 >
                   <span>Launch Live</span>
-                  <ExternalLink className="w-3 h-3" />
+                  <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
                 </a>
               )}
             </div>
           </div>
 
           {/* Author Card */}
-          <div className="flex items-center justify-between p-3.5 rounded-lg bg-surface-raised border border-border">
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
             <div className="flex items-center gap-3">
               <img
                 src={portfolio.author.avatar}
                 alt={portfolio.author.name}
-                className="w-10 h-10 rounded-full object-cover border border-border"
+                className="w-10 h-10 rounded-full object-cover ring-1 ring-slate-200"
               />
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-semibold text-foreground">{portfolio.author.name}</span>
+                  <span className="text-sm font-semibold text-slate-900">{portfolio.author.name}</span>
                   {portfolio.author.isVerified && (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-accent-emerald" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                   )}
-                  <span className="text-xs font-mono text-muted">@{portfolio.author.username}</span>
+                  <span className="text-xs font-mono text-slate-500">@{portfolio.author.username}</span>
                 </div>
-                <div className="text-xs text-muted">{portfolio.author.role}</div>
+                <div className="text-xs text-slate-500">{portfolio.author.role}</div>
               </div>
             </div>
 
@@ -228,20 +262,20 @@ export function PortfolioDetailModal({
                 type="button"
                 onClick={handleLike}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors cursor-pointer",
+                  "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-xs font-medium transition-all cursor-pointer",
                   isLiked
-                    ? "bg-accent-rose/10 border-accent-rose/40 text-accent-rose"
-                    : "bg-surface border-border text-muted hover:text-foreground"
+                    ? "bg-rose-50 border-rose-200 text-rose-600 shadow-sm"
+                    : "bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                 )}
               >
-                <Heart className={cn("w-4 h-4", isLiked && "fill-accent-rose text-accent-rose")} />
+                <Heart className={cn("w-4 h-4", isLiked && "fill-rose-500 text-rose-500")} />
                 <span className="font-mono tabular-nums">{formatNumber(likesCount)}</span>
               </button>
             </div>
           </div>
 
-          {/* Project Screenshot / Media preview */}
-          <div className="relative aspect-[16/9] w-full rounded-lg overflow-hidden border border-border bg-surface-raised">
+          {/* Project Media Preview */}
+          <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm">
             <img
               src={portfolio.thumbnail}
               alt={portfolio.title}
@@ -249,42 +283,45 @@ export function PortfolioDetailModal({
             />
           </div>
 
-          {/* Navigation Tabs inside Modal */}
-          <div className="flex items-center gap-2 border-b border-border/80 pb-2">
+          {/* Navigation Tabs */}
+          <div className="flex items-center gap-1.5 border-b border-slate-100 pb-2 overflow-x-auto no-scrollbar scrollbar-none">
             <button
               onClick={() => setActiveTab("overview")}
               className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                "px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer shrink-0",
                 activeTab === "overview"
-                  ? "bg-surface-raised text-foreground border border-border"
-                  : "text-muted hover:text-foreground"
+                  ? "bg-slate-900 text-white font-semibold shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               )}
             >
-              Overview & Architecture
+              <span>Overview</span>
+              <span className="hidden sm:inline">&nbsp;&amp; Architecture</span>
             </button>
             <button
               onClick={() => setActiveTab("reviews")}
               className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5",
+                "px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer shrink-0",
                 activeTab === "reviews"
-                  ? "bg-surface-raised text-foreground border border-border"
-                  : "text-muted hover:text-foreground"
+                  ? "bg-slate-900 text-white font-semibold shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               )}
             >
-              <Star className="w-3.5 h-3.5 text-brand-400" />
-              Peer Reviews & Ratings ({portfolio.ratingCount})
+              <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+              <span>Reviews</span>
+              <span className="hidden sm:inline">&nbsp;&amp; Rubric</span>
+              <span>({portfolio.ratingCount})</span>
             </button>
             <button
               onClick={() => setActiveTab("discussion")}
               className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5",
+                "px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer shrink-0",
                 activeTab === "discussion"
-                  ? "bg-surface-raised text-foreground border border-border"
-                  : "text-muted hover:text-foreground"
+                  ? "bg-slate-900 text-white font-semibold shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               )}
             >
-              <MessageSquare className="w-3.5 h-3.5" />
-              Discussion ({portfolio.comments.length})
+              <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
+              <span>Discussion ({portfolio.commentsCount})</span>
             </button>
           </div>
 
@@ -292,23 +329,23 @@ export function PortfolioDetailModal({
           {activeTab === "overview" && (
             <div className="space-y-4">
               <div>
-                <h4 className="text-xs font-mono uppercase text-muted tracking-wider mb-2">
-                  Technical Architecture
+                <h4 className="text-xs font-mono uppercase text-slate-500 tracking-wider mb-2">
+                  Technical Architecture &amp; Execution
                 </h4>
-                <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-line bg-surface-raised/50 p-4 rounded-lg border border-border/60">
+                <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-line bg-slate-50 p-4 rounded-2xl border border-slate-200">
                   {portfolio.description}
                 </p>
               </div>
 
               <div>
-                <h4 className="text-xs font-mono uppercase text-muted tracking-wider mb-2">
-                  Technologies & Standards
+                <h4 className="text-xs font-mono uppercase text-slate-500 tracking-wider mb-2">
+                  Technologies &amp; Frameworks
                 </h4>
                 <div className="flex flex-wrap gap-2">
                   {portfolio.techStack.map((tech) => (
                     <span
                       key={tech}
-                      className="px-2.5 py-1 rounded-md bg-surface-raised border border-border text-foreground text-xs font-mono"
+                      className="px-3 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 text-xs font-mono font-medium"
                     >
                       {tech}
                     </span>
@@ -318,54 +355,55 @@ export function PortfolioDetailModal({
             </div>
           )}
 
-          {/* Tab 2: Reviews & Multi-Criteria Rating */}
+          {/* Tab 2: Reviews & Multi-Criteria Rubric */}
           {activeTab === "reviews" && (
             <div className="space-y-6">
               {/* Aggregate Score Card */}
-              <div className="p-4 rounded-lg bg-surface-raised border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="text-center">
-                    <div className="text-4xl font-mono font-bold text-brand-400 tabular-nums">
+                    <div className="text-4xl font-mono font-bold text-amber-800 tabular-nums">
                       {portfolio.rating.toFixed(2)}
                     </div>
-                    <div className="text-[11px] text-muted mt-0.5">out of 5.0</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">out of 5.0</div>
                   </div>
-                  <div className="border-l border-border pl-4 space-y-1">
+                  <div className="border-l border-slate-200 pl-4 space-y-1">
                     <RatingWidget
                       currentRating={portfolio.rating}
                       ratingCount={portfolio.ratingCount}
                       interactive={false}
                     />
-                    <div className="text-[11px] text-muted">
-                      Aggregated across {portfolio.ratingCount} verified developer evaluations
+                    <div className="text-[11px] text-slate-500">
+                      Aggregated across {portfolio.ratingCount} peer critiques
                     </div>
                   </div>
                 </div>
 
                 {userRating && (
-                  <div className="text-right sm:border-l sm:border-border sm:pl-4">
-                    <div className="text-xs font-mono text-accent-emerald">Your Score</div>
-                    <div className="text-xl font-mono font-bold text-foreground tabular-nums">
+                  <div className="text-right sm:border-l sm:border-slate-200 sm:pl-4">
+                    <div className="text-xs font-mono text-emerald-700">Your Evaluation</div>
+                    <div className="text-xl font-mono font-bold text-slate-900 tabular-nums">
                       {userRating.toFixed(2)}★
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Interactive Peer Evaluation Breakdown */}
+              {/* Multi-Criteria Evaluation */}
               <div className="space-y-3">
-                <h4 className="text-xs font-mono uppercase text-muted tracking-wider">
-                  Evaluate This Portfolio (Click Stars to Rate)
+                <h4 className="text-xs font-mono uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                  Evaluate This Architecture (Tap Stars to Rate)
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Code Quality */}
-                  <div className="p-3.5 rounded-lg bg-surface-raised border border-border space-y-2">
+                  <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                        <Cpu className="w-4 h-4 text-brand-400" /> Code Architecture
+                      <span className="text-xs font-medium text-slate-900 flex items-center gap-1.5">
+                        <Cpu className="w-4 h-4 text-slate-700" /> Code Architecture
                       </span>
-                      <span className="text-xs font-mono font-bold text-brand-400 tabular-nums">
+                      <span className="text-xs font-mono font-bold text-slate-900 tabular-nums">
                         {criteria.codeQuality.toFixed(1)} / 5.0
                       </span>
                     </div>
@@ -381,8 +419,8 @@ export function PortfolioDetailModal({
                             className={cn(
                               "w-4 h-4",
                               criteria.codeQuality >= star
-                                ? "fill-brand-500 text-brand-500"
-                                : "fill-surface text-muted-dark"
+                                ? "fill-amber-500 text-amber-500"
+                                : "fill-slate-100 text-slate-300"
                             )}
                           />
                         </button>
@@ -391,12 +429,12 @@ export function PortfolioDetailModal({
                   </div>
 
                   {/* Performance */}
-                  <div className="p-3.5 rounded-lg bg-surface-raised border border-border space-y-2">
+                  <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                        <Zap className="w-4 h-4 text-accent-emerald" /> Performance & Latency
+                      <span className="text-xs font-medium text-slate-900 flex items-center gap-1.5">
+                        <Zap className="w-4 h-4 text-emerald-600" /> Performance &amp; Latency
                       </span>
-                      <span className="text-xs font-mono font-bold text-brand-400 tabular-nums">
+                      <span className="text-xs font-mono font-bold text-emerald-700 tabular-nums">
                         {criteria.performance.toFixed(1)} / 5.0
                       </span>
                     </div>
@@ -412,8 +450,8 @@ export function PortfolioDetailModal({
                             className={cn(
                               "w-4 h-4",
                               criteria.performance >= star
-                                ? "fill-brand-500 text-brand-500"
-                                : "fill-surface text-muted-dark"
+                                ? "fill-amber-500 text-amber-500"
+                                : "fill-slate-100 text-slate-300"
                             )}
                           />
                         </button>
@@ -421,13 +459,13 @@ export function PortfolioDetailModal({
                     </div>
                   </div>
 
-                  {/* Visual UX */}
-                  <div className="p-3.5 rounded-lg bg-surface-raised border border-border space-y-2">
+                  {/* Visual Craft */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                        <Layers className="w-4 h-4 text-cyan-400" /> Visual Craft & UX
+                      <span className="text-xs font-medium text-slate-900 flex items-center gap-1.5">
+                        <Layers className="w-4 h-4 text-amber-600" /> Visual Craft &amp; UX
                       </span>
-                      <span className="text-xs font-mono font-bold text-brand-400 tabular-nums">
+                      <span className="text-xs font-mono font-bold text-amber-700 tabular-nums">
                         {criteria.design.toFixed(1)} / 5.0
                       </span>
                     </div>
@@ -443,8 +481,8 @@ export function PortfolioDetailModal({
                             className={cn(
                               "w-4 h-4",
                               criteria.design >= star
-                                ? "fill-brand-500 text-brand-500"
-                                : "fill-surface text-muted-dark"
+                                ? "fill-amber-500 text-amber-500"
+                                : "fill-slate-100 text-slate-300"
                             )}
                           />
                         </button>
@@ -453,12 +491,12 @@ export function PortfolioDetailModal({
                   </div>
 
                   {/* Documentation */}
-                  <div className="p-3.5 rounded-lg bg-surface-raised border border-border space-y-2">
+                  <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                        <BookOpen className="w-4 h-4 text-purple-400" /> Documentation & Tests
+                      <span className="text-xs font-medium text-slate-900 flex items-center gap-1.5">
+                        <BookOpen className="w-4 h-4 text-indigo-600" /> Documentation &amp; Tests
                       </span>
-                      <span className="text-xs font-mono font-bold text-brand-400 tabular-nums">
+                      <span className="text-xs font-mono font-bold text-indigo-700 tabular-nums">
                         {criteria.documentation.toFixed(1)} / 5.0
                       </span>
                     </div>
@@ -474,8 +512,8 @@ export function PortfolioDetailModal({
                             className={cn(
                               "w-4 h-4",
                               criteria.documentation >= star
-                                ? "fill-brand-500 text-brand-500"
-                                : "fill-surface text-muted-dark"
+                                ? "fill-amber-500 text-amber-500"
+                                : "fill-slate-100 text-slate-300"
                             )}
                           />
                         </button>
@@ -487,87 +525,86 @@ export function PortfolioDetailModal({
             </div>
           )}
 
-          {/* Tab 3: Comments & Discussion */}
+          {/* Tab 3: Comments & Peer Discussion */}
           {activeTab === "discussion" && (
             <div className="space-y-6">
-              {/* Add Comment Input Form */}
+              {/* Comment Input */}
               <form onSubmit={handleCommentSubmit} className="space-y-3">
                 <div className="relative">
                   <textarea
                     rows={3}
-                    placeholder="Leave technical feedback, question architecture decisions, or praise craft..."
+                    placeholder="Leave technical critique, query architectural choices, or compliment craft..."
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
-                    className="w-full bg-surface-raised border border-border rounded-lg p-3 text-xs text-foreground placeholder:text-muted/60 focus:outline-none focus:border-brand-500/50 resize-none transition-colors"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white resize-none transition-colors"
                   />
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-[11px] text-muted-dark font-mono">
-                      Markdown supported • Peer critique rules apply
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      Markdown supported • Constructive peer review enforced
                     </span>
                     <button
                       type="submit"
                       disabled={!commentText.trim()}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-brand-500 hover:bg-brand-400 disabled:opacity-50 disabled:pointer-events-none text-background text-xs font-medium transition-all"
+                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-slate-900 hover:bg-neutral-800 disabled:opacity-50 disabled:pointer-events-none text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
                     >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Post Comment</span>
+                      <Send className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Post Critique</span>
                     </button>
                   </div>
                 </div>
               </form>
 
-              {/* Comment Thread List */}
+              {/* Comment Threads */}
               <div className="space-y-3">
                 {portfolio.comments.length === 0 ? (
-                  <div className="text-center py-8 border border-dashed border-border rounded-lg text-muted text-xs">
-                    No comments yet. Start the architectural discussion!
+                  <div className="text-center py-8 border border-dashed border-slate-200 rounded-2xl text-slate-400 text-xs">
+                    No critique posted yet. Initiate the peer review dialogue!
                   </div>
                 ) : (
                   portfolio.comments.map((comment) => (
                     <div
                       key={comment.id}
-                      className="p-3.5 rounded-lg bg-surface-raised border border-border/70 space-y-2"
+                      className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <img
                             src={comment.authorAvatar}
                             alt={comment.authorName}
-                            className="w-6 h-6 rounded-full object-cover"
+                            className="w-6 h-6 rounded-full object-cover ring-1 ring-slate-200"
                           />
-                          <span className="text-xs font-semibold text-foreground">
+                          <span className="text-xs font-semibold text-slate-900">
                             {comment.authorName}
                           </span>
-                          <span className="text-[11px] font-mono text-muted">
+                          <span className="text-[11px] font-mono text-slate-400">
                             @{comment.authorUsername}
                           </span>
-                          <span className="text-muted-dark text-xs">•</span>
-                          <span className="text-[11px] text-muted">
+                          <span className="text-slate-300 text-xs">•</span>
+                          <span className="text-[11px] text-slate-400">
                             {timeAgo(comment.createdAt)}
                           </span>
                         </div>
 
                         <div className="flex items-center gap-1.5">
-                          {/* Report Button */}
                           <button
                             type="button"
                             onClick={() => handleReportComment(comment.id)}
                             className={cn(
-                              "p-1 rounded text-muted hover:text-foreground text-xs transition-colors",
-                              reportedComments[comment.id] && "text-accent-rose pointer-events-none"
+                              "p-1 rounded-md text-slate-400 hover:text-slate-700 text-xs transition-colors cursor-pointer",
+                              reportedComments[comment.id] && "text-rose-500 pointer-events-none"
                             )}
                             title={reportedComments[comment.id] ? "Reported to moderator" : "Report comment"}
                           >
                             <Flag className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* Delete own comment */}
-                          {comment.isUserOwner && (
+                          {(comment.isUserOwner || comment.authorUsername === "arneldev") && (
                             <button
                               type="button"
                               onClick={() => onDeleteComment(portfolio.id, comment.id)}
-                              className="p-1 rounded text-muted hover:text-accent-rose text-xs transition-colors"
+                              className="p-1 rounded-md text-slate-400 hover:text-rose-600 text-xs transition-colors cursor-pointer"
                               title="Delete comment"
+                              aria-label="Delete your comment"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -575,13 +612,13 @@ export function PortfolioDetailModal({
                         </div>
                       </div>
 
-                      <p className="text-xs text-foreground/90 leading-relaxed pl-8">
+                      <p className="text-xs text-slate-700 leading-relaxed pl-8">
                         {comment.content}
                       </p>
 
                       {reportedComments[comment.id] && (
-                        <div className="pl-8 text-[11px] font-mono text-accent-rose">
-                          ✓ Comment flagged for moderator review (PRD Section 4.5).
+                        <div className="pl-8 text-[11px] font-mono text-rose-600">
+                          ✓ Comment flagged for moderator review.
                         </div>
                       )}
                     </div>
@@ -593,21 +630,21 @@ export function PortfolioDetailModal({
 
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-3 border-t border-border/80 bg-surface-raised flex items-center justify-between text-xs text-muted">
+        {/* Modal Footer */}
+        <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between text-xs text-slate-500">
           <span className="font-mono text-[11px]">
-            ID: {portfolio.id} • Submitted {timeAgo(portfolio.createdAt)}
+            Registry ID: {portfolio.id} • Indexed {timeAgo(portfolio.createdAt)}
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1 rounded bg-surface border border-border text-foreground hover:bg-surface-overlay transition-colors"
+            className="px-4 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 transition-colors font-medium text-xs cursor-pointer"
           >
-            Close
+            Close Blueprint
           </button>
         </div>
 
-      </div>
+      </motion.div>
     </div>
   );
 }

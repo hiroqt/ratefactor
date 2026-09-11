@@ -4,11 +4,8 @@ import React, { useState, useMemo } from "react";
 import { Navbar } from "@/components/Navbar";
 import { HeroSection } from "@/components/HeroSection";
 import { ShowcaseBanner } from "@/components/ShowcaseBanner";
-import { FilterBar } from "@/components/FilterBar";
-import { PortfolioCard } from "@/components/PortfolioCard";
 import { PortfolioDetailModal } from "@/components/PortfolioDetailModal";
 import { SubmitPortfolioModal } from "@/components/SubmitPortfolioModal";
-import { NotificationDrawer } from "@/components/NotificationDrawer";
 import { DeveloperDashboardModal } from "@/components/DeveloperDashboardModal";
 import { Footer } from "@/components/Footer";
 import { INITIAL_PORTFOLIOS } from "@/data/mockPortfolios";
@@ -21,18 +18,48 @@ import {
   RatingBreakdown,
   CommentItem 
 } from "@/types/portfolio";
-import { Flame, Star, Sparkles, Terminal } from "lucide-react";
+import { 
+  selectShowcaseCandidate, 
+  DEFAULT_SHOWCASE_WEIGHTS 
+} from "@/lib/showcaseAlgorithm";
+import { trackEvent } from "@/lib/analytics";
+import { Terminal, ArrowLeft } from "lucide-react";
+import { DeveloperProfile } from "@/types/profile";
+import { INITIAL_DEVELOPER_PROFILE } from "@/data/mockProfile";
+import { DeveloperDashboard } from "@/components/dashboard/DeveloperDashboard";
 
 export default function Home() {
   // State
   const [portfolios, setPortfolios] = useState<Portfolio[]>(INITIAL_PORTFOLIOS);
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const [showcaseHistoryIds, setShowcaseHistoryIds] = useState<string[]>(["hyperion-lsm", "kubelens-tui"]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<PortfolioCategory>("All");
   const [activeSort, setActiveSort] = useState<SortOption>("highest_rated");
-  const [selectedTech, setSelectedTech] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [activeNavTab, setActiveNavTab] = useState("discover");
+
+  // Developer Profile State (GitHub-style bio, status, showcase pins)
+  const [developerProfile, setDeveloperProfile] = useState<DeveloperProfile>(INITIAL_DEVELOPER_PROFILE);
+
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem("ratefactor_dev_profile");
+      if (saved) {
+        setDeveloperProfile(JSON.parse(saved));
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
+  const handleUpdateProfile = (updated: DeveloperProfile) => {
+    setDeveloperProfile(updated);
+    try {
+      localStorage.setItem("ratefactor_dev_profile", JSON.stringify(updated));
+    } catch (e) {
+      // ignore
+    }
+  };
 
   // Modals
   const [selectedPortfolio, setSelectedPortfolio] = useState<Portfolio | null>(null);
@@ -50,117 +77,79 @@ export default function Home() {
     }, 4000);
   };
 
-  // Collect unique technologies for filter chips
-  const availableTechs = useMemo(() => {
-    const techSet = new Set<string>();
-    portfolios.forEach((p) => {
-      p.techStack.forEach((t) => techSet.add(t));
-    });
-    return Array.from(techSet).slice(0, 8);
-  }, [portfolios]);
-
   // Daily & Weekly showcases
   const dailyShowcase = useMemo(() => {
-    return portfolios.find((p) => p.showcaseType === "daily") || portfolios[0];
+    return portfolios.find((p) => p.showcaseType === "daily") || portfolios[0] || null;
   }, [portfolios]);
 
   const weeklyShowcase = useMemo(() => {
     return (
       portfolios.find((p) => p.showcaseType === "weekly") ||
       portfolios[1] ||
-      portfolios[0]
+      portfolios[0] ||
+      null
     );
   }, [portfolios]);
 
-  // User's own portfolios (Arnel Rivera / @arneldev)
+  // User's own portfolios (Arnel Rivera / @arneldev or updated profile username)
   const myPortfolios = useMemo(() => {
-    return portfolios.filter((p) => p.author.username === "arneldev");
-  }, [portfolios]);
+    return portfolios.filter(
+      (p) =>
+        p.author.username === developerProfile.username ||
+        p.author.username === "arneldev"
+    );
+  }, [portfolios, developerProfile.username]);
 
   // Unread notification count
   const unreadCount = useMemo(() => {
     return notifications.filter((n) => !n.isRead).length;
   }, [notifications]);
 
-  // Filtered & Sorted Portfolios
-  const filteredPortfolios = useMemo(() => {
-    return portfolios
-      .filter((p) => {
-        // Category filter
-        if (activeCategory !== "All" && p.category !== activeCategory) {
-          return false;
-        }
+  // Navigation tab handler
+  const handleNavTabChange = (tab: string) => {
+    setActiveNavTab(tab);
+    if (tab === "showcase") {
+      setActiveSort("showcase");
+    } else if (tab === "discover" && activeSort === "showcase") {
+      setActiveSort("highest_rated");
+    }
+  };
 
-        // Tech filter
-        if (selectedTech && !p.techStack.includes(selectedTech)) {
-          return false;
-        }
-
-        // Search query filter
-        if (searchQuery.trim()) {
-          const query = searchQuery.toLowerCase();
-          const matchTitle = p.title.toLowerCase().includes(query);
-          const matchTagline = p.tagline.toLowerCase().includes(query);
-          const matchAuthor = p.author.name.toLowerCase().includes(query);
-          const matchTech = p.techStack.some((t) => t.toLowerCase().includes(query));
-          if (!matchTitle && !matchTagline && !matchAuthor && !matchTech) {
-            return false;
-          }
-        }
-
-        // Showcase only filter
-        if (activeSort === "showcase" && !p.isShowcase) {
-          return false;
-        }
-
-        return true;
-      })
-      .sort((a, b) => {
-        switch (activeSort) {
-          case "highest_rated":
-            return b.rating - a.rating;
-          case "most_liked":
-            return b.likesCount - a.likesCount;
-          case "most_discussed":
-            return b.commentsCount - a.commentsCount;
-          case "latest":
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-          case "showcase":
-            return (b.isShowcase ? 1 : 0) - (a.isShowcase ? 1 : 0);
-          default:
-            return 0;
-        }
-      });
-  }, [portfolios, activeCategory, selectedTech, searchQuery, activeSort]);
-
-  // Action: Toggle Like
+  // Action: Toggle Like (with optimistic sync to selectedPortfolio & PRD notification)
   const handleLikeToggle = (portfolioId: string, isLiked: boolean) => {
     setPortfolios((prev) =>
       prev.map((p) => {
         if (p.id === portfolioId) {
           const nextCount = isLiked ? p.likesCount + 1 : Math.max(0, p.likesCount - 1);
-          return {
+          const updated = {
             ...p,
             isLiked,
             likesCount: nextCount,
           };
+          if (selectedPortfolio && selectedPortfolio.id === portfolioId) {
+            setSelectedPortfolio(updated);
+          }
+          return updated;
         }
         return p;
       })
     );
 
-    // If we liked someone else's portfolio, simulate a notification
+    // Notification on like (PRD Sections 4.4, 5)
     if (isLiked) {
       const target = portfolios.find((p) => p.id === portfolioId);
-      if (target && target.author.username === "arneldev") {
+      if (target) {
+        const isTargetAuthorMe = target.author.username === "arneldev";
         const newNotif: NotificationItem = {
-          id: "notif-" + Date.now(),
+          id: "notif-like-" + Date.now(),
           type: "like",
-          actorName: "Elena Rostova",
-          actorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+          actorName: isTargetAuthorMe ? "Elena Rostova" : "Arnel Rivera",
+          actorAvatar: isTargetAuthorMe
+            ? "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"
+            : "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
           portfolioId: target.id,
           portfolioTitle: target.title,
-          message: "liked your portfolio.",
+          message: isTargetAuthorMe ? "liked your portfolio." : `appreciated ${target.title}.`,
           timestamp: new Date().toISOString(),
           isRead: false,
         };
@@ -169,7 +158,7 @@ export default function Home() {
     }
   };
 
-  // Action: Rate Portfolio
+  // Action: Rate Portfolio (Mathematically sound aggregate breakdown updates and user tracking)
   const handleRatePortfolio = (
     portfolioId: string,
     ratingScore: number,
@@ -178,17 +167,64 @@ export default function Home() {
     setPortfolios((prev) =>
       prev.map((p) => {
         if (p.id === portfolioId) {
-          const newCount = p.ratingCount + (p.userRating ? 0 : 1);
-          const newAvg = Number(
-            ((p.rating * p.ratingCount + ratingScore) / (p.ratingCount + 1)).toFixed(2)
-          );
-          return {
+          const hasUserRated = Boolean(p.userRating);
+          const newCount = hasUserRated ? p.ratingCount : p.ratingCount + 1;
+          const oldPoints = p.rating * p.ratingCount;
+          const prevScore = p.userRating || 0;
+          const newPoints = hasUserRated
+            ? oldPoints - prevScore + ratingScore
+            : oldPoints + ratingScore;
+          const newAvg = Number((newPoints / Math.max(1, newCount)).toFixed(2));
+          const boundedAvg = Math.min(5, Math.max(1, newAvg));
+
+          // Calculate updated aggregate breakdown across criteria without overwriting community scores
+          const prevUserBreakdown = p.userRatingBreakdown || {
+            codeQuality: prevScore,
+            performance: prevScore,
+            design: prevScore,
+            documentation: prevScore,
+          };
+
+          const calcNewCriterion = (
+            currentAggregate: number,
+            newCriterionValue: number,
+            prevUserCriterionValue: number
+          ) => {
+            const currentTotal = currentAggregate * p.ratingCount;
+            const updatedTotal = hasUserRated
+              ? currentTotal - prevUserCriterionValue + newCriterionValue
+              : currentTotal + newCriterionValue;
+            return Number((Math.min(5, Math.max(1, updatedTotal / Math.max(1, newCount)))).toFixed(2));
+          };
+
+          const currentBreakdown = p.ratingBreakdown || {
+            codeQuality: p.rating,
+            performance: p.rating,
+            design: p.rating,
+            documentation: p.rating,
+          };
+
+          const updatedAggregateBreakdown: RatingBreakdown = {
+            codeQuality: calcNewCriterion(currentBreakdown.codeQuality, breakdown.codeQuality, prevUserBreakdown.codeQuality),
+            performance: calcNewCriterion(currentBreakdown.performance, breakdown.performance, prevUserBreakdown.performance),
+            design: calcNewCriterion(currentBreakdown.design, breakdown.design, prevUserBreakdown.design),
+            documentation: calcNewCriterion(currentBreakdown.documentation, breakdown.documentation, prevUserBreakdown.documentation),
+          };
+
+          const updated: Portfolio = {
             ...p,
-            rating: newAvg,
+            rating: boundedAvg,
             ratingCount: newCount,
             userRating: ratingScore,
-            ratingBreakdown: breakdown,
+            userRatingBreakdown: breakdown,
+            ratingBreakdown: updatedAggregateBreakdown,
           };
+
+          if (selectedPortfolio && selectedPortfolio.id === portfolioId) {
+            setSelectedPortfolio(updated);
+          }
+
+          return updated;
         }
         return p;
       })
@@ -196,17 +232,22 @@ export default function Home() {
 
     showToast(`Your rating (${ratingScore.toFixed(1)}★) has been logged.`);
 
-    // Push notification to author
+    // Push notification to author (PRD Section 5)
     const target = portfolios.find((p) => p.id === portfolioId);
     if (target) {
+      const isTargetAuthorMe = target.author.username === "arneldev";
       const newNotif: NotificationItem = {
-        id: "notif-" + Date.now(),
+        id: "notif-rate-" + Date.now(),
         type: "rating",
-        actorName: "Arnel Rivera",
-        actorAvatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
+        actorName: isTargetAuthorMe ? "Elena Rostova" : "Arnel Rivera",
+        actorAvatar: isTargetAuthorMe
+          ? "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"
+          : "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
         portfolioId: target.id,
         portfolioTitle: target.title,
-        message: `submitted a ${ratingScore.toFixed(1)}★ peer critique.`,
+        message: isTargetAuthorMe
+          ? `evaluated your portfolio with ${ratingScore.toFixed(1)}★ peer score.`
+          : `submitted a ${ratingScore.toFixed(1)}★ peer critique for ${target.title}.`,
         ratingScore,
         timestamp: new Date().toISOString(),
         isRead: false,
@@ -215,7 +256,7 @@ export default function Home() {
     }
   };
 
-  // Action: Add Comment
+  // Action: Add Comment (PRD Section 4.5 & 5)
   const handleAddComment = (portfolioId: string, content: string) => {
     const newComment: CommentItem = {
       id: "comment-" + Date.now(),
@@ -255,6 +296,28 @@ export default function Home() {
       );
     }
 
+    // Dispatch comment notification to author (PRD Section 4.5 & 5)
+    const target = portfolios.find((p) => p.id === portfolioId);
+    if (target) {
+      const isTargetAuthorMe = target.author.username === "arneldev";
+      const newNotif: NotificationItem = {
+        id: "notif-comment-" + Date.now(),
+        type: "comment",
+        actorName: isTargetAuthorMe ? "Marcus Chen" : "Arnel Rivera",
+        actorAvatar: isTargetAuthorMe
+          ? "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80"
+          : "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
+        portfolioId: target.id,
+        portfolioTitle: target.title,
+        message: isTargetAuthorMe
+          ? `commented on your project: "${content.slice(0, 45)}${content.length > 45 ? "..." : ""}"`
+          : `commented on ${target.title}: "${content.slice(0, 45)}${content.length > 45 ? "..." : ""}"`,
+        timestamp: new Date().toISOString(),
+        isRead: false,
+      };
+      setNotifications((prev) => [newNotif, ...prev]);
+    }
+
     showToast("Comment posted successfully.");
   };
 
@@ -292,13 +355,129 @@ export default function Home() {
   // Action: Submit New Portfolio
   const handleSubmitPortfolio = (newPortfolio: Portfolio) => {
     setPortfolios((prev) => [newPortfolio, ...prev]);
+
+    // If submitted by user, auto-pin to showcase if space available
+    if (newPortfolio.author.username === developerProfile.username || newPortfolio.author.username === "arneldev") {
+      setDeveloperProfile((prev) => {
+        if (prev.pinnedPortfolioIds.length < 6 && !prev.pinnedPortfolioIds.includes(newPortfolio.id)) {
+          const updated: DeveloperProfile = {
+            ...prev,
+            pinnedPortfolioIds: [newPortfolio.id, ...prev.pinnedPortfolioIds],
+            spotlightPortfolioId: prev.spotlightPortfolioId || newPortfolio.id,
+          };
+          try {
+            localStorage.setItem("ratefactor_dev_profile", JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
+        }
+        return prev;
+      });
+    }
+
+    trackEvent("portfolio_submit", {
+      portfolioId: newPortfolio.id,
+      title: newPortfolio.title,
+      category: newPortfolio.category,
+    });
     showToast(`Portfolio '${newPortfolio.title}' submitted and indexed!`);
   };
 
   // Action: Delete Portfolio
   const handleDeletePortfolio = (portfolioId: string) => {
     setPortfolios((prev) => prev.filter((p) => p.id !== portfolioId));
+    if (selectedPortfolio && selectedPortfolio.id === portfolioId) {
+      setSelectedPortfolio(null);
+    }
+
+    // Clean up from pinned showcase if deleted
+    setDeveloperProfile((prev) => {
+      if (prev.pinnedPortfolioIds.includes(portfolioId)) {
+        const nextPinned = prev.pinnedPortfolioIds.filter((id) => id !== portfolioId);
+        const updated: DeveloperProfile = {
+          ...prev,
+          pinnedPortfolioIds: nextPinned,
+          spotlightPortfolioId:
+            prev.spotlightPortfolioId === portfolioId
+              ? nextPinned[0] || undefined
+              : prev.spotlightPortfolioId,
+        };
+        try {
+          localStorage.setItem("ratefactor_dev_profile", JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      }
+      return prev;
+    });
+
+    trackEvent("portfolio_delete", { portfolioId });
     showToast("Portfolio removed from registry.");
+  };
+
+  // Action: Trigger Automated Weighted Showcase Selection (Vercel Cron simulation per PRD Section 6)
+  const handleRunShowcaseCron = (type: "daily" | "weekly" = "daily") => {
+    if (portfolios.length === 0) {
+      showToast("No candidate portfolios available for showcase selection.");
+      return;
+    }
+
+    const result = selectShowcaseCandidate(
+      portfolios,
+      type,
+      DEFAULT_SHOWCASE_WEIGHTS,
+      showcaseHistoryIds
+    );
+    if (!result) return;
+
+    const { winner, reason } = result;
+
+    setPortfolios((prev) =>
+      prev.map((p) => {
+        if (p.id === winner.id) {
+          const updated: Portfolio = {
+            ...p,
+            isShowcase: true,
+            showcaseType: type,
+            showcaseReason: reason,
+          };
+          if (selectedPortfolio && selectedPortfolio.id === winner.id) {
+            setSelectedPortfolio(updated);
+          }
+          return updated;
+        }
+        if (p.showcaseType === type && p.id !== winner.id) {
+          return {
+            ...p,
+            showcaseType: null,
+            isShowcase: p.showcaseType === (type === "daily" ? "weekly" : "daily"),
+          };
+        }
+        return p;
+      })
+    );
+
+    setShowcaseHistoryIds((prev) => [winner.id, ...prev]);
+
+    // Dispatch real-time notification to winner (PRD Section 5 & 6)
+    const showcaseNotif: NotificationItem = {
+      id: "cron-" + Date.now(),
+      type: "showcase",
+      actorName: "RateFactor Cron Engine",
+      actorAvatar: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80",
+      portfolioId: winner.id,
+      portfolioTitle: winner.title,
+      message: `Your project was elected as ${type === "daily" ? "today's Daily Showcase" : "this week's Weekly Showcase"} winner! (${reason})`,
+      timestamp: new Date().toISOString(),
+      isRead: false,
+    };
+    setNotifications((prev) => [showcaseNotif, ...prev]);
+
+    trackEvent("showcase_cron_triggered", {
+      type,
+      winnerId: winner.id,
+      score: result.scores[0]?.totalScore,
+    });
+
+    showToast(`⚡ Showcase Cron: Elected '${winner.title}' as ${type === "daily" ? "Daily Showcase" : "Weekly Showcase"}!`);
   };
 
   // Action: Notification handlers
@@ -332,6 +511,8 @@ export default function Home() {
     const randomActor = actors[Math.floor(Math.random() * actors.length)];
     const randomPortfolio = portfolios[Math.floor(Math.random() * portfolios.length)];
 
+    if (!randomPortfolio) return;
+
     const newNotif: NotificationItem = {
       id: "sim-" + Date.now(),
       type: "rating",
@@ -355,6 +536,8 @@ export default function Home() {
     if (found) {
       setSelectedPortfolio(found);
       setIsNotificationOpen(false);
+    } else {
+      showToast("Selected portfolio not found in current registry.");
     }
   };
 
@@ -362,104 +545,97 @@ export default function Home() {
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       {/* Toast message alert */}
       {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-lg bg-surface border border-brand-500/50 shadow-elevated text-xs text-foreground flex items-center gap-2 animate-in slide-in-from-bottom-3 duration-200">
-          <span className="w-2 h-2 rounded-full bg-brand-400 live-beacon" />
-          <span>{toastMessage}</span>
+        <div className="fixed bottom-5 right-5 z-50 px-3.5 py-2 rounded-lg bg-slate-900 text-white border border-slate-800 shadow-lg text-xs flex items-center gap-2.5 animate-in slide-in-from-bottom-2 duration-150">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+          <span className="font-medium">{toastMessage}</span>
         </div>
       )}
 
       {/* Top Navbar */}
       <Navbar
         unreadCount={unreadCount}
-        onOpenNotifications={() => setIsNotificationOpen(true)}
+        isNotificationOpen={isNotificationOpen}
+        setIsNotificationOpen={setIsNotificationOpen}
+        notifications={notifications}
+        onMarkAllAsRead={handleMarkAllAsRead}
+        onMarkAsRead={handleMarkAsRead}
+        onSimulateIncoming={handleSimulateIncoming}
+        onSelectPortfolioById={handleSelectPortfolioById}
         onOpenSubmitModal={() => setIsSubmitModalOpen(true)}
         onOpenDashboard={() => setIsDashboardOpen(true)}
         activeNavTab={activeNavTab}
-        setActiveNavTab={setActiveNavTab}
+        setActiveNavTab={handleNavTabChange}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
+        onSelectCategory={(cat) => {
+          setActiveCategory(cat);
+          setActiveNavTab("discover");
+          const el = document.getElementById("showcase-bento");
+          el?.scrollIntoView({ behavior: "smooth" });
+        }}
+        onSelectSort={setActiveSort}
+        profile={developerProfile}
       />
 
       <main className="flex-1">
-        {/* Hero Section */}
-        {activeNavTab === "discover" && (
-          <HeroSection
-            showcasePortfolio={dailyShowcase}
-            onInspectShowcase={(p) => setSelectedPortfolio(p)}
-            onSubmitClick={() => setIsSubmitModalOpen(true)}
-            onExploreClick={() => {
-              const el = document.getElementById("discovery-grid");
-              el?.scrollIntoView({ behavior: "smooth" });
-            }}
-          />
-        )}
-
-        {/* Showcase Banner (Daily & Weekly) */}
-        {(activeNavTab === "discover" || activeNavTab === "showcase") && (
-          <ShowcaseBanner
-            dailyShowcase={dailyShowcase}
-            weeklyShowcase={weeklyShowcase}
-            onSelectPortfolio={(p) => setSelectedPortfolio(p)}
-          />
-        )}
-
-        {/* Discovery Feed Section */}
-        <section id="discovery-grid" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Filter Bar */}
-          <FilterBar
-            activeCategory={activeCategory}
-            onCategoryChange={setActiveCategory}
-            activeSort={activeSort}
-            onSortChange={setActiveSort}
-            selectedTech={selectedTech}
-            onTechSelect={setSelectedTech}
-            availableTechs={availableTechs}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-            totalCount={filteredPortfolios.length}
-          />
-
-          {/* Portfolios Grid / List View */}
-          {filteredPortfolios.length === 0 ? (
-            <div className="text-center py-20 border border-dashed border-border rounded-xl bg-surface/50 my-6">
-              <Terminal className="w-8 h-8 text-muted mx-auto mb-3" />
-              <h3 className="text-base font-semibold text-foreground">No portfolios found</h3>
-              <p className="text-xs text-muted mt-1 max-w-sm mx-auto">
-                No developer portfolios match your current search query or technology filters.
-              </p>
+        {/* Dedicated Full Developer Dashboard View */}
+        {activeNavTab === "dashboard" ? (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in duration-300">
+            <div className="mb-4">
               <button
                 type="button"
-                onClick={() => {
-                  setSearchQuery("");
-                  setActiveCategory("All");
-                  setSelectedTech(null);
-                  setActiveSort("highest_rated");
-                }}
-                className="mt-4 px-3 py-1.5 rounded-md bg-surface-raised border border-border text-xs text-brand-400 hover:text-brand-300"
+                onClick={() => handleNavTabChange("discover")}
+                className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1.5 font-medium transition-colors cursor-pointer"
               >
-                Clear all filters
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back to Architecture Discovery Feed</span>
               </button>
             </div>
-          ) : (
-            <div
-              className={
-                viewMode === "grid"
-                  ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 my-6"
-                  : "flex flex-col gap-3 my-6"
-              }
-            >
-              {filteredPortfolios.map((portfolio) => (
-                <PortfolioCard
-                  key={portfolio.id}
-                  portfolio={portfolio}
-                  onSelect={(p) => setSelectedPortfolio(p)}
-                  onLikeToggle={handleLikeToggle}
-                  viewMode={viewMode}
-                />
-              ))}
+
+            <div className="bg-slate-50 rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-xs">
+              <DeveloperDashboard
+                profile={developerProfile}
+                onUpdateProfile={handleUpdateProfile}
+                myPortfolios={myPortfolios}
+                onSelectPortfolio={(p) => setSelectedPortfolio(p)}
+                onDeletePortfolio={handleDeletePortfolio}
+                onOpenSubmitModal={() => setIsSubmitModalOpen(true)}
+              />
             </div>
-          )}
-        </section>
+          </div>
+        ) : (
+          <>
+            {/* Hero Section (Only in discover mode) */}
+            {activeNavTab === "discover" && (
+              <HeroSection
+                showcasePortfolio={dailyShowcase}
+                onInspectShowcase={(p) => setSelectedPortfolio(p)}
+                onSubmitClick={() => setIsSubmitModalOpen(true)}
+                onExploreClick={() => {
+                  const el = document.getElementById("showcase-bento");
+                  el?.scrollIntoView({ behavior: "smooth" });
+                }}
+                profile={developerProfile}
+              />
+            )}
+
+            {/* Bento Showcase Grid: Daily Spotlight, Leaderboard, Fresh from Developers */}
+            <ShowcaseBanner
+              portfolios={portfolios}
+              dailyShowcase={dailyShowcase}
+              weeklyShowcase={weeklyShowcase}
+              onSelectPortfolio={(p) => setSelectedPortfolio(p)}
+              onLikeToggle={handleLikeToggle}
+              onTriggerAlgorithm={handleRunShowcaseCron}
+              onCategorySelect={(cat) => {
+                setActiveCategory(cat);
+                const el = document.getElementById("showcase-bento");
+                el?.scrollIntoView({ behavior: "smooth" });
+              }}
+              isCompact={activeNavTab === "discover"}
+            />
+          </>
+        )}
       </main>
 
       {/* Footer */}
@@ -480,21 +656,14 @@ export default function Home() {
         onClose={() => setIsSubmitModalOpen(false)}
         onSubmit={handleSubmitPortfolio}
         existingPortfolios={portfolios}
-      />
-
-      <NotificationDrawer
-        isOpen={isNotificationOpen}
-        onClose={() => setIsNotificationOpen(false)}
-        notifications={notifications}
-        onMarkAllAsRead={handleMarkAllAsRead}
-        onMarkAsRead={handleMarkAsRead}
-        onSimulateIncoming={handleSimulateIncoming}
-        onSelectPortfolioById={handleSelectPortfolioById}
+        profile={developerProfile}
       />
 
       <DeveloperDashboardModal
         isOpen={isDashboardOpen}
         onClose={() => setIsDashboardOpen(false)}
+        profile={developerProfile}
+        onUpdateProfile={handleUpdateProfile}
         myPortfolios={myPortfolios}
         onSelectPortfolio={(p) => setSelectedPortfolio(p)}
         onDeletePortfolio={handleDeletePortfolio}

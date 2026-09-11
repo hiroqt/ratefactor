@@ -1,26 +1,19 @@
 "use client";
 
-import React from "react";
-import { 
-  Flame, 
-  ArrowRight, 
-  Terminal, 
-  CheckCircle2, 
-  ShieldCheck, 
-  Star, 
-  Sparkles,
-  GitBranch,
-  Cpu,
-  Zap
-} from "lucide-react";
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowDown, ArrowRight, User } from "lucide-react";
 import { Portfolio } from "@/types/portfolio";
+import { DeveloperProfile } from "@/types/profile";
 import { cn } from "@/lib/utils";
 
 interface HeroSectionProps {
-  showcasePortfolio: Portfolio;
-  onInspectShowcase: (p: Portfolio) => void;
+  showcasePortfolio?: Portfolio | null;
+  onInspectShowcase?: (p: Portfolio) => void;
   onSubmitClick: () => void;
   onExploreClick: () => void;
+  profile?: DeveloperProfile;
 }
 
 export function HeroSection({
@@ -28,175 +21,209 @@ export function HeroSection({
   onInspectShowcase,
   onSubmitClick,
   onExploreClick,
+  profile,
 }: HeroSectionProps) {
+  const [activeKeywordIndex, setActiveKeywordIndex] = useState(0);
+  // Grounded in RateFactor ARD & PRD specifications (Sections 1, 4.1, 4.3, 6)
+  const keywords = [
+    "PORTFOLIO",
+    "DEV CRAFT",
+    "CODEBASE",
+    "UNIQUENESS",
+  ];
+  const currentKeyword = keywords[activeKeywordIndex];
+
+  // Auto-cycle keywords every 3.5s with graceful interval
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveKeywordIndex((prev) => (prev + 1) % keywords.length);
+    }, 3500);
+    return () => clearInterval(timer);
+  }, [keywords.length]);
+
+  const handleToggleKeyword = () => {
+    setActiveKeywordIndex((prev) => (prev + 1) % keywords.length);
+  };
+
   return (
-    <section className="relative pt-8 pb-12 border-b border-border/60 bg-gradient-to-b from-surface/40 to-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Asymmetric 2-Column Hero Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+    <section className="relative w-full min-h-[85vh] lg:min-h-[90vh] flex flex-col justify-between overflow-hidden select-none bg-[#fafafa] text-slate-950">
+      
+      {/* Background Subtle Radial Halftone Dot Matrix */}
+      <div 
+        className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden"
+        aria-hidden="true"
+      >
+        <div 
+          className="w-full h-full"
+          style={{
+            backgroundImage: "radial-gradient(rgba(15, 23, 42, 0.16) 1.5px, transparent 1.5px)",
+            backgroundSize: "22px 22px",
+            maskImage: "radial-gradient(ellipse 65% 55% at 52% 48%, black 20%, transparent 72%)",
+            WebkitMaskImage: "radial-gradient(ellipse 65% 55% at 52% 48%, black 20%, transparent 72%)",
+            opacity: 0.85,
+          }}
+        />
+      </div>
+
+      {/* Top spacing to account for floating nav */}
+      <div className="h-20 sm:h-24" />
+
+      {/* Main Content Area */}
+      <div className="flex-1 w-full max-w-[1380px] mx-auto px-4 sm:px-8 lg:px-12 flex flex-col justify-end pb-12 sm:pb-16 lg:pb-20 z-10">
+        
+        {/* Content Grid: Headline shifted left + Right Subtitle & Actions */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 xl:gap-16 items-end">
           
-          {/* Left Column (7 cols): Editorial Typography & Telemetry */}
-          <div className="lg:col-span-7 flex flex-col items-start">
-            {/* Telemetry pill */}
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-surface-raised border border-border text-[11px] font-mono text-muted mb-4">
-              <span className="w-2 h-2 rounded-full bg-accent-emerald live-beacon" />
-              <span className="text-foreground font-medium">DAILY SHOWCASE ALGORITHM ACTIVE</span>
-              <span className="text-muted-dark">|</span>
-              <span className="text-brand-400">NEXT DROP IN 04:12:30</span>
-            </div>
-
-            {/* Main Headline */}
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground leading-[1.15]">
-              Developer portfolios rated on{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-brand-400 to-amber-200">
-                code, architecture,
-              </span>{" "}
-              and craft.
+          {/* Left Column (8 cols): Massive Editorial Typography grounded in ARD & PRD */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+            className="lg:col-span-8 flex flex-col justify-end -ml-1 sm:-ml-2 lg:-ml-3"
+          >
+            <h1 className="text-[2.2rem] min-[360px]:text-[2.6rem] xs:text-[3.2rem] sm:text-[4rem] md:text-[4.6rem] lg:text-[4.4rem] xl:text-[5rem] 2xl:text-[5.6rem] font-black uppercase tracking-[-0.04em] leading-[0.93] text-slate-950 font-sans">
+              <span className="block break-words sm:whitespace-nowrap">SHOWCASING</span>
+              <span className="block break-words sm:whitespace-nowrap">
+                <button
+                  type="button"
+                  onClick={handleToggleKeyword}
+                  title="Click to cycle: PORTFOLIO / DEV CRAFT / CODEBASE / UNIQUENESS"
+                  className="inline-flex items-baseline group text-left cursor-pointer hover:opacity-85 transition-opacity"
+                  aria-label={`Current focus: ${currentKeyword}. Click to cycle.`}
+                >
+                  <span className="inline-block relative overflow-hidden align-baseline">
+                    <AnimatePresence mode="wait">
+                      <motion.span
+                        key={currentKeyword}
+                        initial={{ opacity: 0, y: 14 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -14 }}
+                        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                        className="inline-block text-slate-950 font-black tracking-[-0.04em]"
+                      >
+                        {currentKeyword}
+                      </motion.span>
+                    </AnimatePresence>
+                  </span>
+                </button>{" "}
+                TODAY
+              </span>
+              <span className="block break-words sm:whitespace-nowrap">RATED BY PEERS.</span>
             </h1>
+          </motion.div>
 
-            {/* Grounded, authentic description */}
-            <p className="mt-4 text-sm sm:text-base text-muted max-w-2xl leading-relaxed">
-              Ditch superficial Dribbble mockups. RateFactor is a peer-critique platform where engineers 
-              evaluate projects on real architectural depth, memory safety, test coverage, and raw performance benchmarks.
-            </p>
-
-            {/* Action CTAs */}
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={onExploreClick}
-                className="px-4 py-2.5 rounded-md bg-brand-500 hover:bg-brand-400 text-background font-medium text-xs shadow-sm transition-all hover:shadow-glow flex items-center gap-2"
-              >
-                <span>Browse Portfolios</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-
-              <button
-                type="button"
-                onClick={onSubmitClick}
-                className="px-4 py-2.5 rounded-md bg-surface-raised hover:bg-surface-overlay text-foreground border border-border hover:border-border-hover font-medium text-xs transition-colors flex items-center gap-2"
-              >
-                <Terminal className="w-3.5 h-3.5 text-brand-400" />
-                <span>Submit Your Work</span>
-              </button>
-            </div>
-
-            {/* Real metrics bar */}
-            <div className="mt-8 pt-6 border-t border-border/50 w-full grid grid-cols-3 sm:grid-cols-4 gap-4 text-left">
-              <div>
-                <div className="font-mono text-lg font-bold text-foreground tabular-nums">1,248</div>
-                <div className="text-[11px] text-muted">Reviewed Projects</div>
-              </div>
-              <div>
-                <div className="font-mono text-lg font-bold text-brand-400 tabular-nums">4.84★</div>
-                <div className="text-[11px] text-muted">Benchmark Avg</div>
-              </div>
-              <div>
-                <div className="font-mono text-lg font-bold text-accent-emerald tabular-nums">98.4%</div>
-                <div className="text-[11px] text-muted">Signal Quality</div>
-              </div>
-              <div className="hidden sm:block">
-                <div className="font-mono text-lg font-bold text-muted-dark tabular-nums">$0</div>
-                <div className="text-[11px] text-muted">Infra Cost MVP</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column (5 cols): Today's Daily Showcase Spotlight Card */}
-          <div className="lg:col-span-5 w-full">
-            <div className="relative rounded-xl bg-surface border border-border p-5 shadow-elevated hover:border-border-hover transition-all">
-              
-              {/* Badge header */}
-              <div className="flex items-center justify-between pb-3 border-b border-border/60">
-                <div className="flex items-center gap-2">
-                  <div className="p-1 rounded bg-brand-500/10 text-brand-400 border border-brand-500/30">
-                    <Flame className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-mono uppercase tracking-wider text-brand-400 font-semibold">
-                      Daily Showcase Winner
-                    </div>
-                    <div className="text-xs text-muted">Curated by weighted engagement & code score</div>
-                  </div>
+          {/* Right Column (4 cols): ARD/PRD Core Value, Dual Action CTAs & Showcase Teaser */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+            className="lg:col-span-4 flex flex-col items-start lg:items-end justify-end pt-8 sm:pt-10 lg:pt-0"
+          >
+            <div className="max-w-[360px] sm:max-w-[420px] space-y-4 sm:space-y-5 w-full">
+              {/* Daily Showcase Teaser Link (if available) */}
+              {showcasePortfolio && onInspectShowcase && (
+                <div className="flex items-center w-full">
+                  <button
+                    type="button"
+                    onClick={() => onInspectShowcase(showcasePortfolio)}
+                    className="inline-flex items-center gap-2 text-xs font-mono text-slate-600 hover:text-slate-900 transition-colors group cursor-pointer text-left max-w-full"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                    <span className="truncate">
+                      Daily Pick: <strong className="text-slate-900 group-hover:underline font-semibold">{showcasePortfolio.title}</strong>
+                    </span>
+                    <ArrowRight className="w-3 h-3 text-slate-400 group-hover:text-slate-900 transition-colors shrink-0" />
+                  </button>
                 </div>
+              )}
 
-                <div className="flex items-center gap-1 text-xs font-mono font-bold text-brand-400 bg-surface-raised px-2 py-0.5 rounded border border-border">
-                  <Star className="w-3.5 h-3.5 fill-brand-500 text-brand-500" />
-                  {showcasePortfolio.rating.toFixed(2)}
-                </div>
-              </div>
-
-              {/* Showcase preview media */}
-              <div 
-                onClick={() => onInspectShowcase(showcasePortfolio)}
-                className="group relative mt-3 aspect-[16/9] rounded-lg overflow-hidden border border-border cursor-pointer bg-surface-raised"
+              {/* Dedicated Profile Dashboard Feature Card */}
+              <Link
+                href="/profile"
+                className="group flex items-center justify-between p-2.5 sm:p-3 rounded-lg bg-white border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer w-full"
+                title="Open dedicated Profile Dashboard"
               >
-                <img
-                  src={showcasePortfolio.thumbnail}
-                  alt={showcasePortfolio.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent opacity-80" />
-                
-                <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="relative shrink-0">
                     <img
-                      src={showcasePortfolio.author.avatar}
-                      alt={showcasePortfolio.author.name}
-                      className="w-6 h-6 rounded-full border border-border object-cover"
+                      src={profile?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80"}
+                      alt={profile?.name || "Developer"}
+                      className="w-9 h-9 rounded-md object-cover border border-slate-200"
                     />
-                    <div>
-                      <div className="text-xs font-medium text-foreground leading-none">{showcasePortfolio.author.name}</div>
-                      <div className="text-[10px] font-mono text-muted leading-none mt-1">{showcasePortfolio.author.role}</div>
-                    </div>
+                    <span
+                      className={cn(
+                        "absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white",
+                        profile?.status?.isBusy
+                          ? "bg-amber-500"
+                          : profile?.status?.statusType === "offline"
+                          ? "bg-slate-400"
+                          : "bg-emerald-500"
+                      )}
+                    />
                   </div>
-                  <span className="text-[11px] font-mono text-accent-emerald bg-accent-emerald/10 border border-accent-emerald/30 px-2 py-0.5 rounded">
-                    Verified
-                  </span>
+                  <div className="text-left min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-bold text-slate-900 group-hover:underline truncate">
+                        {profile?.name || "Arnel Rivera"}
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-mono">
+                        @{profile?.username || "arneldev"}
+                      </span>
+                      {profile?.status?.emoji && (
+                        <span className="text-xs">{profile.status.emoji}</span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                      {profile?.status?.message || "Bio, status & pinned showcase shelf"}
+                    </p>
+                  </div>
                 </div>
-              </div>
-
-              {/* Content description */}
-              <div className="mt-3.5">
-                <h3 className="text-base font-semibold text-foreground hover:text-brand-400 transition-colors cursor-pointer"
-                    onClick={() => onInspectShowcase(showcasePortfolio)}>
-                  {showcasePortfolio.title}
-                </h3>
-                <p className="text-xs text-muted mt-1 leading-relaxed line-clamp-2">
-                  {showcasePortfolio.tagline}
-                </p>
-              </div>
-
-              {/* Criteria Scorecard Bars */}
-              <div className="mt-3.5 pt-3 border-t border-border/60 grid grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center justify-between p-1.5 rounded bg-surface-raised border border-border/50">
-                  <span className="text-muted flex items-center gap-1.5">
-                    <Cpu className="w-3 h-3 text-brand-400" /> Code Quality
-                  </span>
-                  <span className="font-mono font-bold text-foreground">5.0</span>
+                <div className="flex items-center gap-1 text-xs font-medium text-slate-700 group-hover:text-slate-900 transition-colors shrink-0 pl-3">
+                  <span className="hidden sm:inline">Profile</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-900 transition-colors" />
                 </div>
-                <div className="flex items-center justify-between p-1.5 rounded bg-surface-raised border border-border/50">
-                  <span className="text-muted flex items-center gap-1.5">
-                    <Zap className="w-3 h-3 text-accent-emerald" /> Performance
-                  </span>
-                  <span className="font-mono font-bold text-foreground">5.0</span>
-                </div>
-              </div>
+              </Link>
 
-              {/* Inspect Button */}
-              <button
-                type="button"
-                onClick={() => onInspectShowcase(showcasePortfolio)}
-                className="w-full mt-3.5 py-2 rounded-md bg-surface-raised hover:bg-surface-overlay border border-border hover:border-brand-500/50 text-foreground font-medium text-xs transition-colors flex items-center justify-center gap-1.5"
-              >
-                <span>Inspect Architecture & Full Review</span>
-                <ArrowRight className="w-3.5 h-3.5 text-brand-400" />
-              </button>
+              {/* Subtitle Paragraph directly quoting PRD Section 1 Core Value */}
+              <p className="text-sm sm:text-[15px] text-slate-600 leading-relaxed font-normal">
+                Discover great developer work, get your work seen, and improve through community feedback. At <strong className="text-slate-950 font-semibold">RateFactor</strong>, engineers showcase codebases, earn authentic peer ratings across our 4-factor rubric, and compete for Daily &amp; Weekly Showcases.
+              </p>
+
+              {/* Editorial Action Buttons Row */}
+              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={onSubmitClick}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs sm:text-sm font-medium border border-slate-900 transition-colors cursor-pointer w-full sm:w-auto"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
+                  <span>Submit Portfolio</span>
+                </button>
+
+                <Link
+                  href="/profile"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-900 text-xs sm:text-sm font-medium border border-slate-200 transition-colors cursor-pointer group flex-1 sm:flex-initial"
+                >
+                  <User className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-900 transition-colors" />
+                  <span>Profile Dashboard</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-900 transition-colors" />
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={onExploreClick}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-medium border border-slate-200 transition-colors cursor-pointer flex-1 sm:flex-initial"
+                >
+                  <span>Explore Feed</span>
+                  <ArrowDown className="w-3.5 h-3.5 text-slate-500" />
+                </button>
+              </div>
             </div>
-          </div>
+          </motion.div>
 
         </div>
       </div>
+
     </section>
   );
 }
