@@ -7,6 +7,7 @@ import { ArrowDown, ArrowRight, User } from "lucide-react";
 import { Portfolio } from "@/types/portfolio";
 import { DeveloperProfile } from "@/types/profile";
 import { cn } from "@/lib/utils";
+import { AdykrniShader } from "./AdykrniShader.webgl";
 
 interface HeroSectionProps {
   showcasePortfolio?: Portfolio | null;
@@ -48,21 +49,19 @@ export function HeroSection({
   return (
     <section className="relative w-full min-h-[85vh] lg:min-h-[90vh] flex flex-col justify-between overflow-hidden select-none bg-[#fafafa] text-slate-950">
       
-      {/* Background Subtle Radial Halftone Dot Matrix */}
+      {/* Background WebGL2 OpenShaders Adykrni Shader */}
       <div 
-        className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden"
+        className="absolute inset-0 pointer-events-none overflow-hidden z-0"
         aria-hidden="true"
       >
-        <div 
-          className="w-full h-full"
-          style={{
-            backgroundImage: "radial-gradient(rgba(15, 23, 42, 0.16) 1.5px, transparent 1.5px)",
-            backgroundSize: "22px 22px",
-            maskImage: "radial-gradient(ellipse 65% 55% at 52% 48%, black 20%, transparent 72%)",
-            WebkitMaskImage: "radial-gradient(ellipse 65% 55% at 52% 48%, black 20%, transparent 72%)",
-            opacity: 0.85,
-          }}
+        <AdykrniShader
+          theme="light"
+          background={{ light: "#fafafa", dark: "#090909" }}
+          className="w-full h-full opacity-70 sm:opacity-85"
+          onError={(err) => console.warn("WebGL shader fallback:", err)}
         />
+        {/* Subtle gradient vignette to preserve pristine editorial typography contrast */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#fafafa] via-transparent to-[#fafafa]/50 pointer-events-none" />
       </div>
 
       {/* Top spacing to account for floating nav */}

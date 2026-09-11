@@ -1,88 +1,70 @@
 "use client";
 
 import React from "react";
-import { Terminal, Github, Heart, ShieldCheck, Cpu } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
+import { AdykrniShader } from "./AdykrniShader.webgl";
 
 export function Footer() {
   return (
-    <footer className="border-t border-slate-200 bg-white text-slate-500 text-xs relative overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-          
-          {/* Brand Info */}
-          <div className="space-y-3 md:col-span-1">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center">
-                <Terminal className="w-3.5 h-3.5 text-slate-900" />
-              </div>
-              <span className="font-sans font-bold text-slate-900 text-sm tracking-tight">
-                RateFactor <span className="text-[10px] font-mono text-slate-400 font-normal">studio</span>
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Developer-first platform for discovering, benchmarking, peer-critiquing, and showcasing software architecture.
-            </p>
-            <div className="flex items-center gap-2 text-[11px] font-mono text-emerald-700">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-              <span>All systems operational • Edge cached</span>
-            </div>
-          </div>
+    <footer className="relative bg-[#fafafa] text-slate-900 border-t border-slate-200/80 overflow-hidden select-none min-h-[380px] sm:min-h-[460px] flex flex-col justify-between">
+      {/* Background WebGL2 Shader - Same Wave as Hero Section */}
+      <div 
+        className="absolute inset-0 pointer-events-none overflow-hidden z-0"
+        aria-hidden="true"
+      >
+        <AdykrniShader
+          theme="light"
+          background={{ light: "#fafafa", dark: "#090909" }}
+          className="w-full h-full opacity-70 sm:opacity-85"
+          onError={(err) => console.warn("WebGL footer shader fallback:", err)}
+        />
+        {/* Soft top gradient to blend cleanly with preceding section */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#fafafa] via-transparent to-[#fafafa]/50 pointer-events-none" />
+        {/* Soft bottom edge mist overlay */}
+        <div 
+          className="absolute inset-x-0 bottom-0 h-16 sm:h-24 pointer-events-none z-10"
+          style={{
+            background: "linear-gradient(to top, #fafafa 15%, rgba(250, 250, 250, 0.8) 50%, rgba(250, 250, 250, 0) 100%)",
+          }}
+        />
+      </div>
 
-          {/* Discovery */}
-          <div className="space-y-2">
-            <h4 className="font-mono text-xs uppercase text-slate-900 font-semibold tracking-wider">
-              Discovery
-            </h4>
-            <ul className="space-y-1.5 text-xs text-slate-500">
-              <li><span className="hover:text-slate-900 transition-colors cursor-pointer">Daily Showcase Spotlight</span></li>
-              <li><span className="hover:text-slate-900 transition-colors cursor-pointer">Weekly Champions Archive</span></li>
-              <li><span className="hover:text-slate-900 transition-colors cursor-pointer">Systems & Concurrency Engines</span></li>
-              <li><span className="hover:text-slate-900 transition-colors cursor-pointer">Creative WebGL Shaders</span></li>
-              <li><span className="hover:text-slate-900 transition-colors cursor-pointer">Fullstack Architectures</span></li>
-            </ul>
-          </div>
-
-          {/* Standards */}
-          <div className="space-y-2">
-            <h4 className="font-mono text-xs uppercase text-slate-900 font-semibold tracking-wider">
-              4-Factor Rubric
-            </h4>
-            <ul className="space-y-1.5 text-xs text-slate-500">
-              <li><span>1. Code Quality & Architecture</span></li>
-              <li><span>2. Performance & Verifiability</span></li>
-              <li><span>3. Visual Craft & Responsive UX</span></li>
-              <li><span>4. Documentation & Reproducibility</span></li>
-              <li><span>Zero AI-Generated Card Slop</span></li>
-            </ul>
-          </div>
-
-          {/* Architecture */}
-          <div className="space-y-2">
-            <h4 className="font-mono text-xs uppercase text-slate-900 font-semibold tracking-wider">
-              Architecture & Stack
-            </h4>
-            <div className="space-y-1 text-[11px] font-mono text-slate-500">
-              <div>Frontend: Next.js 15 App Router</div>
-              <div>Styling: Tailwind CSS Editorial</div>
-              <div>Animation: Framer Motion</div>
-              <div>Database: Supabase PostgreSQL + RLS</div>
-              <div>Runtime: Edge Function Realtime</div>
-            </div>
-          </div>
-
+      {/* Centered Simple Header */}
+      <div className="max-w-[1380px] mx-auto px-6 sm:px-10 lg:px-16 pt-14 sm:pt-18 pb-4 relative z-10 flex flex-col items-center justify-center text-center">
+        
+        {/* Built by @yheellls on TikTok */}
+        <div className="mb-2.5">
+          <a
+            href="https://www.tiktok.com/@yheellls"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/95 hover:bg-white border border-slate-200/90 text-xs sm:text-sm text-slate-700 shadow-2xs hover:shadow-xs transition-all group backdrop-blur-xs"
+          >
+            <span>Built by</span>
+            <span className="font-bold text-slate-950 group-hover:text-rose-600 transition-colors">
+              @yheellls
+            </span>
+            <span className="text-slate-500">on TikTok</span>
+            <ArrowUpRight className="w-3.5 h-3.5 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+          </a>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="pt-8 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] font-mono text-slate-400">
-          <div>
-            © {new Date().getFullYear()} RateFactor Studio. Engineered for developers who care about code.
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="hover:text-slate-900 transition-colors cursor-pointer">Privacy Policy</span>
-            <span className="hover:text-slate-900 transition-colors cursor-pointer">Terms of Review</span>
-            <span className="hover:text-slate-900 transition-colors cursor-pointer">Telemetry Status</span>
-          </div>
-        </div>
+        {/* All rights reserved below */}
+        <p className="text-xs text-slate-400 font-mono">
+          © 2026 RateFactor · All rights reserved
+        </p>
+      </div>
+
+      {/* Giant Display Typography Emerging from the Wave at Bottom */}
+      <div className="relative z-20 w-full overflow-hidden flex items-end justify-center pointer-events-none pb-0">
+        <span 
+          className="block text-[14vw] sm:text-[15.5vw] md:text-[17vw] font-black uppercase tracking-[-0.045em] leading-[0.82] select-none text-white font-sans text-center transition-all drop-shadow-[0_4px_36px_rgba(0,0,0,0.08)]"
+          style={{
+            WebkitTextFillColor: "rgba(255, 255, 255, 0.95)",
+          }}
+        >
+          RateFactor
+        </span>
       </div>
     </footer>
   );
