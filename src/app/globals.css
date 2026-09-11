@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace;
+}
+
+@layer base {
+  * {
+    border-color: #202736;
+  }
+
+  body {
+    background-color: #090a0f;
+    color: #f0f4f8;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  /* Custom subtle scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #090a0f;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #202736;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #364154;
+  }
+}
+
+/* Accessibility Focus Ring */
+*:focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 2px;
+}
+
+/* Tabular figures for ratings and counters */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subtle border grid pattern without tacky glows */
+.dev-grid-pattern {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+
+/* Crisp card styling adhering to Park UI / Radix principles */
+.park-card {
+  background-color: #0f1219;
+  border: 1px solid #202736;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.park-card:hover {
+  border-color: #364154;
+  background-color: #121620;
+}
+
+/* Shimmer pulse for live ticker */
+@keyframes pulse-emerald {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.92);
+  }
+}
+
+.live-beacon {
+  animation: pulse-emerald 2.5s infinite ease-in-out;
+}
