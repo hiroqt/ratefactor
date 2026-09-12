@@ -17,11 +17,12 @@ import {
   Cpu,
   Layers,
   Zap,
+  BookOpen,
   Sparkles,
   AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Portfolio, CommentItem, RatingBreakdown } from "@/types/portfolio";
+import { Portfolio, CommentItem, RatingBreakdown, CritiqueTag, CRITIQUE_TAG_CONFIG } from "@/types/portfolio";
 import { RatingWidget } from "./RatingWidget";
 import { cn, formatNumber, timeAgo, formatRating } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
@@ -47,7 +48,7 @@ interface PortfolioDetailModalProps {
   onClose: () => void;
   onLikeToggle: (id: string, liked: boolean) => void;
   onReact?: (id: string, emojiName: string) => void;
-  onAddComment: (portfolioId: string, content: string) => void;
+  onAddComment: (portfolioId: string, content: string, critiqueTag?: CritiqueTag | null) => void;
   onDeleteComment: (portfolioId: string, commentId: string) => void;
   onRatePortfolio: (portfolioId: string, rating: number, breakdown: RatingBreakdown) => void;
   currentUser?: any;
@@ -67,6 +68,7 @@ export function PortfolioDetailModal({
 }: PortfolioDetailModalProps) {
   const [commentText, setCommentText] = useState("");
   const [commentError, setCommentError] = useState<string | null>(null);
+  const [selectedCritiqueTag, setSelectedCritiqueTag] = useState<CritiqueTag | null>(null);
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const [userRating, setUserRating] = useState<number | null>(null);
@@ -80,6 +82,7 @@ export function PortfolioDetailModal({
     codeQuality: 5,
     performance: 5,
     design: 4.8,
+    documentation: 5,
   });
 
   useEffect(() => {
@@ -179,11 +182,13 @@ export function PortfolioDetailModal({
       return;
     }
 
-    onAddComment(portfolio.id, commentText.trim());
+    onAddComment(portfolio.id, commentText.trim(), selectedCritiqueTag);
     trackEvent("portfolio_comment", {
       portfolioId: portfolio.id,
+      critiqueTag: selectedCritiqueTag,
     });
     setCommentText("");
+    setSelectedCritiqueTag(null);
   };
 
   const handleCriteriaRate = (key: keyof RatingBreakdown, value: number) => {
@@ -194,7 +199,7 @@ export function PortfolioDetailModal({
     const next = { ...criteria, [key]: value };
     setCriteria(next);
     const avg = Number(
-      ((next.codeQuality + next.performance + next.design) / 3).toFixed(2)
+      ((next.design + next.codeQuality + next.performance + next.documentation) / 4).toFixed(2)
     );
     setUserRating(avg);
     onRatePortfolio(portfolio.id, avg, next);
@@ -275,6 +280,24 @@ export function PortfolioDetailModal({
                 </strong>
                 <p className="text-amber-800 mt-0.5 leading-relaxed">
                   {portfolio.showcaseReason}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Roast / In-Depth Critique Beacon Banner */}
+          {portfolio.requestCritique && (
+            <div className="p-3.5 sm:p-4 rounded-xl bg-orange-50 border border-orange-200 flex items-start gap-3">
+              <div className="p-1.5 rounded-lg bg-orange-100 text-orange-700 flex-shrink-0">
+                <Flame className="w-4 h-4" />
+              </div>
+              <div className="text-xs">
+                <strong className="text-orange-900 font-semibold text-sm block flex items-center gap-1.5">
+                  <span>🔥 Roast / In-Depth Critique Requested</span>
+                  <span className="inline-block w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                </strong>
+                <p className="text-orange-800 mt-0.5 leading-relaxed">
+                  The author specifically invites rigorous, constructive feedback, UX tear-downs, and architectural reviews.
                 </p>
               </div>
             </div>
@@ -488,6 +511,7 @@ export function PortfolioDetailModal({
                     <RatingWidget
                       currentRating={portfolio.rating}
                       ratingCount={portfolio.ratingCount}
+                      breakdown={portfolio.ratingBreakdown}
                       interactive={false}
                     />
                     <div className="text-[11px] text-slate-500">
@@ -513,7 +537,39 @@ export function PortfolioDetailModal({
                   Evaluate This Architecture (Tap Stars to Rate)
                 </h4>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* Design & UI/UX */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-900 flex items-center gap-1.5">
+                        <Layers className="w-4 h-4 text-amber-600" /> Design &amp; UI/UX
+                      </span>
+                      <span className="text-xs font-mono font-bold text-amber-700 tabular-nums">
+                        {criteria.design.toFixed(1)} / 5.0
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => handleCriteriaRate("design", star)}
+                          className="p-1 hover:scale-110 transition-transform cursor-pointer"
+                          aria-label={`Rate Design ${star} stars`}
+                        >
+                          <Star
+                            className={cn(
+                              "w-4 h-4",
+                              criteria.design >= star
+                                ? "fill-amber-500 text-amber-500"
+                                : "fill-slate-100 text-slate-300"
+                            )}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Code Quality */}
                   <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
@@ -531,6 +587,7 @@ export function PortfolioDetailModal({
                           type="button"
                           onClick={() => handleCriteriaRate("codeQuality", star)}
                           className="p-1 hover:scale-110 transition-transform cursor-pointer"
+                          aria-label={`Rate Code Quality ${star} stars`}
                         >
                           <Star
                             className={cn(
@@ -562,6 +619,7 @@ export function PortfolioDetailModal({
                           type="button"
                           onClick={() => handleCriteriaRate("performance", star)}
                           className="p-1 hover:scale-110 transition-transform cursor-pointer"
+                          aria-label={`Rate Performance ${star} stars`}
                         >
                           <Star
                             className={cn(
@@ -576,14 +634,14 @@ export function PortfolioDetailModal({
                     </div>
                   </div>
 
-                  {/* Visual Craft */}
+                  {/* Documentation */}
                   <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium text-slate-900 flex items-center gap-1.5">
-                        <Layers className="w-4 h-4 text-amber-600" /> Visual Craft &amp; UX
+                        <BookOpen className="w-4 h-4 text-sky-600" /> Documentation
                       </span>
-                      <span className="text-xs font-mono font-bold text-amber-700 tabular-nums">
-                        {criteria.design.toFixed(1)} / 5.0
+                      <span className="text-xs font-mono font-bold text-sky-700 tabular-nums">
+                        {(criteria.documentation ?? 5).toFixed(1)} / 5.0
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
@@ -591,13 +649,14 @@ export function PortfolioDetailModal({
                         <button
                           key={star}
                           type="button"
-                          onClick={() => handleCriteriaRate("design", star)}
+                          onClick={() => handleCriteriaRate("documentation", star)}
                           className="p-1 hover:scale-110 transition-transform cursor-pointer"
+                          aria-label={`Rate Documentation ${star} stars`}
                         >
                           <Star
                             className={cn(
                               "w-4 h-4",
-                              criteria.design >= star
+                              (criteria.documentation ?? 5) >= star
                                 ? "fill-amber-500 text-amber-500"
                                 : "fill-slate-100 text-slate-300"
                             )}
@@ -606,7 +665,6 @@ export function PortfolioDetailModal({
                       ))}
                     </div>
                   </div>
-
                 </div>
               </div>
             </div>
@@ -636,6 +694,37 @@ export function PortfolioDetailModal({
                     </button>
                   </div>
                 )}
+
+                {/* Critique Category Tag Selector */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-mono text-slate-500 uppercase tracking-wider block">
+                    Feedback Category (Optional):
+                  </label>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {(Object.keys(CRITIQUE_TAG_CONFIG) as CritiqueTag[]).map((tagKey) => {
+                      const cfg = CRITIQUE_TAG_CONFIG[tagKey];
+                      const isSelected = selectedCritiqueTag === tagKey;
+                      return (
+                        <button
+                          key={tagKey}
+                          type="button"
+                          onClick={() =>
+                            setSelectedCritiqueTag((prev) => (prev === tagKey ? null : tagKey))
+                          }
+                          className={cn(
+                            "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono transition-all cursor-pointer border",
+                            isSelected
+                              ? cn(cfg.badgeClass, "ring-2 ring-slate-900 ring-offset-1 font-semibold shadow-xs")
+                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                          )}
+                        >
+                          <span>{cfg.emoji}</span>
+                          <span>{cfg.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
                 <div className="relative">
                   <textarea
@@ -678,7 +767,7 @@ export function PortfolioDetailModal({
                       className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2"
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <img
                             src={comment.authorAvatar}
                             alt={comment.authorName}
@@ -694,6 +783,18 @@ export function PortfolioDetailModal({
                           <span className="text-[11px] text-slate-400">
                             {timeAgo(comment.createdAt)}
                           </span>
+
+                          {comment.critiqueTag && CRITIQUE_TAG_CONFIG[comment.critiqueTag] && (
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full border font-medium",
+                                CRITIQUE_TAG_CONFIG[comment.critiqueTag].badgeClass
+                              )}
+                            >
+                              <span>{CRITIQUE_TAG_CONFIG[comment.critiqueTag].emoji}</span>
+                              <span>{CRITIQUE_TAG_CONFIG[comment.critiqueTag].label}</span>
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-1.5">

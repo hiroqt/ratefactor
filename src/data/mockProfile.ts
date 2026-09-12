@@ -15,6 +15,8 @@ export const INITIAL_DEVELOPER_PROFILE: DeveloperProfile = {
     statusType: "available",
     updatedAt: "Just now",
   },
+  availableForHire: true,
+  customHireMessage: "Open for contract engineering and full-time architecture roles.",
   company: "",
   location: "",
   website: "",

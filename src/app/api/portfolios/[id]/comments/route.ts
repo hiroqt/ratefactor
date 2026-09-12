@@ -73,21 +73,27 @@ export async function POST(
     }
 
     const body = await req.json();
-    const content = (body.content || "").trim();
+    const parseResult = commentSubmissionSchema.safeParse({ ...body, portfolioId });
 
-    // Strict Guardrail Quality Check
-    const guardrailCheck = validateCommentContent(content);
-    if (!guardrailCheck.isValid) {
+    if (!parseResult.success) {
+      const firstIssue = parseResult.error.issues[0];
+      const isContentIssue = firstIssue?.path.includes("content");
+      const guardrail = isContentIssue ? validateCommentContent((body.content || "").trim()) : null;
       return NextResponse.json(
         {
-          type: "https://ratefactor.dev/errors/guardrail-violation",
-          title: "Comment Guardrail Violation",
+          type: isContentIssue
+            ? "https://ratefactor.dev/errors/guardrail-violation"
+            : "https://ratefactor.dev/errors/validation-error",
+          title: isContentIssue ? "Comment Guardrail Violation" : "Invalid Comment Data",
           status: 400,
-          detail: guardrailCheck.error || "Comment failed community quality standards.",
+          detail: (guardrail && !guardrail.isValid ? guardrail.error : firstIssue?.message) || "Comment failed quality standards.",
+          errors: parseResult.error.flatten().fieldErrors,
         },
         { status: 400 }
       );
     }
+
+    const { content, critiqueTag } = parseResult.data;
 
     const newComment = {
       id: `comm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -96,6 +102,7 @@ export async function POST(
       authorUsername: body.authorUsername || authUser.username || "arneldev",
       authorAvatar: body.authorAvatar || authUser.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
       content,
+      critiqueTag: critiqueTag || null,
       createdAt: new Date().toISOString(),
       likes: 0,
       isUserOwner: true,
@@ -114,6 +121,7 @@ export async function POST(
       {
         message: "Comment successfully posted.",
         comment: newComment,
+        critiqueTag: newComment.critiqueTag,
       },
       { status: 201 }
     );

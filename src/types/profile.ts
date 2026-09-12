@@ -28,6 +28,8 @@ export interface DeveloperProfile {
   pronouns?: string;
   bio: string;
   status: UserStatus;
+  availableForHire?: boolean;
+  customHireMessage?: string;
   company?: string;
   location?: string;
   website?: string;
@@ -41,3 +43,14 @@ export interface DeveloperProfile {
   skills: string[];
   joinedDate: string;
 }
+
+export interface ShowcaseAccolade {
+  id: string;
+  type: "daily" | "weekly";
+  title: string;
+  portfolioId: string;
+  portfolioTitle: string;
+  awardedDate: string;
+  iconName: "trophy" | "flame";
+}
+

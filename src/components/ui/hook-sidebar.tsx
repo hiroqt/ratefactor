@@ -90,12 +90,12 @@ const Rail = ({
         transition={travel}
         width="12"
         height="7"
-        viewBox="0 12 7"
+        viewBox="0 0 12 7"
         fill="none"
         className="absolute left-0.5"
       >
         <path
-          d="M0.5 0a6 6 0 6H12"
+          d="M0.5 0 A 6 6 0 0 0 6.5 6 H 12"
           stroke="currentColor"
           strokeDasharray={dashed ? "2" : undefined}
         />

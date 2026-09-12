@@ -38,12 +38,26 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
       const targetHandle = (currentUser.username || "").trim().replace(/^@/, "");
 
       setDeveloperProfile((prev) => {
+        const nextName = currentUser.name || prev.name;
+        const nextUsername = targetHandle || prev.username;
+        const nextAvatar = currentUser.avatar || prev.avatar;
+        const nextRole = currentUser.role || prev.role;
+
+        if (
+          prev.name === nextName &&
+          prev.username === nextUsername &&
+          prev.avatar === nextAvatar &&
+          prev.role === nextRole
+        ) {
+          return prev;
+        }
+
         const updated = {
           ...prev,
-          name: currentUser.name || prev.name,
-          username: targetHandle || prev.username,
-          avatar: currentUser.avatar || prev.avatar,
-          role: currentUser.role || prev.role,
+          name: nextName,
+          username: nextUsername,
+          avatar: nextAvatar,
+          role: nextRole,
         };
         try {
           localStorage.setItem("ratefactor_dev_profile", JSON.stringify(updated));
@@ -53,7 +67,7 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
         return updated;
       });
 
-      // Auto-sync GitHub bio, public README.md, and contributions
+      // Auto-sync GitHub bio, public README.md, and contributions (only if handle is valid)
       if (targetHandle && targetHandle !== "developer" && targetHandle !== "user-default") {
         fetch(`/api/github/contributions?username=${encodeURIComponent(targetHandle)}`)
           .then((res) => (res.ok ? res.json() : null))
@@ -97,7 +111,7 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
           .catch(() => {});
       }
     }
-  }, [currentUser]);
+  }, [currentUser?.username, currentUser?.name, currentUser?.avatar, currentUser?.role]);
 
   const updateProfile = useCallback((updated: DeveloperProfile) => {
     setDeveloperProfile(updated);

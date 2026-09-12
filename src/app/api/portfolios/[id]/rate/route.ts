@@ -52,9 +52,9 @@ export async function POST(
       );
     }
 
-    const { design, codeQuality, performance } = parseResult.data;
+    const { design, codeQuality, performance, documentation } = parseResult.data;
     const averageScore = Number(
-      ((design + codeQuality + performance) / 3).toFixed(2)
+      ((design + codeQuality + performance + documentation) / 4).toFixed(2)
     );
 
     const key = `${actorId}:${portfolioId}`;
@@ -62,15 +62,21 @@ export async function POST(
       userId: actorId,
       portfolioId,
       score: averageScore,
-      breakdown: { design, codeQuality, performance },
+      breakdown: { design, codeQuality, performance, documentation },
       updatedAt: new Date().toISOString(),
     });
+
+    let portfolioRatingCount = 0;
+    for (const r of userRatings.values()) {
+      if (r.portfolioId === portfolioId) portfolioRatingCount++;
+    }
 
     return NextResponse.json({
       message: "Rating successfully recorded.",
       portfolioId,
       score: averageScore,
-      breakdown: { design, codeQuality, performance },
+      breakdown: { design, codeQuality, performance, documentation },
+      ratingCount: portfolioRatingCount || 1,
     });
   } catch (error: any) {
     return NextResponse.json(

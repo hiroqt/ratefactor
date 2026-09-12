@@ -8,6 +8,7 @@ import {
   RatingBreakdown,
   CommentItem,
   NotificationItem,
+  CritiqueTag,
 } from "@/types/portfolio";
 import { INITIAL_PORTFOLIOS } from "@/data/mockPortfolios";
 import {
@@ -72,7 +73,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
   // Cooldown tracker per portfolio to prevent spam clicking / rapid toggles
   const lastActionTimestamps = useRef<Map<string, number>>(new Map());
 
-  // Listen for cross-tab and cross-component portfolio updates for true real-time sync
+  // Listen for cross-tab portfolio updates via localStorage
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === "ratefactor_portfolios" && e.newValue) {
@@ -85,30 +86,16 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
       }
     };
 
-    const handleCustomUpdate = (e: Event) => {
-      const customEvent = e as CustomEvent<Portfolio[]>;
-      if (customEvent.detail && Array.isArray(customEvent.detail)) {
-        setPortfolios(customEvent.detail);
-      }
-    };
-
     window.addEventListener("storage", handleStorage);
-    window.addEventListener("ratefactor_portfolios_updated", handleCustomUpdate);
     return () => {
       window.removeEventListener("storage", handleStorage);
-      window.removeEventListener("ratefactor_portfolios_updated", handleCustomUpdate);
     };
   }, []);
 
-  // Persist portfolios changes to localStorage and broadcast real-time event
+  // Persist portfolios changes to localStorage
   useEffect(() => {
     try {
       localStorage.setItem("ratefactor_portfolios", JSON.stringify(portfolios));
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(
-          new CustomEvent("ratefactor_portfolios_updated", { detail: portfolios })
-        );
-      }
     } catch (e) {}
   }, [portfolios]);
 
@@ -366,6 +353,11 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         return;
       }
 
+      // Calculate composite arithmetic mean across all 4 dimensions
+      const compositeScore = Number(
+        ((breakdown.design + breakdown.codeQuality + breakdown.performance + breakdown.documentation) / 4).toFixed(2)
+      );
+
       setPortfolios((prev) =>
         prev.map((p) => {
           if (p.id === portfolioId) {
@@ -374,8 +366,8 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
             const oldPoints = p.rating * p.ratingCount;
             const prevScore = p.userRating || 0;
             const newPoints = hasUserRated
-              ? oldPoints - prevScore + ratingScore
-              : oldPoints + ratingScore;
+              ? oldPoints - prevScore + compositeScore
+              : oldPoints + compositeScore;
             const newAvg = Number((newPoints / Math.max(1, newCount)).toFixed(2));
             const boundedAvg = Math.min(5, Math.max(1, newAvg));
 
@@ -383,6 +375,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
               codeQuality: prevScore,
               performance: prevScore,
               design: prevScore,
+              documentation: prevScore,
             };
 
             const calcNewCriterion = (
@@ -411,13 +404,18 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
                 breakdown.performance,
                 prevUserBreakdown.performance
               ),
+              documentation: calcNewCriterion(
+                p.ratingBreakdown.documentation ?? 5,
+                breakdown.documentation ?? 5,
+                prevUserBreakdown.documentation ?? 5
+              ),
             };
 
             const updated: Portfolio = {
               ...p,
               rating: boundedAvg,
               ratingCount: newCount,
-              userRating: ratingScore,
+              userRating: compositeScore,
               ratingBreakdown: updatedBreakdown,
               userRatingBreakdown: breakdown,
             };
@@ -432,14 +430,27 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         })
       );
 
-      options?.onToast?.(`Your rating (${ratingScore.toFixed(1)}★) has been logged.`);
+      // Persist rating via API endpoint
+      fetch(`/api/portfolios/${portfolioId}/rate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          portfolioId,
+          design: breakdown.design,
+          codeQuality: breakdown.codeQuality,
+          performance: breakdown.performance,
+          documentation: breakdown.documentation,
+        }),
+      }).catch(() => {});
+
+      options?.onToast?.(`Your rating (${compositeScore.toFixed(1)}★) has been logged.`);
     },
     [options, selectedPortfolio]
   );
 
   // Add Comment
   const handleAddComment = useCallback(
-    (portfolioId: string, content: string) => {
+    (portfolioId: string, content: string, critiqueTag?: CritiqueTag | null) => {
       if (!options?.currentUser) {
         options?.onRequireAuth?.("Sign in with GitHub or Email to post comments.");
         return;
@@ -456,6 +467,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         createdAt: new Date().toISOString(),
         likes: 0,
         isUserOwner: true,
+        critiqueTag: critiqueTag || null,
       };
 
       setPortfolios((prev) =>
@@ -483,6 +495,17 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
             : null
         );
       }
+
+      // Persist structured critique comment via API endpoint
+      fetch(`/api/portfolios/${portfolioId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          portfolioId,
+          content,
+          critiqueTag: critiqueTag || undefined,
+        }),
+      }).catch(() => {});
 
       options?.onToast?.("Comment posted successfully.");
     },

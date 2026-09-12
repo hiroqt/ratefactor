@@ -231,6 +231,8 @@ function ProfilePageContent() {
     statusEmoji: developerProfile.status?.emoji || "⚡",
     statusMessage: developerProfile.status?.message || "Building software",
     skillsInput: (developerProfile.skills || []).join(", "),
+    availableForHire: developerProfile.availableForHire ?? true,
+    customHireMessage: developerProfile.customHireMessage || "",
   });
 
   useEffect(() => {
@@ -248,6 +250,8 @@ function ProfilePageContent() {
       statusEmoji: developerProfile.status?.emoji || "⚡",
       statusMessage: developerProfile.status?.message || "Building software",
       skillsInput: (developerProfile.skills || []).join(", "),
+      availableForHire: developerProfile.availableForHire ?? true,
+      customHireMessage: developerProfile.customHireMessage || "",
     });
   }, [developerProfile]);
 
@@ -276,6 +280,8 @@ function ProfilePageContent() {
         statusType: "available",
       },
       skills: skillsArray.length > 0 ? skillsArray : developerProfile.skills,
+      availableForHire: editForm.availableForHire,
+      customHireMessage: editForm.customHireMessage || undefined,
     };
 
     updateProfile(updated);
@@ -1076,6 +1082,48 @@ function ProfilePageContent() {
                           className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900"
                         />
                       </div>
+                    </div>
+
+                    {/* Hire Availability Toggle & Custom Message */}
+                    <div className="space-y-3 pt-2 border-t border-slate-100">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                          <Mail className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Available for Hire</span>
+                        </label>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={editForm.availableForHire}
+                          onClick={() => setEditForm({ ...editForm, availableForHire: !editForm.availableForHire })}
+                          className={cn(
+                            "relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer",
+                            editForm.availableForHire ? "bg-emerald-500" : "bg-slate-300"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-xs",
+                              editForm.availableForHire ? "translate-x-4.5" : "translate-x-0.5"
+                            )}
+                          />
+                        </button>
+                      </div>
+                      {editForm.availableForHire && (
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-slate-500 font-mono">
+                            Custom Hire Message (optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.customHireMessage}
+                            onChange={(e) => setEditForm({ ...editForm, customHireMessage: e.target.value })}
+                            placeholder="Open for contract engineering and full-time roles..."
+                            maxLength={500}
+                            className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                        </div>
+                      )}
                     </div>
 
                     {/* README Story */}

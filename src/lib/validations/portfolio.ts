@@ -55,7 +55,15 @@ export const portfolioSubmissionSchema = z.object({
     .array(z.string().trim().min(1))
     .min(1, "At least one technology tag is required")
     .max(15, "Cannot specify more than 15 technologies"),
+  requestCritique: z.boolean().optional().default(false),
 });
+
+export const critiqueTagEnum = z.enum([
+  "ui_suggestion",
+  "bug_spotted",
+  "performance_tip",
+  "love_detail",
+]);
 
 export const commentSubmissionSchema = z.object({
   portfolioId: z.string().min(1, "Portfolio ID is required"),
@@ -65,6 +73,7 @@ export const commentSubmissionSchema = z.object({
     .refine((val) => validateCommentContent(val).isValid, {
       message: "Comment does not meet quality guardrails (min 10 characters, constructive feedback, no spam).",
     }),
+  critiqueTag: critiqueTagEnum.optional().nullable(),
 });
 
 export const commentReportSchema = z.object({
@@ -75,10 +84,10 @@ export const commentReportSchema = z.object({
 
 export const ratingSubmissionSchema = z.object({
   portfolioId: z.string().min(1, "Portfolio ID is required"),
-  design: z.number().min(1).max(5),
-  codeQuality: z.number().min(1).max(5),
-  performance: z.number().min(1).max(5),
-  documentation: z.number().min(1).max(5).optional(),
+  design: z.number().min(1, "Design rating must be between 1.0 and 5.0").max(5, "Design rating must be between 1.0 and 5.0"),
+  codeQuality: z.number().min(1, "Code quality rating must be between 1.0 and 5.0").max(5, "Code quality rating must be between 1.0 and 5.0"),
+  performance: z.number().min(1, "Performance rating must be between 1.0 and 5.0").max(5, "Performance rating must be between 1.0 and 5.0"),
+  documentation: z.number().min(1, "Documentation rating must be between 1.0 and 5.0").max(5, "Documentation rating must be between 1.0 and 5.0"),
 });
 
 export const otpRequestSchema = z.object({

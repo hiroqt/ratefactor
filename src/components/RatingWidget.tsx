@@ -1,9 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Star } from "lucide-react";
+import { Star, Layers, Cpu, Zap, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RatingBreakdown } from "@/types/portfolio";
+
+export function calculateMeterFillPercent(score: number): number {
+  return Math.round(Math.min(100, Math.max(0, (score / 5.0) * 100)));
+}
 
 interface RatingWidgetProps {
   currentRating: number;
@@ -46,6 +50,43 @@ export function RatingWidget({
     setSelectedRating(score);
     if (onRate) onRate(score);
   };
+
+  const dimensions = breakdown
+    ? [
+        {
+          key: "design" as const,
+          label: "Design & UI/UX",
+          score: breakdown.design,
+          icon: Layers,
+          textColor: "text-amber-800",
+          barColor: "bg-amber-500",
+        },
+        {
+          key: "codeQuality" as const,
+          label: "Code Quality & Architecture",
+          score: breakdown.codeQuality,
+          icon: Cpu,
+          textColor: "text-indigo-800",
+          barColor: "bg-indigo-500",
+        },
+        {
+          key: "performance" as const,
+          label: "Performance & Responsiveness",
+          score: breakdown.performance,
+          icon: Zap,
+          textColor: "text-emerald-800",
+          barColor: "bg-emerald-500",
+        },
+        {
+          key: "documentation" as const,
+          label: "Documentation & Completeness",
+          score: breakdown.documentation,
+          icon: BookOpen,
+          textColor: "text-sky-800",
+          barColor: "bg-sky-500",
+        },
+      ]
+    : [];
 
   return (
     <div className="flex flex-col gap-2">
@@ -101,25 +142,33 @@ export function RatingWidget({
       </div>
 
       {breakdown && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-200 text-xs">
-          <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1 p-1.5 rounded-lg bg-slate-50 border border-slate-100">
-            <span className="text-slate-600 text-[11px]">Code Architecture</span>
-            <span className="font-mono font-bold text-slate-900 tabular-nums text-xs">
-              {breakdown.codeQuality.toFixed(1)}★
-            </span>
-          </div>
-          <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1 p-1.5 rounded-lg bg-slate-50 border border-slate-100">
-            <span className="text-slate-600 text-[11px]">Performance</span>
-            <span className="font-mono font-bold text-emerald-700 tabular-nums text-xs">
-              {breakdown.performance.toFixed(1)}★
-            </span>
-          </div>
-          <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1 p-1.5 rounded-lg bg-slate-50 border border-slate-100">
-            <span className="text-slate-600 text-[11px]">Visual Craft / UX</span>
-            <span className="font-mono font-bold text-amber-700 tabular-nums text-xs">
-              {breakdown.design.toFixed(1)}★
-            </span>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-slate-200 text-xs">
+          {dimensions.map((dim) => {
+            const Icon = dim.icon;
+            const fillPercent = calculateMeterFillPercent(dim.score);
+            return (
+              <div
+                key={dim.key}
+                className="flex flex-col gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-100"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600 text-[11px] font-medium flex items-center gap-1.5">
+                    <Icon className="w-3.5 h-3.5 text-slate-500" />
+                    <span>{dim.label}</span>
+                  </span>
+                  <span className={cn("font-mono font-bold tabular-nums text-xs", dim.textColor)}>
+                    {dim.score.toFixed(1)}★
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className={cn("h-full rounded-full transition-all duration-300", dim.barColor)}
+                    style={{ width: `${fillPercent}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

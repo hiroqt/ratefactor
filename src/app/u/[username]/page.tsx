@@ -31,7 +31,15 @@ import {
   ArrowUpRight,
   MessageSquare,
   Calendar,
-  Share2
+  Share2,
+  Briefcase,
+  Mail,
+  Cpu,
+  Zap,
+  BookOpen,
+  Trophy,
+  CircleDot,
+  X
 } from "lucide-react";
 import { Navbar, Footer } from "@/components/layout";
 import { PortfolioDetailModal, SubmitPortfolioModal, usePortfolios } from "@/features/portfolios";
@@ -45,7 +53,8 @@ import { createProfileFromAuthor, PublicProfileModal } from "@/components/Public
 import { getEmojiDisplay } from "@/components/PortfolioDetailModal";
 import { formatRating, formatNumber, timeAgo, formatJoinedDate, cn } from "@/lib/utils";
 import { Portfolio, PortfolioCategory } from "@/types/portfolio";
-import { DeveloperProfile } from "@/types/profile";
+import { DeveloperProfile, ShowcaseAccolade } from "@/types/profile";
+import { deriveDeveloperAccolades } from "@/lib/accolades";
 
 interface PublicProfilePageProps {
   params: Promise<{ username: string }>;
@@ -60,6 +69,7 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "submissions">("overview");
   const [visitedUser, setVisitedUser] = useState<DeveloperProfile | null>(null);
+  const [hireInquiryOpen, setHireInquiryOpen] = useState(false);
 
   // 1. Auth State
   const {
@@ -196,6 +206,61 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
     const profileSkills = targetProfile?.skills || [];
     return Array.from(new Set([...profileSkills, ...skillsFromPortfolios]));
   }, [targetAuthorPortfolios, targetProfile]);
+
+  // Showcase Accolades derived from portfolio showcase history
+  const accolades = useMemo(() => {
+    return deriveDeveloperAccolades(targetAuthorPortfolios);
+  }, [targetAuthorPortfolios]);
+
+  // Tech Stack Domain Matrix — classifies skills into domains with portfolio project counts
+  const techDomainMatrix = useMemo(() => {
+    const DOMAIN_KEYWORDS: Record<string, string[]> = {
+      Frontend: ["react", "next.js", "nextjs", "vue", "svelte", "angular", "tailwind", "css", "html", "javascript", "typescript", "framer-motion", "radix"],
+      Backend: ["node", "node.js", "nodejs", "go", "golang", "rust", "python", "fastapi", "express", "nest", "grpc", "graphql", "rest", "c++", "java"],
+      Database: ["postgres", "postgresql", "supabase", "redis", "mongodb", "sqlite", "prisma", "drizzle", "mysql", "sql"],
+      Cloud: ["docker", "kubernetes", "k8s", "aws", "gcp", "azure", "vercel", "fly.io", "terraform", "ci/cd", "cloudflare"],
+      "AI / ML": ["ai", "ml", "pytorch", "tensorflow", "openai", "gemini", "langchain", "rag", "llm", "huggingface"],
+    };
+
+    const classify = (skill: string) => {
+      const norm = skill.trim().toLowerCase();
+      for (const [domain, keywords] of Object.entries(DOMAIN_KEYWORDS)) {
+        if (keywords.some((kw) => norm.includes(kw) || kw.includes(norm))) return domain;
+      }
+      return "Frontend";
+    };
+
+    const domains: Record<string, { skills: string[]; projectCount: number }> = {};
+    for (const domain of Object.keys(DOMAIN_KEYWORDS)) {
+      domains[domain] = { skills: [], projectCount: 0 };
+    }
+
+    for (const skill of allSkills) {
+      const d = classify(skill);
+      if (!domains[d].skills.some((s) => s.toLowerCase() === skill.toLowerCase())) {
+        domains[d].skills.push(skill);
+      }
+    }
+
+    let totalUsages = 0;
+    for (const p of targetAuthorPortfolios) {
+      for (const tech of p.techStack || []) {
+        const d = classify(tech);
+        domains[d].projectCount++;
+        totalUsages++;
+      }
+    }
+
+    return Object.entries(domains)
+      .map(([domain, data]) => ({
+        domain,
+        skills: data.skills,
+        projectCount: data.projectCount,
+        percentage: totalUsages > 0 ? Math.round((data.projectCount / totalUsages) * 100) : 0,
+      }))
+      .filter((d) => d.skills.length > 0 || d.projectCount > 0)
+      .sort((a, b) => b.percentage - a.percentage);
+  }, [allSkills, targetAuthorPortfolios]);
 
   // Pinned Showcase Portfolios
   const pinnedPortfolios = useMemo(() => {
@@ -475,6 +540,35 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
                   {targetProfile.bio}
                 </div>
 
+                {/* Available for Hire Beacon & Contact Trigger */}
+                {targetProfile.availableForHire && (
+                  <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                        </span>
+                        <span className="text-xs font-semibold text-emerald-900">Available for Hire</span>
+                      </div>
+                      <Briefcase className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    {targetProfile.customHireMessage && (
+                      <p className="text-[11px] text-emerald-800 leading-relaxed">
+                        {targetProfile.customHireMessage}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setHireInquiryOpen(true)}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      <span>Contact / Hire Inquiry</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* Metadata / Links (GitHub Style) */}
                 <div className="space-y-2 pt-2 border-t border-slate-100 text-xs text-slate-600 min-w-0">
                   {targetProfile.company && (
@@ -597,6 +691,105 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
                   </div>
                 </div>
               </div>
+
+              {/* Showcase Accolades & Awards */}
+              {accolades.length > 0 && (
+                <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-3">
+                  <div className="text-xs font-mono text-slate-500 uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                    <Trophy className="w-3.5 h-3.5 text-amber-600" />
+                    Showcase Accolades
+                  </div>
+                  <div className="space-y-2">
+                    {accolades.map((accolade) => (
+                      <div
+                        key={accolade.id}
+                        className={cn(
+                          "flex items-center gap-3 p-2.5 rounded-xl border",
+                          accolade.type === "weekly"
+                            ? "bg-amber-50 border-amber-200"
+                            : "bg-orange-50 border-orange-200"
+                        )}
+                      >
+                        <div className={cn(
+                          "p-1.5 rounded-lg shrink-0",
+                          accolade.type === "weekly" ? "bg-amber-100 text-amber-700" : "bg-orange-100 text-orange-700"
+                        )}>
+                          {accolade.type === "weekly" ? (
+                            <Award className="w-4 h-4" />
+                          ) : (
+                            <Flame className="w-4 h-4" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-semibold text-slate-900 truncate">
+                            {accolade.title}
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-mono truncate">
+                            {accolade.portfolioTitle} • {timeAgo(accolade.awardedDate)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tech Stack Domain Matrix */}
+              {techDomainMatrix.length > 0 && (
+                <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-3">
+                  <div className="text-xs font-mono text-slate-500 uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                    Tech Stack Matrix
+                  </div>
+                  <div className="space-y-2.5">
+                    {techDomainMatrix.map((entry) => {
+                      const domainColors: Record<string, { bar: string; text: string; bg: string }> = {
+                        Frontend: { bar: "bg-amber-500", text: "text-amber-800", bg: "bg-amber-50" },
+                        Backend: { bar: "bg-indigo-500", text: "text-indigo-800", bg: "bg-indigo-50" },
+                        Database: { bar: "bg-emerald-500", text: "text-emerald-800", bg: "bg-emerald-50" },
+                        Cloud: { bar: "bg-sky-500", text: "text-sky-800", bg: "bg-sky-50" },
+                        "AI / ML": { bar: "bg-purple-500", text: "text-purple-800", bg: "bg-purple-50" },
+                      };
+                      const colors = domainColors[entry.domain] || domainColors.Frontend;
+                      return (
+                        <div key={entry.domain} className="space-y-1">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className={cn("font-semibold font-mono", colors.text)}>
+                              {entry.domain}
+                            </span>
+                            <span className="text-slate-500 font-mono tabular-nums">
+                              {entry.percentage}% • {entry.projectCount} projects
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              className={cn("h-full rounded-full transition-all duration-500", colors.bar)}
+                              style={{ width: `${Math.max(entry.percentage, 4)}%` }}
+                            />
+                          </div>
+                          {entry.skills.length > 0 && (
+                            <div className="flex flex-wrap gap-1 pt-0.5">
+                              {entry.skills.slice(0, 5).map((skill) => (
+                                <span
+                                  key={skill}
+                                  className={cn("text-[10px] font-mono px-1.5 py-0.5 rounded-md border border-slate-200", colors.bg, colors.text)}
+                                >
+                                  {skill}
+                                </span>
+                              ))}
+                              {entry.skills.length > 5 && (
+                                <span className="text-[10px] font-mono text-slate-400 px-1">
+                                  +{entry.skills.length - 5}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
             </div>
 
@@ -1012,6 +1205,112 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
         onAuthSuccess={handleAuthSuccess}
         intentMessage={authIntentMessage}
       />
+
+      {/* Hire Inquiry Modal */}
+      {hireInquiryOpen && targetProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={() => setHireInquiryOpen(false)}
+          />
+          <div className="relative w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-5 z-10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700">
+                  <Briefcase className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Contact {targetProfile.name}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-mono">@{targetProfile.username}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHireInquiryOpen(false)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {targetProfile.customHireMessage && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 leading-relaxed">
+                &ldquo;{targetProfile.customHireMessage}&rdquo;
+              </div>
+            )}
+
+            <div className="space-y-2.5">
+              <div className="text-xs font-mono text-slate-500 uppercase tracking-wider font-semibold">
+                Reach Out Via
+              </div>
+              {targetProfile.website && (
+                <a
+                  href={targetProfile.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors group"
+                >
+                  <Globe className="w-4 h-4 text-sky-600" />
+                  <span className="text-xs font-medium text-slate-800 flex-1 truncate">
+                    {targetProfile.website.replace(/^https?:\/\//, "")}
+                  </span>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700" />
+                </a>
+              )}
+              {targetProfile.github && (
+                <a
+                  href={targetProfile.github}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors group"
+                >
+                  <Github className="w-4 h-4 text-slate-900" />
+                  <span className="text-xs font-medium text-slate-800 flex-1 truncate">
+                    {targetProfile.github.replace(/^https?:\/\/github\.com\//, "@")}
+                  </span>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700" />
+                </a>
+              )}
+              {targetProfile.twitter && (
+                <a
+                  href={targetProfile.twitter}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors group"
+                >
+                  <Twitter className="w-4 h-4 text-sky-500" />
+                  <span className="text-xs font-medium text-slate-800 flex-1 truncate">
+                    {targetProfile.twitter.replace(/^https?:\/\/twitter\.com\//, "@")}
+                  </span>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700" />
+                </a>
+              )}
+              {targetProfile.linkedin && (
+                <a
+                  href={targetProfile.linkedin}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors group"
+                >
+                  <Linkedin className="w-4 h-4 text-blue-600" />
+                  <span className="text-xs font-medium text-slate-800 flex-1 truncate">
+                    {targetProfile.linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, "in/")}
+                  </span>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700" />
+                </a>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-100">
+              <p className="text-[10px] text-slate-400 font-mono text-center">
+                Reaching out through these channels connects you directly with the developer.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

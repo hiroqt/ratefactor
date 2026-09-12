@@ -125,6 +125,11 @@ export function PortfolioCard({
                   <Award className="w-3 h-3 text-amber-600" /> Weekly Pick
                 </span>
               )}
+              {portfolio.requestCritique && (
+                <span className="flex items-center gap-1 text-[11px] font-mono font-medium text-orange-800 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-md">
+                  <Flame className="w-3 h-3 text-orange-600" /> Roast Welcome
+                </span>
+              )}
             </div>
 
             <h3 className="font-bold text-slate-900 text-sm sm:text-base group-hover:text-black transition-colors truncate">
@@ -221,13 +226,18 @@ export function PortfolioCard({
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
 
-            <div className="absolute top-3 left-3 flex items-center gap-2">
+            <div className="absolute top-3 left-3 flex items-center gap-2 flex-wrap">
               <span className={cn("text-[11px] font-mono font-medium px-2 py-0.5 rounded-md border bg-white text-slate-900", getCategoryColor(portfolio.category))}>
                 {portfolio.category}
               </span>
               <span className="flex items-center gap-1 text-[11px] font-mono font-medium text-slate-900 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
                 Featured Blueprint
               </span>
+              {portfolio.requestCritique && (
+                <span className="flex items-center gap-1 text-[11px] font-mono font-medium text-orange-800 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-md shadow-xs">
+                  <Flame className="w-3 h-3 text-orange-600" /> Roast Welcome
+                </span>
+              )}
             </div>
 
             <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-white px-2.5 py-1 rounded-md border border-slate-200 text-slate-900">
@@ -265,7 +275,7 @@ export function PortfolioCard({
 
             {/* Rubric mini summary */}
             {portfolio.ratingBreakdown && (
-              <div className="grid grid-cols-3 gap-2 py-2.5 border-y border-slate-100 text-center font-mono text-xs">
+              <div className="grid grid-cols-4 gap-2 py-2.5 border-y border-slate-100 text-center font-mono text-xs">
                 <div>
                   <div className="text-[10px] text-slate-500">Code</div>
                   <div className="font-bold text-slate-900">{portfolio.ratingBreakdown.codeQuality.toFixed(1)}★</div>
@@ -277,6 +287,10 @@ export function PortfolioCard({
                 <div>
                   <div className="text-[10px] text-slate-500">UX</div>
                   <div className="font-bold text-amber-700">{portfolio.ratingBreakdown.design.toFixed(1)}★</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-slate-500">Doc</div>
+                  <div className="font-bold text-sky-700">{(portfolio.ratingBreakdown.documentation ?? 5.0).toFixed(1)}★</div>
                 </div>
               </div>
             )}
@@ -357,6 +371,11 @@ export function PortfolioCard({
               <Award className="w-3 h-3 text-amber-600" /> Weekly
             </span>
           )}
+          {portfolio.requestCritique && (
+            <span className="flex items-center gap-1 text-[10px] font-mono font-medium text-orange-800 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-md shadow-xs">
+              <Flame className="w-3 h-3 text-orange-600" /> Roast Welcome
+            </span>
+          )}
         </div>
 
         {/* Author Badge */}
@@ -371,6 +390,12 @@ export function PortfolioCard({
           </span>
           {portfolio.author.isVerified && (
             <CheckCircle2 className="w-3 h-3 text-emerald-600 flex-shrink-0" />
+          )}
+          {portfolio.author.availableForHire && (
+            <span
+              className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0"
+              title="Available for Hire"
+            />
           )}
         </div>
 

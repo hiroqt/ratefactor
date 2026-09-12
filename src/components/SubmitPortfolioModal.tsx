@@ -85,6 +85,7 @@ export function SubmitPortfolioModal({
   const [category, setCategory] = useState<"Developer" | "Arts" | "Client" | "Frontend" | "Fullstack" | "Systems" | "Design Engineer" | "Mobile" | "AI / ML">("Developer");
   const [techStack, setTechStack] = useState<string[]>(["TypeScript", "Next.js 15"]);
   const [customTech, setCustomTech] = useState("");
+  const [requestCritique, setRequestCritique] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"form" | "preview">("form");
 
@@ -154,6 +155,7 @@ export function SubmitPortfolioModal({
     setCategory("Developer");
     setTechStack(["TypeScript", "Next.js 15"]);
     setCustomTech("");
+    setRequestCritique(false);
     setError(null);
     setActiveTab("form");
   };
@@ -253,6 +255,7 @@ export function SubmitPortfolioModal({
         design: 5.0,
         codeQuality: 5.0,
         performance: 5.0,
+        documentation: 5.0,
       },
       likesCount: 1,
       isLiked: true,
@@ -260,6 +263,7 @@ export function SubmitPortfolioModal({
       comments: [],
       createdAt: new Date().toISOString(),
       isShowcase: false,
+      requestCritique: Boolean(requestCritique),
     };
 
     onSubmit(newPortfolio);
@@ -290,12 +294,14 @@ export function SubmitPortfolioModal({
       design: 5.0,
       codeQuality: 5.0,
       performance: 5.0,
+      documentation: 5.0,
     },
     likesCount: 1,
     isLiked: true,
     commentsCount: 0,
     comments: [],
     createdAt: new Date().toISOString(),
+    requestCritique: Boolean(requestCritique),
   };
 
   if (!isOpen) return null;
@@ -648,6 +654,25 @@ export function SubmitPortfolioModal({
                     <span>Description length looks good ({descriptionChars} characters).</span>
                   </p>
                 )}
+              </div>
+
+              {/* Request Roast / In-Depth Critique Toggle */}
+              <div className="p-3.5 rounded-xl bg-orange-50/70 border border-orange-200/80 flex items-start justify-between gap-3">
+                <div className="space-y-0.5">
+                  <label htmlFor="request-critique-toggle" className="text-xs font-semibold text-slate-900 flex items-center gap-1.5 cursor-pointer">
+                    <span>🔥 Request Roast / In-Depth Critique</span>
+                  </label>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    Signal to reviewers that you actively welcome rigorous, no-holds-barred constructive critique, UX tear-downs, and code architecture feedback.
+                  </p>
+                </div>
+                <input
+                  id="request-critique-toggle"
+                  type="checkbox"
+                  checked={requestCritique}
+                  onChange={(e) => setRequestCritique(e.target.checked)}
+                  className="mt-1 w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                />
               </div>
 
               {/* Submit CTA */}
