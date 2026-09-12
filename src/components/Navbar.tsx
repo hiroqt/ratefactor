@@ -12,7 +12,15 @@ import {
   Menu,
   User,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  LayoutGrid,
+  Settings,
+  LogOut,
+  PlusCircle,
+  Bookmark,
+  ChevronDown,
+  ShieldCheck,
+  Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Portfolio, PortfolioCategory, SortOption, NotificationItem } from "@/types/portfolio";
@@ -76,6 +84,7 @@ export function Navbar({
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [localNotificationOpen, setLocalNotificationOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const { data: session } = useSession();
 
   const effectiveUser = currentUser || (session?.user ? {
@@ -116,6 +125,7 @@ export function Navbar({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const notificationContainerRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
 
   // Keyboard shortcut (Cmd+K / Ctrl+K)
   useEffect(() => {
@@ -127,6 +137,7 @@ export function Navbar({
       if (e.key === "Escape") {
         setShowSearchModal(false);
         setIsMobileMenuOpen(false);
+        setIsProfileDropdownOpen(false);
         closeNotificationOpen();
       }
     };
@@ -161,6 +172,26 @@ export function Navbar({
     }
   }, [effectiveNotificationOpen]);
 
+  // Click outside handler for profile dropdown menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (
+        profileDropdownRef.current &&
+        !profileDropdownRef.current.contains(e.target as Node)
+      ) {
+        setIsProfileDropdownOpen(false);
+      }
+    };
+    if (isProfileDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener("touchstart", handleClickOutside);
+      };
+    }
+  }, [isProfileDropdownOpen]);
+
   // Click outside and touch handler for mobile navigation menu
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
@@ -184,9 +215,10 @@ export function Navbar({
   const router = useRouter();
   const pathname = usePathname();
 
-  // Close mobile menu on route change
+  // Close menus on route change
   useEffect(() => {
     setIsMobileMenuOpen(false);
+    setIsProfileDropdownOpen(false);
   }, [pathname]);
 
   const handleNavClick = (tab: string) => {
@@ -471,20 +503,21 @@ export function Navbar({
               </AnimatePresence>
             </div>
 
-            {/* Signed-in Developer Profile or Guest Sign-In */}
+            {/* Signed-in Developer Profile Dropdown or Guest Sign-In */}
             {effectiveUser ? (
-              <div className="hidden md:flex items-center gap-1.5 shrink-0">
+              <div className="relative hidden md:block shrink-0" ref={profileDropdownRef}>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (pathname !== "/profile") {
-                      router.push("/profile");
-                    } else {
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }
-                  }}
-                  className="flex items-center gap-2 py-1 px-2.5 rounded-full hover:bg-slate-100 transition-colors border border-slate-200/60 hover:border-slate-300 cursor-pointer group whitespace-nowrap"
-                  title="Open Dedicated Profile Dashboard"
+                  onClick={() => setIsProfileDropdownOpen((prev) => !prev)}
+                  className={cn(
+                    "flex items-center gap-2 py-1 px-2.5 rounded-full transition-all border cursor-pointer group whitespace-nowrap",
+                    isProfileDropdownOpen
+                      ? "bg-slate-100 border-slate-300 ring-2 ring-slate-900/5 shadow-2xs"
+                      : "hover:bg-slate-100 border-slate-200/80 hover:border-slate-300"
+                  )}
+                  aria-expanded={isProfileDropdownOpen}
+                  aria-haspopup="true"
+                  title="Account Menu"
                 >
                   <div className="relative shrink-0">
                     <div className="w-7 h-7 rounded-full overflow-hidden ring-1 ring-slate-300 flex-shrink-0">
@@ -499,14 +532,109 @@ export function Navbar({
                   <span className="hidden lg:inline-block text-xs font-semibold text-slate-900 truncate max-w-[120px] whitespace-nowrap">
                     {effectiveUser.name || effectiveUser.username || "Developer"}
                   </span>
+                  <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-200", isProfileDropdownOpen && "rotate-180 text-slate-700")} />
                 </button>
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  className="text-xs font-mono text-slate-400 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-100 transition cursor-pointer whitespace-nowrap"
-                >
-                  Sign Out
-                </button>
+
+                {/* Profile Dropdown Popover */}
+                <AnimatePresence>
+                  {isProfileDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                      transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                      className="absolute right-0 mt-2 w-64 rounded-2xl bg-white border border-slate-200 shadow-xl p-2 z-50 text-slate-900 space-y-1"
+                    >
+                      {/* User Header */}
+                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full overflow-hidden ring-1 ring-slate-200 shrink-0">
+                          <img
+                            src={effectiveUser.avatar || profile?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80"}
+                            alt={effectiveUser.name || "Developer"}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-bold text-slate-900 truncate">
+                            {effectiveUser.name || "Developer"}
+                          </div>
+                          <div className="text-[11px] font-mono text-slate-500 truncate">
+                            @{effectiveUser.username || "developer"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Dropdown Navigation Actions */}
+                      <div className="pt-1 space-y-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsProfileDropdownOpen(false);
+                            onOpenSubmitModal();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-colors cursor-pointer text-left"
+                        >
+                          <PlusCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span className="font-semibold">Submit Portfolio</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsProfileDropdownOpen(false);
+                            if (pathname !== "/profile") {
+                              router.push("/profile?tab=dashboard");
+                            } else {
+                              window.scrollTo({ top: 0, behavior: "smooth" });
+                            }
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:text-slate-950 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer text-left"
+                        >
+                          <LayoutGrid className="w-4 h-4 text-slate-500 shrink-0" />
+                          <span>Dashboard</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsProfileDropdownOpen(false);
+                            router.push("/profile?tab=bookmarks");
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:text-slate-950 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer text-left"
+                        >
+                          <Bookmark className="w-4 h-4 text-slate-500 shrink-0" />
+                          <span>Bookmarks</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsProfileDropdownOpen(false);
+                            router.push("/profile?tab=edit");
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:text-slate-950 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer text-left"
+                        >
+                          <Settings className="w-4 h-4 text-slate-500 shrink-0" />
+                          <span>Settings</span>
+                        </button>
+                      </div>
+
+                      <div className="border-t border-slate-100 my-1" />
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileDropdownOpen(false);
+                          handleSignOut();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer text-left"
+                      >
+                        <LogOut className="w-4 h-4 text-rose-500 shrink-0" />
+                        <span>Sign Out</span>
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             ) : (
               <button

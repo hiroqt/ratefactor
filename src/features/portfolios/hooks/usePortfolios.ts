@@ -234,9 +234,6 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
       }
       lastActionTimestamps.current.set(portfolioId, now);
 
-      let targetAuthorMe = false;
-      let targetTitle = "";
-
       setPortfolios((prev) =>
         prev.map((p) => {
           if (p.id === portfolioId) {
@@ -266,10 +263,6 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
               likesCount: nextCount,
             };
 
-            const myUname = (options?.currentUsername || options?.currentUser?.username || "").toLowerCase();
-            targetAuthorMe = Boolean(myUname && p.author?.username?.toLowerCase() === myUname);
-            targetTitle = p.title;
-
             if (selectedPortfolio && selectedPortfolio.id === portfolioId) {
               setSelectedPortfolio(updated);
             }
@@ -287,23 +280,6 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
           }
         })
         .catch(() => {});
-
-      if (isLiked !== false) {
-        const newNotif: NotificationItem = {
-          id: "notif-like-" + Date.now(),
-          type: "like",
-          actorName: options?.currentUser?.name || "Developer",
-          actorAvatar:
-            options?.currentUser?.avatar ||
-            "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
-          portfolioId,
-          portfolioTitle: targetTitle,
-          message: targetAuthorMe ? "liked your portfolio." : `appreciated ${targetTitle || "your architecture"}.`,
-          timestamp: new Date().toISOString(),
-          isRead: false,
-        };
-        options?.onNotify?.(newNotif);
-      }
     },
     [options, selectedPortfolio]
   );
@@ -325,9 +301,6 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         return;
       }
       lastActionTimestamps.current.set(portfolioId, now);
-
-      let targetAuthorMe = false;
-      let targetTitle = "";
 
       setPortfolios((prev) =>
         prev.map((p) => {
@@ -368,10 +341,6 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
               likesCount: Math.max(0, totalReactionsCount),
             };
 
-            const myUname = (options?.currentUsername || options?.currentUser?.username || "").toLowerCase();
-            targetAuthorMe = Boolean(myUname && p.author?.username?.toLowerCase() === myUname);
-            targetTitle = p.title;
-
             if (selectedPortfolio && selectedPortfolio.id === portfolioId) {
               setSelectedPortfolio(updated);
             }
@@ -385,21 +354,6 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
       fetch(`/api/portfolios/${portfolioId}/like`, { method: "POST" }).catch(() => {});
 
       trackEvent("portfolio_reaction", { portfolioId, reaction: emojiName });
-
-      const newNotif: NotificationItem = {
-        id: "notif-react-" + Date.now(),
-        type: "like",
-        actorName: options?.currentUser?.name || "Developer",
-        actorAvatar:
-          options?.currentUser?.avatar ||
-          "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
-        portfolioId,
-        portfolioTitle: targetTitle,
-        message: targetAuthorMe ? `reacted with ${emojiName} on your portfolio.` : `reacted with ${emojiName} on ${targetTitle || "your architecture"}.`,
-        timestamp: new Date().toISOString(),
-        isRead: false,
-      };
-      options?.onNotify?.(newNotif);
     },
     [options, selectedPortfolio]
   );
@@ -479,31 +433,8 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
       );
 
       options?.onToast?.(`Your rating (${ratingScore.toFixed(1)}★) has been logged.`);
-
-      const target = portfolios.find((p) => p.id === portfolioId);
-      if (target) {
-        const isTargetAuthorMe =
-          target.author.username === (options?.currentUser?.username || "arneldev");
-        const newNotif: NotificationItem = {
-          id: "notif-rate-" + Date.now(),
-          type: "rating",
-          actorName: options?.currentUser?.name || "Developer",
-          actorAvatar:
-            options?.currentUser?.avatar ||
-            "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
-          portfolioId: target.id,
-          portfolioTitle: target.title,
-          message: isTargetAuthorMe
-            ? `evaluated your portfolio with ${ratingScore.toFixed(1)}★ peer score.`
-            : `submitted a ${ratingScore.toFixed(1)}★ peer critique for ${target.title}.`,
-          ratingScore,
-          timestamp: new Date().toISOString(),
-          isRead: false,
-        };
-        options?.onNotify?.(newNotif);
-      }
     },
-    [options, portfolios, selectedPortfolio]
+    [options, selectedPortfolio]
   );
 
   // Add Comment
@@ -553,31 +484,9 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         );
       }
 
-      const target = portfolios.find((p) => p.id === portfolioId);
-      if (target) {
-        const myUname = options?.currentUser?.username || options?.currentUsername;
-        const isTargetAuthorMe = Boolean(myUname && target.author.username === myUname);
-        const newNotif: NotificationItem = {
-          id: "notif-comment-" + Date.now(),
-          type: "comment",
-          actorName: options.currentUser.name || "Developer",
-          actorAvatar:
-            options.currentUser.avatar ||
-            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
-          portfolioId: target.id,
-          portfolioTitle: target.title,
-          message: isTargetAuthorMe
-            ? `commented on your project: "${content.slice(0, 45)}${content.length > 45 ? "..." : ""}"`
-            : `commented on ${target.title}: "${content.slice(0, 45)}${content.length > 45 ? "..." : ""}"`,
-          timestamp: new Date().toISOString(),
-          isRead: false,
-        };
-        options?.onNotify?.(newNotif);
-      }
-
       options?.onToast?.("Comment posted successfully.");
     },
-    [options, portfolios, selectedPortfolio]
+    [options, selectedPortfolio]
   );
 
   // Delete comment

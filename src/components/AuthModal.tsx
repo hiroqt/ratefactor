@@ -14,10 +14,14 @@ import {
   CheckCircle2, 
   RefreshCw,
   ShieldCheck,
-  Github
+  Github,
+  Sparkles,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { authClient, normalizeUsername } from "@/lib/auth/client";
+import { cn } from "@/lib/utils";
 
 export interface AuthModalProps {
   isOpen: boolean;
@@ -37,6 +41,7 @@ export function AuthModal({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   
   // OTP state (for backward compatibility / 2FA flow)
   const [otpStep, setOtpStep] = useState<"request" | "verify">("request");
@@ -76,6 +81,7 @@ export function AuthModal({
       setSuccessMsg(null);
       setOtpCode("");
       setDemoCode(null);
+      setShowPassword(false);
     }
     return () => {
       document.body.style.overflow = "unset";
@@ -87,7 +93,7 @@ export function AuthModal({
     isOpen,
     modalRef,
     scrollRef,
-    deps: [viewMode, authTab],
+    deps: [viewMode, authTab, error, successMsg],
   });
 
   if (!isOpen) return null;
@@ -266,37 +272,65 @@ export function AuthModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-hidden">
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={onClose}
+        className="fixed inset-0 bg-slate-900/50 backdrop-blur-md"
+      />
+
+      {/* Modal Card */}
       <motion.div
         ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="auth-modal-title"
         data-lenis-prevent="true"
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        initial={{ opacity: 0, scale: 0.95, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        className="relative w-full max-w-md bg-[#0d1117] border border-white/10 rounded-2xl shadow-2xl overflow-hidden text-neutral-200 max-h-[90vh] flex flex-col"
+        exit={{ opacity: 0, scale: 0.95, y: 15 }}
+        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+        className="relative w-full max-w-md bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xl overflow-hidden z-10 text-slate-900 max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Subtle top ambient highlight */}
+        <div className="absolute top-0 inset-x-12 h-[1px] bg-gradient-to-r from-transparent via-slate-300 to-transparent pointer-events-none" />
+
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/[0.02] shrink-0">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400">
-              <Terminal className="w-4 h-4" />
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-100 bg-slate-50/80 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs shrink-0">
+              <svg
+                className="w-4 h-4 text-white"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+              </svg>
             </div>
-            <div>
-              <h3 id="auth-modal-title" className="text-sm font-semibold text-white tracking-wide">
-                {viewMode === "better_auth"
-                  ? authTab === "signin" ? "Developer Sign In" : "Create Developer Account"
-                  : otpStep === "request" ? "Request OTP" : "Verify Code"}
-              </h3>
-              <p className="text-[11px] text-neutral-400">RateFactor Community &bull; Secure Authentication</p>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h3 id="auth-modal-title" className="text-sm font-bold text-slate-900 tracking-tight truncate">
+                  {viewMode === "better_auth"
+                    ? authTab === "signin" ? "Sign In to RateFactor" : "Create Developer Account"
+                    : otpStep === "request" ? "One-Time Password Sign In" : "Verify Authentication Code"}
+                </h3>
+                <span className="text-[9px] font-mono uppercase bg-slate-100 text-slate-600 font-semibold px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                  beta
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 truncate">RateFactor Community &bull; Developer Network</p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-neutral-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
+            className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors ml-1 cursor-pointer shrink-0"
+            aria-label="Close dialog"
           >
             <X className="w-4 h-4" />
           </button>
@@ -304,29 +338,41 @@ export function AuthModal({
 
         {/* Intent banner */}
         {intentMessage && (
-          <div className="bg-orange-500/10 border-b border-orange-500/20 px-6 py-2.5 flex items-center space-x-2 shrink-0">
-            <ShieldCheck className="w-4 h-4 text-orange-400 shrink-0" />
-            <p className="text-xs text-orange-300">{intentMessage}</p>
+          <div className="bg-emerald-50/70 border-b border-emerald-100 px-5 sm:px-6 py-2.5 flex items-center gap-2 shrink-0">
+            <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <p className="text-xs text-emerald-800 font-medium leading-tight">{intentMessage}</p>
           </div>
         )}
 
-        <div ref={scrollRef} data-lenis-prevent="true" className="p-6 overflow-y-auto overscroll-contain flex-1">
+        {/* Content Body */}
+        <div ref={scrollRef} data-lenis-prevent="true" className="p-5 sm:p-6 overflow-y-auto overscroll-contain flex-1">
+          {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start space-x-2.5">
-              <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-red-300">{error}</p>
+            <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <p className="leading-relaxed flex-1 font-medium">{error}</p>
             </div>
           )}
 
+          {/* Success Message */}
           {successMsg && (
-            <div className="mb-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-start space-x-2.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-              <div className="text-xs text-emerald-300">
-                <p>{successMsg}</p>
+            <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="flex-1 font-medium space-y-1.5">
+                <p className="leading-relaxed">{successMsg}</p>
                 {demoCode && (
-                  <p className="mt-1 font-mono text-[11px] text-emerald-200 bg-emerald-950/60 px-2 py-0.5 rounded inline-block">
-                    Demo OTP Code: <strong>{demoCode}</strong>
-                  </p>
+                  <div className="flex items-center justify-between bg-white border border-emerald-200/80 rounded-lg px-2.5 py-1.5 shadow-2xs">
+                    <span className="font-mono text-[11px] text-emerald-900">
+                      Demo OTP Code: <strong>{demoCode}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setOtpCode(demoCode)}
+                      className="text-[10px] font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded transition cursor-pointer"
+                    >
+                      Fill Code
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -339,33 +385,34 @@ export function AuthModal({
                 type="button"
                 onClick={handleGithubSignIn}
                 disabled={isLoading}
-                className="w-full flex items-center justify-center space-x-3 px-4 py-3 bg-white text-neutral-900 font-medium text-sm rounded-xl hover:bg-neutral-100 transition shadow-lg active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-900 font-semibold text-sm rounded-xl border border-slate-200 hover:border-slate-300 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99] disabled:opacity-50 cursor-pointer group"
               >
-                <Github className="w-4 h-4 text-neutral-900" />
+                <Github className="w-4 h-4 text-slate-900 group-hover:scale-105 transition-transform" />
                 <span>Continue with GitHub</span>
               </button>
 
-              <div className="flex items-center my-3">
-                <div className="flex-1 border-t border-white/10" />
-                <span className="px-3 text-[11px] uppercase tracking-wider text-neutral-500 font-mono">
+              <div className="flex items-center my-3.5">
+                <div className="flex-1 border-t border-slate-200" />
+                <span className="px-3 text-[10px] uppercase font-mono tracking-wider text-slate-400 font-semibold">
                   or email &amp; password
                 </span>
-                <div className="flex-1 border-t border-white/10" />
+                <div className="flex-1 border-t border-slate-200" />
               </div>
 
               {/* Mode Toggle: Sign In vs Sign Up */}
-              <div className="flex rounded-xl bg-white/5 p-1 border border-white/10">
+              <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200/80">
                 <button
                   type="button"
                   onClick={() => {
                     setAuthTab("signin");
                     setError(null);
                   }}
-                  className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition ${
+                  className={cn(
+                    "flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all text-center cursor-pointer",
                     authTab === "signin"
-                      ? "bg-orange-600 text-white shadow-sm"
-                      : "text-neutral-400 hover:text-white"
-                  }`}
+                      ? "bg-white text-slate-900 shadow-xs border border-slate-200/40"
+                      : "text-slate-500 hover:text-slate-900"
+                  )}
                 >
                   Sign In
                 </button>
@@ -375,83 +422,100 @@ export function AuthModal({
                     setAuthTab("signup");
                     setError(null);
                   }}
-                  className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition ${
+                  className={cn(
+                    "flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all text-center cursor-pointer",
                     authTab === "signup"
-                      ? "bg-orange-600 text-white shadow-sm"
-                      : "text-neutral-400 hover:text-white"
-                  }`}
+                      ? "bg-white text-slate-900 shadow-xs border border-slate-200/40"
+                      : "text-slate-500 hover:text-slate-900"
+                  )}
                 >
                   Create Account
                 </button>
               </div>
 
               {/* Email / Password Form */}
-              <form onSubmit={handleEmailAuth} className="space-y-3">
+              <form onSubmit={handleEmailAuth} className="space-y-3.5">
                 {authTab === "signup" && (
                   <div>
-                    <label className="block text-xs font-medium text-neutral-400 mb-1">
-                      Full Name
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Full Name / Display Handle
                     </label>
                     <div className="relative">
-                      <User className="absolute left-3 top-3 w-4 h-4 text-neutral-500" />
+                      <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                       <input
                         type="text"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="Ada Lovelace"
+                        placeholder="e.g. Satoshi Nakamoto"
                         required={authTab === "signup"}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-orange-500 transition"
+                        autoComplete="name"
+                        className="w-full bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all"
                       />
                     </div>
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-xs font-medium text-neutral-400 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Email Address
                   </label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-3 w-4 h-4 text-neutral-500" />
+                    <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                     <input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="dev@ratefactor.dev"
                       required
-                      className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-orange-500 transition"
+                      autoComplete="email"
+                      className="w-full bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-neutral-400 mb-1">
-                    Password
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-slate-700">
+                      Password
+                    </label>
+                    {authTab === "signup" && (
+                      <span className="text-[10px] font-mono text-slate-400">Min 6 characters</span>
+                    )}
+                  </div>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-3 w-4 h-4 text-neutral-500" />
+                    <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                     <input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
                       required
                       minLength={6}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-orange-500 transition"
+                      autoComplete={authTab === "signup" ? "new-password" : "current-password"}
+                      className="w-full bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all font-sans"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
 
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full mt-2 flex items-center justify-center space-x-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-xl transition shadow-lg shadow-orange-600/20 disabled:opacity-50 cursor-pointer"
+                  className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-black text-white text-sm font-semibold rounded-xl shadow-xs hover:shadow transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
                 >
                   {isLoading ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
                   ) : (
                     <>
-                      <span>{authTab === "signin" ? "Sign In" : "Register Account"}</span>
-                      <ArrowRight className="w-4 h-4" />
+                      <span>{authTab === "signin" ? "Sign In" : "Create Account"}</span>
+                      <ArrowRight className="w-4 h-4 stroke-[2.5]" />
                     </>
                   )}
                 </button>
@@ -466,9 +530,10 @@ export function AuthModal({
                     setOtpStep("request");
                     setError(null);
                   }}
-                  className="text-xs text-neutral-400 hover:text-orange-400 transition"
+                  className="text-xs text-slate-500 hover:text-slate-900 transition font-medium flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
                 >
-                  Or use 2-Step OTP Verification
+                  <KeyRound className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Or use 2-Step OTP Verification</span>
                 </button>
               </div>
             </div>
@@ -481,21 +546,21 @@ export function AuthModal({
                     e.preventDefault();
                     handleRequestOtp();
                   }}
-                  className="space-y-3"
+                  className="space-y-3.5"
                 >
                   <div>
-                    <label className="block text-xs font-medium text-neutral-400 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Email Address for OTP
                     </label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-3 w-4 h-4 text-neutral-500" />
+                      <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                       <input
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="dev@ratefactor.dev"
                         required
-                        className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-orange-500 transition"
+                        className="w-full bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all"
                       />
                     </div>
                   </div>
@@ -503,14 +568,14 @@ export function AuthModal({
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-xl transition shadow-lg shadow-orange-600/20 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-black text-white text-sm font-semibold rounded-xl shadow-xs transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
                   >
                     {isLoading ? (
                       <RefreshCw className="w-4 h-4 animate-spin" />
                     ) : (
                       <>
                         <span>Send 6-Digit Code</span>
-                        <ArrowRight className="w-4 h-4" />
+                        <ArrowRight className="w-4 h-4 stroke-[2.5]" />
                       </>
                     )}
                   </button>
@@ -518,14 +583,14 @@ export function AuthModal({
               ) : (
                 <form onSubmit={handleVerifyOtp} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-medium text-neutral-300 mb-1">
+                    <label className="block text-xs font-semibold text-slate-900 mb-1">
                       Enter 6-Digit Verification Code
                     </label>
-                    <p className="text-[11px] text-neutral-400 mb-3">
-                      Sent to <span className="text-white font-mono">{email}</span>.
+                    <p className="text-[11px] text-slate-500 mb-3">
+                      Code sent to <span className="text-slate-900 font-mono font-semibold">{email}</span>
                     </p>
                     <div className="relative">
-                      <KeyRound className="absolute left-3 top-3.5 w-4 h-4 text-orange-400" />
+                      <KeyRound className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
                       <input
                         type="text"
                         maxLength={6}
@@ -534,24 +599,24 @@ export function AuthModal({
                         placeholder="000000"
                         autoFocus
                         required
-                        className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-lg font-mono tracking-widest text-center text-white placeholder-neutral-600 focus:outline-none focus:border-orange-500 transition"
+                        className="w-full bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 rounded-xl pl-10 pr-4 py-3 text-lg font-mono font-bold tracking-[0.4em] text-center text-slate-900 placeholder:text-slate-300 outline-none transition-all"
                       />
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-neutral-400">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
                     <button
                       type="button"
                       onClick={() => setOtpStep("request")}
-                      className="hover:text-white transition"
+                      className="hover:text-slate-900 transition font-medium cursor-pointer"
                     >
-                      Change email
+                      &larr; Change email
                     </button>
                     <button
                       type="button"
                       disabled={countdown > 0 || isLoading}
                       onClick={handleRequestOtp}
-                      className="text-orange-400 hover:underline disabled:opacity-50 disabled:no-underline"
+                      className="text-slate-900 hover:underline disabled:opacity-50 disabled:no-underline font-medium cursor-pointer"
                     >
                       {countdown > 0 ? `Resend code (${countdown}s)` : "Resend Code"}
                     </button>
@@ -560,14 +625,14 @@ export function AuthModal({
                   <button
                     type="submit"
                     disabled={isLoading || otpCode.length !== 6}
-                    className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-xl transition shadow-lg shadow-orange-600/20 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-black text-white text-sm font-semibold rounded-xl shadow-xs transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
                   >
                     {isLoading ? (
                       <RefreshCw className="w-4 h-4 animate-spin" />
                     ) : (
                       <>
-                        <ShieldCheck className="w-4 h-4" />
-                        <span>Verify Code &amp; Enter</span>
+                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                        <span>Verify Code &amp; Continue</span>
                       </>
                     )}
                   </button>
@@ -581,7 +646,7 @@ export function AuthModal({
                     setViewMode("better_auth");
                     setError(null);
                   }}
-                  className="text-xs text-neutral-400 hover:text-orange-400 transition"
+                  className="text-xs text-slate-500 hover:text-slate-900 transition font-medium cursor-pointer"
                 >
                   &larr; Back to GitHub &amp; Password Sign In
                 </button>
@@ -589,12 +654,14 @@ export function AuthModal({
             </div>
           )}
 
-          <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-center space-x-2 text-[11px] text-neutral-500">
-            <Lock className="w-3 h-3" />
-            <span>Protected by Secure Authentication &bull; End-to-End Encrypted</span>
+          {/* Modal Footer Note */}
+          <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-400 font-mono">
+            <Lock className="w-3 h-3 text-slate-400" />
+            <span>Protected by RateFactor Auth &bull; End-to-End Encrypted</span>
           </div>
         </div>
       </motion.div>
     </div>
   );
 }
+
