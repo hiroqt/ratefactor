@@ -8,7 +8,6 @@ import {
   ArrowUpRight, 
   ChevronUp, 
   MessageSquare, 
-  Clock, 
   CheckCircle2,
   Search,
   X,
@@ -124,10 +123,6 @@ export function ShowcaseBanner({
     return [...portfolios]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 4);
-  }, [portfolios]);
-
-  const totalUpvotes = useMemo(() => {
-    return portfolios.reduce((acc, p) => acc + (p.likesCount || 0), 0);
   }, [portfolios]);
 
   const handleInspect = (p: Portfolio, origin: string) => {
@@ -617,12 +612,6 @@ export function ShowcaseBanner({
               </div>
             </div>
 
-            {/* Bottom Meta */}
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-mono text-slate-500">
-              <span>{formatNumber(totalUpvotes)} votes recorded</span>
-              <span>Sorted by peer engagement</span>
-            </div>
-
           </article>
 
           {/* ========================================================================= */}
@@ -638,10 +627,6 @@ export function ShowcaseBanner({
                   Recently submitted software architectures and developer codebases.
                 </p>
               </div>
-              <span className="text-xs font-mono text-slate-500 flex items-center gap-1 mt-1 sm:mt-0">
-                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                <span>Latest index</span>
-              </span>
             </div>
 
             {/* Quad Grid */}
@@ -678,12 +663,6 @@ export function ShowcaseBanner({
                   </div>
                 </div>
               ))}
-            </div>
-
-            {/* Bottom Meta */}
-            <div className="pt-3.5 mt-3.5 border-t border-slate-100 flex items-center justify-between text-xs font-mono text-slate-500">
-              <span>{portfolios.length} architectures indexed</span>
-              <span>100% Peer Reviewed Rubric</span>
             </div>
           </article>
         </div>

@@ -187,8 +187,8 @@ export function HeroSection({
                   onClick={onExploreClick}
                   className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-white hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-medium border border-slate-200 transition-colors shadow-2xs cursor-pointer flex-1 sm:flex-initial"
                 >
-                  <span>Explore Feed</span>
-                  <ArrowDown className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Discover Feed</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
                 </button>
               </div>
             </div>

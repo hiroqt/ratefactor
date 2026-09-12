@@ -6,4 +6,6 @@ export * from "./components/ShowcaseBanner";
 export * from "./components/FilterBar";
 export * from "./components/RatingWidget";
 export * from "./components/HeroSection";
+export * from "@/components/AppCard";
+export * from "@/components/DiscoverApps";
 export * from "./hooks/usePortfolios";

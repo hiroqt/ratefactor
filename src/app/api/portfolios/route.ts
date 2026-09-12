@@ -11,6 +11,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category") || "All";
+    const hostParam = (searchParams.get("host") || "").toLowerCase().trim();
     const sort = searchParams.get("sort") || "highest_rated";
     const query = (searchParams.get("q") || "").toLowerCase().trim();
     const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit")) || 20));
@@ -18,9 +19,28 @@ export async function GET(req: NextRequest) {
 
     let filtered = [...dynamicPortfolios];
 
-    // Filter by Category
+    // Filter by Category / Domain
     if (category !== "All") {
       filtered = filtered.filter((p) => p.category === category);
+    }
+
+    // Filter by Host / TLD
+    if (hostParam && hostParam !== "all") {
+      filtered = filtered.filter((p) => {
+        let domain = "";
+        try {
+          if (p.portfolioUrl) {
+            domain = new URL(
+              p.portfolioUrl.startsWith("http") ? p.portfolioUrl : `https://${p.portfolioUrl}`
+            ).hostname.toLowerCase();
+          }
+        } catch {}
+
+        if (hostParam.startsWith(".")) {
+          return domain.endsWith(hostParam) || p.portfolioUrl?.toLowerCase().includes(hostParam);
+        }
+        return domain.includes(hostParam);
+      });
     }
 
     // Filter by Search Query (Primary Domain, Username, Title, Tech Stack)

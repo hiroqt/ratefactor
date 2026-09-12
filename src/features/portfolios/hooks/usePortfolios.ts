@@ -28,31 +28,39 @@ export interface UsePortfoliosOptions {
 }
 
 export function usePortfolios(options?: UsePortfoliosOptions) {
-  const [portfolios, setPortfolios] = useState<Portfolio[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("ratefactor_portfolios");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          // Purge legacy dummy portfolios if present in client localStorage
-          if (
-            Array.isArray(parsed) &&
-            parsed.some(
-              (p: any) =>
-                p.id === "hyperion-lsm" ||
-                p.id === "kubelens-tui" ||
-                p.id === "zenith-state"
-            )
-          ) {
-            localStorage.removeItem("ratefactor_portfolios");
-            return [];
-          }
-          return parsed;
+  const [portfolios, setPortfolios] = useState<Portfolio[]>(INITIAL_PORTFOLIOS);
+
+  // Hydration-safe initial load from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("ratefactor_portfolios");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Clean legacy placeholder items if any
+          const validSaved = parsed.filter(
+            (p: any) =>
+              p &&
+              p.id &&
+              p.id !== "hyperion-lsm" &&
+              p.id !== "kubelens-tui" &&
+              p.id !== "zenith-state"
+          );
+
+          // Merge with INITIAL_PORTFOLIOS so catalog updates are included while user changes are preserved
+          const map = new Map<string, Portfolio>();
+          INITIAL_PORTFOLIOS.forEach((p) => map.set(p.id, p));
+          validSaved.forEach((p: Portfolio) => {
+            if (p && p.id) {
+              map.set(p.id, p);
+            }
+          });
+          const merged = Array.from(map.values());
+          setPortfolios(merged);
         }
-      } catch (e) {}
-    }
-    return INITIAL_PORTFOLIOS;
-  });
+      }
+    } catch (e) {}
+  }, []);
 
   const [selectedPortfolio, setSelectedPortfolio] = useState<Portfolio | null>(null);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);

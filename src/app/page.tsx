@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Navbar, Footer } from "@/components/layout";
 import {
   HeroSection,
   ShowcaseBanner,
+  DiscoverApps,
   PortfolioDetailModal,
   SubmitPortfolioModal,
   usePortfolios,
@@ -23,6 +25,7 @@ import { PublicProfileModal } from "@/components/PublicProfileModal";
 import { Terminal, ArrowLeft } from "lucide-react";
 
 export default function Home() {
+  const router = useRouter();
   const { toast } = useToast();
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [visitedUser, setVisitedUser] = useState<DeveloperProfile | null>(null);
@@ -227,6 +230,24 @@ export default function Home() {
               />
             </div>
           </div>
+        ) : activeNavTab === "apps" ? (
+          /* Dedicated Discover Apps View */
+          <div className="pt-2 animate-in fade-in duration-300">
+            <DiscoverApps
+              portfolios={portfolios}
+              onSelectPortfolio={(p) => setSelectedPortfolio(p)}
+              onLikeToggle={handleLikeToggle}
+              onReact={handleReact}
+              onOpenSubmitModal={() => {
+                if (!currentUser) {
+                  requireAuth("Sign in with GitHub or Email to submit an app.");
+                  return;
+                }
+                setIsSubmitModalOpen(true);
+              }}
+              initialCategory={activeCategory}
+            />
+          </div>
         ) : (
           <>
             {/* Hero Section (Only in discover mode) */}
@@ -242,8 +263,7 @@ export default function Home() {
                   setIsSubmitModalOpen(true);
                 }}
                 onExploreClick={() => {
-                  const el = document.getElementById("showcase-bento");
-                  el?.scrollIntoView({ behavior: "smooth" });
+                  router.push("/apps");
                 }}
                 profile={developerProfile}
                 totalDevelopers={totalDevelopers}

@@ -197,6 +197,12 @@ export function Navbar({
       } else {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
+    } else if (tab === "apps") {
+      if (pathname !== "/apps") {
+        router.push("/apps");
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     } else if (tab === "discover") {
       if (pathname !== "/") {
         router.push("/");
@@ -340,6 +346,18 @@ export function Navbar({
               Showcases
             </button>
 
+            {/* Discover Apps Link */}
+            <button
+              type="button"
+              onClick={() => handleNavClick("apps")}
+              className={cn(
+                "whitespace-nowrap text-xs sm:text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors py-1.5 px-3 rounded-lg hover:bg-slate-100 cursor-pointer",
+                activeNavTab === "apps" && "text-slate-950 font-semibold bg-slate-100"
+              )}
+            >
+              Discover Apps
+            </button>
+
             {/* Leaderboard Link */}
             <button
               type="button"
@@ -403,7 +421,7 @@ export function Navbar({
 
           {/* RIGHT: Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 lg:gap-3.5 shrink-0">
-            {/* Search Trigger */}
+            {/* Search Icon Trigger (Unified with Dashboard animated search modal) */}
             <button
               type="button"
               onClick={() => setShowSearchModal(true)}
@@ -621,6 +639,21 @@ export function Navbar({
                 >
                   <span className="font-semibold whitespace-nowrap">Showcases</span>
                   <span className="text-[10px] font-mono opacity-80 whitespace-nowrap">Daily &amp; Weekly</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    handleNavClick("apps");
+                  }}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left cursor-pointer",
+                    activeNavTab === "apps" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-50"
+                  )}
+                >
+                  <span className="font-semibold whitespace-nowrap">Discover Apps</span>
+                  <span className="text-[10px] font-mono opacity-80 whitespace-nowrap">All Domains</span>
                 </button>
 
                 <button
