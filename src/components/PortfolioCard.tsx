@@ -14,7 +14,7 @@ import { Portfolio } from "@/types/portfolio";
 import { cn, formatNumber, formatRating } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
 
-interface PortfolioCardProps {
+export interface PortfolioCardProps {
   portfolio: Portfolio;
   onSelect: (portfolio: Portfolio) => void;
   onLikeToggle?: (id: string, liked: boolean) => void;
@@ -52,6 +52,12 @@ export function PortfolioCard({
 
   const getCategoryColor = (cat: string) => {
     switch (cat) {
+      case "Developer":
+        return "text-indigo-800 bg-indigo-50 border-indigo-200";
+      case "Arts":
+        return "text-rose-800 bg-rose-50 border-rose-200";
+      case "Client":
+        return "text-teal-800 bg-teal-50 border-teal-200";
       case "Systems":
         return "text-amber-800 bg-amber-50 border-amber-200";
       case "Design Engineer":

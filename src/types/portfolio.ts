@@ -1,5 +1,8 @@
 export type PortfolioCategory =
   | "All"
+  | "Developer"
+  | "Arts"
+  | "Client"
   | "Frontend"
   | "Fullstack"
   | "Systems"
@@ -42,7 +45,7 @@ export interface Portfolio {
     isVerified?: boolean;
   };
   techStack: string[];
-  category: "Frontend" | "Fullstack" | "Systems" | "Design Engineer" | "Mobile" | "AI / ML";
+  category: "Developer" | "Arts" | "Client" | "Frontend" | "Fullstack" | "Systems" | "Design Engineer" | "Mobile" | "AI / ML";
   rating: number;
   ratingCount: number;
   ratingBreakdown: RatingBreakdown;

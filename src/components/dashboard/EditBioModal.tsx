@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   X, 
   User, 
@@ -98,6 +98,9 @@ export function EditBioModal({
   const [newSkill, setNewSkill] = useState("");
   const [readmeMarkdown, setReadmeMarkdown] = useState(profile.readmeMarkdown || "");
 
+  const modalRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (isOpen) {
       setName(profile.name);
@@ -122,10 +125,54 @@ export function EditBioModal({
       if (e.key === "Escape") onClose();
     };
     if (isOpen) {
+      document.body.style.overflow = "hidden";
       window.addEventListener("keydown", handleKeyDown);
-      return () => window.removeEventListener("keydown", handleKeyDown);
     }
+    return () => {
+      document.body.style.overflow = "unset";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [isOpen, onClose]);
+
+  // Isolate scroll so ONLY the modal content scrolls when cursor is inside modal (matching Notification pattern)
+  useEffect(() => {
+    if (!isOpen) return;
+    const modalEl = modalRef.current;
+    const scrollEl = scrollRef.current;
+    if (!modalEl || !scrollEl) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.stopPropagation();
+
+      const deltaY = e.deltaY;
+      const isDirectlyOnScroll = e.target && scrollEl.contains(e.target as Node);
+
+      if (!isDirectlyOnScroll) {
+        e.preventDefault();
+        scrollEl.scrollTop += deltaY;
+        return;
+      }
+
+      const atTop = scrollEl.scrollTop <= 0;
+      const atBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight <= 1;
+
+      if ((deltaY < 0 && atTop) || (deltaY > 0 && atBottom)) {
+        e.preventDefault();
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.stopPropagation();
+    };
+
+    modalEl.addEventListener("wheel", handleWheel, { passive: false });
+    modalEl.addEventListener("touchmove", handleTouchMove, { passive: true });
+
+    return () => {
+      modalEl.removeEventListener("wheel", handleWheel);
+      modalEl.removeEventListener("touchmove", handleTouchMove);
+    };
+  }, [isOpen, activeTab]);
 
   if (!isOpen) return null;
 
@@ -166,7 +213,7 @@ export function EditBioModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-hidden">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -176,17 +223,20 @@ export function EditBioModal({
       />
 
       <motion.div
+        ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-bio-modal-title"
+        data-lenis-prevent="true"
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 15 }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-2xl bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden z-10 my-8"
+        className="relative w-full max-w-2xl bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden z-10 max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80 shrink-0">
           <div className="flex items-center gap-2">
             <User className="w-4 h-4 text-slate-700" />
             <h3 id="edit-bio-modal-title" className="font-bold text-slate-900 text-sm">
@@ -239,16 +289,17 @@ export function EditBioModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors ml-1"
+              className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors ml-1 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Scrollable Form Body */}
-        <form onSubmit={handleSave} className="p-6 max-h-[75vh] overflow-y-auto space-y-4">
-          {activeTab === "general" && (
+        {/* Form Body */}
+        <form onSubmit={handleSave} className="flex-1 flex flex-col overflow-hidden min-h-0">
+          <div ref={scrollRef} data-lenis-prevent="true" className="p-6 flex-1 overflow-y-auto overscroll-contain space-y-4">
+            {activeTab === "general" && (
             <>
               {/* Avatar Selector & Preview */}
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
@@ -598,13 +649,14 @@ export function EditBioModal({
               </div>
             </div>
           )}
+          </div>
 
           {/* Footer Actions */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+          <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-end gap-3 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-full border border-slate-200 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+              className="px-4 py-2 rounded-full border border-slate-200 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
             >
               Cancel
             </button>

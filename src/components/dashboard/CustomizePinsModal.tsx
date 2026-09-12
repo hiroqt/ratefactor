@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   X, 
   Pin, 
@@ -41,6 +41,9 @@ export function CustomizePinsModal({
   const [currentSpotlight, setCurrentSpotlight] = useState<string | undefined>(spotlightId);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const modalRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (isOpen) {
       setSelectedIds(pinnedIds);
@@ -54,10 +57,54 @@ export function CustomizePinsModal({
       if (e.key === "Escape") onClose();
     };
     if (isOpen) {
+      document.body.style.overflow = "hidden";
       window.addEventListener("keydown", handleKeyDown);
-      return () => window.removeEventListener("keydown", handleKeyDown);
     }
+    return () => {
+      document.body.style.overflow = "unset";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [isOpen, onClose]);
+
+  // Isolate scroll so ONLY the modal content scrolls when cursor is inside modal (matching Notification pattern)
+  useEffect(() => {
+    if (!isOpen) return;
+    const modalEl = modalRef.current;
+    const scrollEl = scrollRef.current;
+    if (!modalEl || !scrollEl) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.stopPropagation();
+
+      const deltaY = e.deltaY;
+      const isDirectlyOnScroll = e.target && scrollEl.contains(e.target as Node);
+
+      if (!isDirectlyOnScroll) {
+        e.preventDefault();
+        scrollEl.scrollTop += deltaY;
+        return;
+      }
+
+      const atTop = scrollEl.scrollTop <= 0;
+      const atBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight <= 1;
+
+      if ((deltaY < 0 && atTop) || (deltaY > 0 && atBottom)) {
+        e.preventDefault();
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.stopPropagation();
+    };
+
+    modalEl.addEventListener("wheel", handleWheel, { passive: false });
+    modalEl.addEventListener("touchmove", handleTouchMove, { passive: true });
+
+    return () => {
+      modalEl.removeEventListener("wheel", handleWheel);
+      modalEl.removeEventListener("touchmove", handleTouchMove);
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -109,7 +156,7 @@ export function CustomizePinsModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-hidden">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -119,17 +166,20 @@ export function CustomizePinsModal({
       />
 
       <motion.div
+        ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="customize-pins-title"
+        data-lenis-prevent="true"
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 15 }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-xl bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden z-10 my-8"
+        className="relative w-full max-w-xl bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden z-10 max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80 shrink-0">
           <div className="flex items-center gap-2">
             <Pin className="w-4 h-4 text-slate-700" />
             <div>
@@ -145,14 +195,14 @@ export function CustomizePinsModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+            className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Search & Counter Bar */}
-        <div className="px-6 py-3 border-b border-slate-100 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div className="px-6 py-3 border-b border-slate-100 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
           <div className="relative flex-1">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
             <input
@@ -191,7 +241,7 @@ export function CustomizePinsModal({
         </div>
 
         {/* Portfolio List */}
-        <div className="p-6 max-h-[60vh] overflow-y-auto space-y-2.5">
+        <div ref={scrollRef} data-lenis-prevent="true" className="p-6 flex-1 overflow-y-auto overscroll-contain space-y-2.5">
           {myPortfolios.length === 0 ? (
             <div className="p-8 border border-dashed border-slate-200 rounded-2xl text-center">
               <p className="text-xs text-slate-500 mb-3">
@@ -203,7 +253,7 @@ export function CustomizePinsModal({
                   onClose();
                   onOpenSubmitModal();
                 }}
-                className="px-4 py-2 rounded-full bg-slate-900 text-white text-xs font-semibold"
+                className="px-4 py-2 rounded-full bg-slate-900 text-white text-xs font-semibold cursor-pointer"
               >
                 + Submit Your First Project
               </button>
@@ -284,7 +334,7 @@ export function CustomizePinsModal({
                         type="button"
                         onClick={(e) => handleSelectSpotlight(portfolio.id, e)}
                         className={cn(
-                          "px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors flex items-center gap-1",
+                          "px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors flex items-center gap-1 cursor-pointer",
                           isSpotlight
                             ? "bg-amber-500 text-white border-amber-600"
                             : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
@@ -305,7 +355,7 @@ export function CustomizePinsModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between">
+        <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between shrink-0">
           <div className="text-[11px] text-slate-500">
             Showcase items appear prominently on your profile shelf.
           </div>
@@ -314,14 +364,14 @@ export function CustomizePinsModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-1.5 rounded-full border border-slate-200 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+              className="px-3.5 py-1.5 rounded-full border border-slate-200 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="px-5 py-1.5 rounded-full bg-slate-900 hover:bg-neutral-800 text-white text-xs font-semibold shadow-sm transition-all"
+              className="px-5 py-1.5 rounded-full bg-slate-900 hover:bg-neutral-800 text-white text-xs font-semibold shadow-sm transition-all cursor-pointer"
             >
               Save Showcase Pins
             </button>

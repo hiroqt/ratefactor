@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   X, 
   Terminal, 
@@ -19,6 +19,11 @@ import { Portfolio, PortfolioCategory } from "@/types/portfolio";
 import { DeveloperProfile } from "@/types/profile";
 import { PortfolioCard } from "./PortfolioCard";
 import { cn, isValidHttpUrl, normalizeUrl } from "@/lib/utils";
+import { 
+  validatePortfolioDescription, 
+  validateImageUpload, 
+  MIN_DESCRIPTION_CHARACTERS,
+} from "@/lib/guardrails";
 
 interface SubmitPortfolioModalProps {
   isOpen: boolean;
@@ -26,6 +31,7 @@ interface SubmitPortfolioModalProps {
   onSubmit: (newPortfolio: Portfolio) => void;
   existingPortfolios: Portfolio[];
   profile?: DeveloperProfile;
+  currentUser?: any;
 }
 
 const PRESET_THUMBNAILS = [
@@ -66,6 +72,7 @@ export function SubmitPortfolioModal({
   onSubmit,
   existingPortfolios,
   profile,
+  currentUser,
 }: SubmitPortfolioModalProps) {
   const [title, setTitle] = useState("");
   const [tagline, setTagline] = useState("");
@@ -74,11 +81,21 @@ export function SubmitPortfolioModal({
   const [githubUrl, setGithubUrl] = useState("");
   const [demoUrl, setDemoUrl] = useState("");
   const [thumbnail, setThumbnail] = useState(PRESET_THUMBNAILS[0].url);
-  const [category, setCategory] = useState<"Frontend" | "Fullstack" | "Systems" | "Design Engineer" | "Mobile" | "AI / ML">("Frontend");
+  const [category, setCategory] = useState<"Developer" | "Arts" | "Client" | "Frontend" | "Fullstack" | "Systems" | "Design Engineer" | "Mobile" | "AI / ML">("Developer");
   const [techStack, setTechStack] = useState<string[]>(["TypeScript", "Next.js 15"]);
   const [customTech, setCustomTech] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"form" | "preview">("form");
+
+  // Single image upload & quota tracking (Free tier standard: Max 2 MB, 1 image)
+  const [uploadedFile, setUploadedFile] = useState<{ name: string; size: number; url: string } | null>(null);
+  const [fileUploadError, setFileUploadError] = useState<string | null>(null);
+
+  const modalRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Description character count (optional field, min 200 chars if provided)
+  const descriptionChars = description.trim().length;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -87,10 +104,74 @@ export function SubmitPortfolioModal({
       }
     };
     if (isOpen) {
+      document.body.style.overflow = "hidden";
       window.addEventListener("keydown", handleKeyDown);
-      return () => window.removeEventListener("keydown", handleKeyDown);
     }
+    return () => {
+      document.body.style.overflow = "unset";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [isOpen, onClose]);
+
+  // Isolate scroll so ONLY the modal content scrolls when cursor is inside modal (matching Notification pattern)
+  useEffect(() => {
+    if (!isOpen) return;
+    const modalEl = modalRef.current;
+    const scrollEl = scrollRef.current;
+    if (!modalEl || !scrollEl) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.stopPropagation();
+
+      const deltaY = e.deltaY;
+      const isDirectlyOnScroll = e.target && scrollEl.contains(e.target as Node);
+
+      if (!isDirectlyOnScroll) {
+        e.preventDefault();
+        scrollEl.scrollTop += deltaY;
+        return;
+      }
+
+      const atTop = scrollEl.scrollTop <= 0;
+      const atBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight <= 1;
+
+      if ((deltaY < 0 && atTop) || (deltaY > 0 && atBottom)) {
+        e.preventDefault();
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.stopPropagation();
+    };
+
+    modalEl.addEventListener("wheel", handleWheel, { passive: false });
+    modalEl.addEventListener("touchmove", handleTouchMove, { passive: true });
+
+    return () => {
+      modalEl.removeEventListener("wheel", handleWheel);
+      modalEl.removeEventListener("touchmove", handleTouchMove);
+    };
+  }, [isOpen, activeTab]);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validation = validateImageUpload(file);
+    if (!validation.isValid) {
+      setFileUploadError(validation.error || "File exceeds maximum size of 2 MB.");
+      return;
+    }
+
+    setFileUploadError(null);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const url = event.target?.result as string;
+      setUploadedFile({ name: file.name, size: file.size, url });
+      setThumbnail(url);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const resetForm = () => {
     setTitle("");
@@ -100,7 +181,9 @@ export function SubmitPortfolioModal({
     setGithubUrl("");
     setDemoUrl("");
     setThumbnail(PRESET_THUMBNAILS[0].url);
-    setCategory("Frontend");
+    setUploadedFile(null);
+    setFileUploadError(null);
+    setCategory("Developer");
     setTechStack(["TypeScript", "Next.js 15"]);
     setCustomTech("");
     setError(null);
@@ -163,6 +246,18 @@ export function SubmitPortfolioModal({
       return;
     }
 
+    // Optional description: if provided, must be at least 200 characters
+    const descValidation = validatePortfolioDescription(description);
+    if (!descValidation.isValid) {
+      setError(descValidation.error || `If provided, description must be at least ${MIN_DESCRIPTION_CHARACTERS} characters.`);
+      return;
+    }
+
+    if (!thumbnail) {
+      setError("Cover image is required. Please upload an image (max 2 MB) or select a preset.");
+      return;
+    }
+
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     const id = slug ? `${slug}-${Date.now().toString(36)}` : `portfolio-${Date.now().toString(36)}`;
 
@@ -176,10 +271,10 @@ export function SubmitPortfolioModal({
       demoUrl: demoUrl.trim() || portfolioUrl.trim(),
       thumbnail,
       author: {
-        name: profile?.name || "Arnel Rivera",
-        username: profile?.username || "arneldev",
-        avatar: profile?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
-        role: profile?.role || "Principal Architect",
+        name: currentUser?.name || profile?.name || "Arnel Rivera",
+        username: currentUser?.username || profile?.username || "arneldev",
+        avatar: currentUser?.avatar || profile?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
+        role: currentUser?.role || profile?.role || "Principal Architect",
         isVerified: true,
       },
       techStack,
@@ -214,10 +309,10 @@ export function SubmitPortfolioModal({
     githubUrl: githubUrl || "https://github.com/user/repo",
     thumbnail,
     author: {
-      name: "Arnel Rivera",
-      username: "arneldev",
-      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
-      role: "Principal Architect",
+      name: currentUser?.name || profile?.name || "Arnel Rivera",
+      username: currentUser?.username || profile?.username || "arneldev",
+      avatar: currentUser?.avatar || profile?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
+      role: currentUser?.role || profile?.role || "Principal Architect",
       isVerified: true,
     },
     techStack: techStack.length > 0 ? techStack : ["TypeScript", "Next.js"],
@@ -240,7 +335,7 @@ export function SubmitPortfolioModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 overflow-hidden">
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -250,19 +345,22 @@ export function SubmitPortfolioModal({
       />
 
       <motion.div 
+        ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="submit-modal-title"
+        data-lenis-prevent="true"
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 15 }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-2xl bg-white rounded-t-2xl sm:rounded-2xl border border-slate-200 shadow-2xl overflow-hidden z-10 my-0 sm:my-8 max-h-[92vh] sm:max-h-[90vh] flex flex-col"
+        className="relative w-full max-w-2xl bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden z-10 max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="absolute top-0 inset-x-12 h-[1px] bg-gradient-to-r from-transparent via-slate-200 to-transparent pointer-events-none" />
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 bg-slate-50/80">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 bg-slate-50/80 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <div className="p-1.5 rounded-lg bg-slate-100 text-slate-900 border border-slate-200 shrink-0">
               <Terminal className="w-4 h-4" />
@@ -300,7 +398,7 @@ export function SubmitPortfolioModal({
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors ml-0.5"
+              className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors ml-0.5 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -308,7 +406,7 @@ export function SubmitPortfolioModal({
         </div>
 
         {/* Content */}
-        <div className="p-4 sm:p-6 flex-1 overflow-y-auto">
+        <div ref={scrollRef} data-lenis-prevent="true" className="p-4 sm:p-6 flex-1 overflow-y-auto overscroll-contain">
           {error && (
             <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -392,56 +490,116 @@ export function SubmitPortfolioModal({
 
               <div>
                 <label className="block text-xs font-medium text-slate-900 mb-1">
-                  Primary Domain Category
+                  Primary Domain *
                 </label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as any)}
                   className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-slate-900 transition-colors shadow-xs"
                 >
-                  <option value="Frontend">Frontend Architecture</option>
-                  <option value="Systems">Systems & Low-Level</option>
-                  <option value="Fullstack">Fullstack / Cloud</option>
-                  <option value="Design Engineer">Design Engineering</option>
-                  <option value="AI / ML">AI / Machine Learning</option>
-                  <option value="Mobile">Mobile Native</option>
+                  <optgroup label="Portfolio Type">
+                    <option value="Developer">Developer Portfolio</option>
+                    <option value="Arts">Arts Portfolio</option>
+                    <option value="Client">Client Portfolio</option>
+                  </optgroup>
+                  <optgroup label="Technical Domain">
+                    <option value="Frontend">Frontend Architecture</option>
+                    <option value="Systems">Systems &amp; Low-Level</option>
+                    <option value="Fullstack">Fullstack / Cloud</option>
+                    <option value="Design Engineer">Design Engineering</option>
+                    <option value="AI / ML">AI / Machine Learning</option>
+                    <option value="Mobile">Mobile Native</option>
+                  </optgroup>
                 </select>
               </div>
 
-              {/* Thumbnail Selector */}
+              {/* Single Image Upload (Max 2 MB, 1 Image Only) */}
               <div>
-                <label className="block text-xs font-medium text-slate-900 mb-1.5">
-                  Visual Banner Preset
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {PRESET_THUMBNAILS.map((thumb) => (
-                    <div
-                      key={thumb.label}
-                      onClick={() => setThumbnail(thumb.url)}
-                      className={cn(
-                        "relative aspect-[16/10] rounded-xl overflow-hidden border cursor-pointer group transition-all",
-                        thumbnail === thumb.url
-                          ? "border-slate-900 ring-2 ring-slate-900/20 shadow-md"
-                          : "border-slate-200 hover:border-slate-300"
-                      )}
-                    >
-                      <img
-                        src={thumb.url}
-                        alt={thumb.label}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-slate-950/60 flex items-end p-1.5">
-                        <span className="text-[10px] font-mono font-medium text-white truncate">
-                          {thumb.label}
-                        </span>
-                      </div>
-                      {thumbnail === thumb.url && (
-                        <div className="absolute top-1.5 right-1.5 p-0.5 rounded-full bg-slate-900 text-white">
-                          <Check className="w-2.5 h-2.5 stroke-[3]" />
-                        </div>
-                      )}
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-medium text-slate-900">
+                    Cover Banner Image *
+                  </label>
+                  <span className="text-[11px] text-slate-500 font-mono">
+                    Max 2 MB (PNG, JPG, WebP)
+                  </span>
+                </div>
+
+                {/* File Upload Dropzone */}
+                <div className="relative border-2 border-dashed border-slate-200 hover:border-slate-300 rounded-xl p-3 text-center transition bg-slate-50/50">
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handleFileUpload}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                  <div className="flex flex-col items-center justify-center gap-1 py-1">
+                    <Upload className="w-5 h-5 text-slate-400" />
+                    <p className="text-xs font-medium text-slate-700">
+                      Click or drag & drop custom cover image
+                    </p>
+                    <p className="text-[10px] text-slate-500 font-mono">
+                      PNG, JPG or WebP strictly up to 2.00 MB
+                    </p>
+                  </div>
+                </div>
+
+                {fileUploadError && (
+                  <p className="mt-1.5 text-xs text-rose-600 font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {fileUploadError}
+                  </p>
+                )}
+
+                {uploadedFile && (
+                  <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 truncate">
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span className="font-mono text-emerald-800 truncate">{uploadedFile.name}</span>
                     </div>
-                  ))}
+                    <span className="text-[10px] font-mono text-emerald-600 shrink-0">
+                      {(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB / 2.00 MB
+                    </span>
+                  </div>
+                )}
+
+                {/* Or choose from Presets */}
+                <div className="mt-3">
+                  <span className="text-[11px] font-mono text-slate-400 block mb-1">
+                    Or select a verified preset banner:
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {PRESET_THUMBNAILS.map((thumb) => (
+                      <div
+                        key={thumb.label}
+                        onClick={() => {
+                          setThumbnail(thumb.url);
+                          setUploadedFile(null);
+                        }}
+                        className={cn(
+                          "relative aspect-[16/10] rounded-xl overflow-hidden border cursor-pointer group transition-all",
+                          thumbnail === thumb.url && !uploadedFile
+                            ? "border-slate-900 ring-2 ring-slate-900/20 shadow-md"
+                            : "border-slate-200 hover:border-slate-300"
+                        )}
+                      >
+                        <img
+                          src={thumb.url}
+                          alt={thumb.label}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-slate-950/60 flex items-end p-1.5">
+                          <span className="text-[10px] font-mono font-medium text-white truncate">
+                            {thumb.label}
+                          </span>
+                        </div>
+                        {thumbnail === thumb.url && !uploadedFile && (
+                          <div className="absolute top-1.5 right-1.5 p-0.5 rounded-full bg-slate-900 text-white">
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -484,17 +642,46 @@ export function SubmitPortfolioModal({
                 </div>
               </div>
 
+              {/* Description — Optional, min 200 chars if provided */}
               <div>
-                <label className="block text-xs font-medium text-slate-900 mb-1">
-                  Architecture & Implementation Notes
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-slate-900">
+                    Description <span className="text-slate-400 font-normal">(optional)</span>
+                  </label>
+                  {descriptionChars > 0 && (
+                    <span
+                      className={cn(
+                        "text-[11px] font-mono px-2 py-0.5 rounded font-medium",
+                        descriptionChars >= MIN_DESCRIPTION_CHARACTERS
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-amber-100 text-amber-800"
+                      )}
+                    >
+                      {descriptionChars} / {MIN_DESCRIPTION_CHARACTERS} chars
+                    </span>
+                  )}
+                </div>
                 <textarea
-                  rows={4}
-                  placeholder="Detail your concurrency model, state machines, rendering loop, or benchmark numbers..."
+                  rows={5}
+                  placeholder="Optional — add context about your portfolio, process, or approach (if provided, must be at least 200 characters)..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="w-full bg-white border border-slate-200 rounded-xl p-3.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/10 transition-colors resize-none shadow-xs"
                 />
+                {descriptionChars > 0 && descriptionChars < MIN_DESCRIPTION_CHARACTERS && (
+                  <p className="text-[11px] text-amber-600 font-mono mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                    <span>
+                      Description needs at least {MIN_DESCRIPTION_CHARACTERS - descriptionChars} more character{MIN_DESCRIPTION_CHARACTERS - descriptionChars !== 1 ? "s" : ""}, or clear it entirely.
+                    </span>
+                  </p>
+                )}
+                {descriptionChars >= MIN_DESCRIPTION_CHARACTERS && (
+                  <p className="text-[11px] text-emerald-600 font-mono mt-1 flex items-center gap-1">
+                    <Check className="w-3 h-3 flex-shrink-0" />
+                    <span>Description length looks good ({descriptionChars} characters).</span>
+                  </p>
+                )}
               </div>
 
               {/* Submit CTA */}

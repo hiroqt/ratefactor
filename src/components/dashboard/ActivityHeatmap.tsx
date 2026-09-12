@@ -11,8 +11,8 @@ interface ActivityDay {
   activityType?: "submission" | "rating" | "comment" | "showcase";
 }
 
-// Generate realistic mock developer activity data for the last 20 weeks (140 days)
-function generateMockHeatmap(): ActivityDay[] {
+// Generate clean activity heatmap data for the last 20 weeks (140 days)
+function generateCleanHeatmap(): ActivityDay[] {
   const days: ActivityDay[] = [];
   const today = new Date();
   
@@ -21,41 +21,16 @@ function generateMockHeatmap(): ActivityDay[] {
     d.setDate(d.getDate() - i);
     const dateStr = d.toISOString().split("T")[0];
     
-    // Seed pseudo-realistic high activity on weekdays, lighter on weekends
-    const dayOfWeek = d.getDay();
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-    
-    // Random activity count biased towards weekdays
-    let raw = (Math.sin(i * 0.4) + Math.cos(i * 0.15) + 2) * (isWeekend ? 0.8 : 2.2);
-    let count = Math.max(0, Math.floor(raw));
-    
-    // Higher activity for recent weeks
-    if (i < 20) count += 2;
-    
-    let level: 0 | 1 | 2 | 3 | 4 = 0;
-    if (count > 0 && count <= 2) level = 1;
-    else if (count > 2 && count <= 4) level = 2;
-    else if (count > 4 && count <= 7) level = 3;
-    else if (count > 7) level = 4;
-
-    const activityTypes: Array<"submission" | "rating" | "comment" | "showcase"> = [
-      "rating",
-      "comment",
-      "submission",
-      "rating",
-    ];
-
     days.push({
       date: dateStr,
-      count,
-      level,
-      activityType: count > 0 ? activityTypes[i % activityTypes.length] : undefined,
+      count: 0,
+      level: 0,
     });
   }
   return days;
 }
 
-const HEATMAP_DATA = generateMockHeatmap();
+const HEATMAP_DATA = generateCleanHeatmap();
 
 export function ActivityHeatmap() {
   const [hoveredDay, setHoveredDay] = useState<ActivityDay | null>(null);
@@ -74,8 +49,8 @@ export function ActivityHeatmap() {
         </div>
 
         <div className="flex items-center gap-3 text-[11px] font-mono text-slate-500">
-          <span className="flex items-center gap-1 text-emerald-700 font-semibold">
-            <Flame className="w-3 h-3 fill-emerald-500 text-emerald-500" /> 16-day active streak
+          <span className="flex items-center gap-1 text-slate-500 font-semibold">
+            <Flame className="w-3 h-3 text-slate-400" /> {totalContributions > 0 ? `${totalContributions} contributions recorded` : "0-day active streak"}
           </span>
         </div>
       </div>

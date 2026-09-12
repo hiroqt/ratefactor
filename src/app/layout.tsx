@@ -22,7 +22,7 @@ export const viewport = {
   initialScale: 1,
 };
 
-import { SmoothScrollProvider } from "@/components/SmoothScrollProvider";
+import { AppProviders } from "@/context";
 
 export default function RootLayout({
   children,
@@ -40,11 +40,11 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-background text-foreground selection:bg-slate-900 selection:text-white relative overflow-x-hidden">
-        <SmoothScrollProvider>
+        <AppProviders>
           <div className="relative z-10">
             {children}
           </div>
-        </SmoothScrollProvider>
+        </AppProviders>
       </body>
     </html>
   );

@@ -30,6 +30,9 @@ interface FilterBarProps {
 
 const CATEGORIES: PortfolioCategory[] = [
   "All",
+  "Developer",
+  "Arts",
+  "Client",
   "Systems",
   "Frontend",
   "Fullstack",

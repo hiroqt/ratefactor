@@ -1,12 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDown, ArrowRight, User } from "lucide-react";
+import { ArrowDown, ArrowRight, Users } from "lucide-react";
 import { Portfolio } from "@/types/portfolio";
 import { DeveloperProfile } from "@/types/profile";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 import { AdykrniShader } from "./AdykrniShader.webgl";
 
 interface HeroSectionProps {
@@ -15,6 +14,7 @@ interface HeroSectionProps {
   onSubmitClick: () => void;
   onExploreClick: () => void;
   profile?: DeveloperProfile;
+  totalDevelopers?: number;
 }
 
 export function HeroSection({
@@ -23,6 +23,7 @@ export function HeroSection({
   onSubmitClick,
   onExploreClick,
   profile,
+  totalDevelopers,
 }: HeroSectionProps) {
   const [activeKeywordIndex, setActiveKeywordIndex] = useState(0);
   // Grounded in RateFactor ARD & PRD specifications (Sections 1, 4.1, 4.3, 6)
@@ -45,6 +46,8 @@ export function HeroSection({
   const handleToggleKeyword = () => {
     setActiveKeywordIndex((prev) => (prev + 1) % keywords.length);
   };
+
+  const devCount = totalDevelopers ?? 1420;
 
   return (
     <section className="relative w-full min-h-[85vh] lg:min-h-[90vh] flex flex-col justify-between overflow-hidden select-none bg-[#fafafa] text-slate-950">
@@ -111,7 +114,7 @@ export function HeroSection({
             </h1>
           </motion.div>
 
-          {/* Right Column (4 cols): ARD/PRD Core Value, Dual Action CTAs & Showcase Teaser */}
+          {/* Right Column (4 cols): ARD/PRD Core Value, Total Developers & Dual Action CTAs */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -136,82 +139,43 @@ export function HeroSection({
                 </div>
               )}
 
-              {/* Dedicated Profile Dashboard Feature Card */}
-              <Link
-                href="/profile"
-                className="group flex items-center justify-between p-2.5 sm:p-3 rounded-lg bg-white border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer w-full"
-                title="Open dedicated Profile Dashboard"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="relative shrink-0">
-                    <img
-                      src={profile?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80"}
-                      alt={profile?.name || "Developer"}
-                      className="w-9 h-9 rounded-md object-cover border border-slate-200"
-                    />
-                    <span
-                      className={cn(
-                        "absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white",
-                        profile?.status?.isBusy
-                          ? "bg-amber-500"
-                          : profile?.status?.statusType === "offline"
-                          ? "bg-slate-400"
-                          : "bg-emerald-500"
-                      )}
-                    />
-                  </div>
-                  <div className="text-left min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-bold text-slate-900 group-hover:underline truncate">
-                        {profile?.name || "Arnel Rivera"}
-                      </span>
-                      <span className="text-[11px] text-slate-500 font-mono">
-                        @{profile?.username || "arneldev"}
-                      </span>
-                      {profile?.status?.emoji && (
-                        <span className="text-xs">{profile.status.emoji}</span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                      {profile?.status?.message || "Bio, status & pinned showcase shelf"}
-                    </p>
+              {/* Total Developers Live Counter Badge (Replaced User Profile card) */}
+              <div className="flex items-center">
+                <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/90 border border-slate-200/90 shadow-2xs backdrop-blur-xs">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                    <Users className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="font-medium text-slate-600">Total Developers:</span>
+                    <span className="font-bold text-slate-950 font-mono tracking-tight text-xs">
+                      {formatNumber(devCount)}+
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 text-xs font-medium text-slate-700 group-hover:text-slate-900 transition-colors shrink-0 pl-3">
-                  <span className="hidden sm:inline">Profile</span>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-900 transition-colors" />
-                </div>
-              </Link>
+              </div>
 
               {/* Subtitle Paragraph directly quoting PRD Section 1 Core Value */}
               <p className="text-sm sm:text-[15px] text-slate-600 leading-relaxed font-normal">
                 Discover great developer work, get your work seen, and improve through community feedback. At <strong className="text-slate-950 font-semibold">RateFactor</strong>, engineers showcase codebases, earn authentic peer ratings across our 4-factor rubric, and compete for Daily &amp; Weekly Showcases.
               </p>
 
-              {/* Editorial Action Buttons Row */}
-              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 pt-1">
+              {/* Editorial Action Buttons Row (Submit Portfolio & Explore Feed) */}
+              <div className="flex flex-wrap items-center gap-2.5 pt-1">
                 <button
                   type="button"
                   onClick={onSubmitClick}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs sm:text-sm font-medium border border-slate-900 transition-colors cursor-pointer w-full sm:w-auto"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-slate-900 hover:bg-black text-white text-xs sm:text-sm font-medium border border-slate-900 transition-all shadow-xs hover:shadow-sm cursor-pointer w-full sm:w-auto"
                 >
                   <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
                   <span>Submit Portfolio</span>
                 </button>
 
-                <Link
-                  href="/profile"
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-900 text-xs sm:text-sm font-medium border border-slate-200 transition-colors cursor-pointer group flex-1 sm:flex-initial"
-                >
-                  <User className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-900 transition-colors" />
-                  <span>Profile Dashboard</span>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-900 transition-colors" />
-                </Link>
-
                 <button
                   type="button"
                   onClick={onExploreClick}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-medium border border-slate-200 transition-colors cursor-pointer flex-1 sm:flex-initial"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-white hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-medium border border-slate-200 transition-colors shadow-2xs cursor-pointer flex-1 sm:flex-initial"
                 >
                   <span>Explore Feed</span>
                   <ArrowDown className="w-3.5 h-3.5 text-slate-500" />

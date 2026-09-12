@@ -9,7 +9,6 @@ import {
   Heart, 
   MessageSquare, 
   CheckCheck, 
-  Zap,
   Sparkles
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -22,7 +21,7 @@ export interface NotificationDropdownProps {
   notifications: NotificationItem[];
   onMarkAllAsRead: () => void;
   onMarkAsRead: (id: string) => void;
-  onSimulateIncoming: () => void;
+  onSimulateIncoming?: () => void;
   onSelectPortfolioById: (id: string) => void;
 }
 
@@ -32,7 +31,7 @@ export function NotificationDropdown({
   notifications,
   onMarkAllAsRead,
   onMarkAsRead,
-  onSimulateIncoming,
+  onSimulateIncoming = () => {},
   onSelectPortfolioById,
 }: NotificationDropdownProps) {
   const [filter, setFilter] = useState<"all" | "unread" | "showcase" | "engagement">("all");
@@ -205,21 +204,6 @@ export function NotificationDropdown({
               5 visible • scrollable
             </span>
           )}
-        </div>
-
-        {/* Realtime Simulation Banner */}
-        <div className="px-4 py-2 bg-slate-50/90 border-b border-slate-100 flex items-center justify-between text-xs">
-          <span className="text-slate-600 text-[11px] font-mono flex items-center gap-1.5">
-            <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-            <span>Supabase Realtime</span>
-          </span>
-          <button
-            type="button"
-            onClick={onSimulateIncoming}
-            className="px-2.5 py-1 rounded-full bg-slate-900 text-white font-mono text-[10px] font-semibold hover:bg-black shadow-2xs transition-all cursor-pointer flex items-center gap-1"
-          >
-            <span>+ Emit Test Event</span>
-          </button>
         </div>
 
         {/* Notifications List (Strictly limited to 5 visible items: 5 * 82px + 4 * 8px gap + 24px padding = 466px, then scrollable) */}

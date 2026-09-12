@@ -17,8 +17,9 @@ import { PortfolioCategory, SortOption, NotificationItem } from "@/types/portfol
 import { DeveloperProfile } from "@/types/profile";
 import { cn } from "@/lib/utils";
 import { NotificationDropdown } from "@/components/NotificationDropdown";
+import { authClient, useSession, normalizeUsername } from "@/lib/auth/client";
 
-interface NavbarProps {
+export interface NavbarProps {
   unreadCount?: number;
   onOpenNotifications?: () => void;
   isNotificationOpen?: boolean;
@@ -37,10 +38,16 @@ interface NavbarProps {
   onSelectCategory?: (category: PortfolioCategory) => void;
   onSelectSort?: (sort: SortOption) => void;
   profile?: DeveloperProfile;
+  currentUser?: any;
+  onOpenAuthModal?: () => void;
+  onSignOut?: () => void;
 }
 
 const CATEGORIES: PortfolioCategory[] = [
   "All",
+  "Developer",
+  "Arts",
+  "Client",
   "Systems",
   "Frontend",
   "Fullstack",
@@ -68,11 +75,35 @@ export function Navbar({
   onSelectCategory,
   onSelectSort,
   profile,
+  currentUser,
+  onOpenAuthModal,
+  onSignOut,
 }: NavbarProps) {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [localNotificationOpen, setLocalNotificationOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { data: session } = useSession();
+
+  const effectiveUser = currentUser || (session?.user ? {
+    id: session.user.id,
+    name: session.user.name,
+    email: session.user.email,
+    avatar: session.user.image || profile?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80",
+    role: (session.user as any).role || "developer",
+    username: normalizeUsername(session.user.email || session.user.name),
+  } : null);
+
+  const handleSignOut = async () => {
+    try {
+      await authClient.signOut();
+    } catch (e) {
+      console.error("Sign out error:", e);
+    }
+    if (onSignOut) {
+      onSignOut();
+    }
+  };
 
   const effectiveNotificationOpen = setIsNotificationOpen !== undefined ? isNotificationOpen : localNotificationOpen;
   const toggleNotificationOpen = () => {
@@ -460,54 +491,62 @@ export function Navbar({
               </AnimatePresence>
             </div>
 
-            {/* Signed-in Developer Profile Pill with Avatar & Status (Desktop md+ only) */}
-            <button
-              type="button"
-              onClick={() => {
-                if (pathname !== "/profile") {
-                  router.push("/profile");
-                } else {
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }
-              }}
-              className="hidden md:flex items-center gap-2 py-1 px-1.5 sm:px-2 rounded-full hover:bg-slate-100 transition-colors border border-slate-200/60 hover:border-slate-300 cursor-pointer group"
-              title="Open Dedicated Profile Dashboard"
-            >
-              <div className="relative">
-                <div className="w-7 h-7 rounded-full overflow-hidden ring-1 ring-slate-300 flex-shrink-0">
-                  <img
-                    src={profile?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80"}
-                    alt={profile?.name || "Developer"}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <span
-                  className={cn(
-                    "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-white",
-                    profile?.status?.isBusy
-                      ? "bg-amber-500"
-                      : profile?.status?.statusType === "offline"
-                      ? "bg-slate-400"
-                      : "bg-emerald-500"
-                  )}
-                />
-              </div>
-              <div className="hidden lg:flex flex-col text-left pr-1">
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-bold text-slate-900 leading-tight">
-                    {profile?.name ? profile.name.split(" ")[0] : "Arnel"}
-                  </span>
-                  {profile?.status?.emoji && (
-                    <span className="text-[11px] leading-tight">
-                      {profile.status.emoji}
+            {/* Signed-in Developer Profile or Guest Sign-In */}
+            {effectiveUser ? (
+              <div className="hidden md:flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (pathname !== "/profile") {
+                      router.push("/profile");
+                    } else {
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }
+                  }}
+                  className="flex items-center gap-2 py-1 px-2 rounded-full hover:bg-slate-100 transition-colors border border-slate-200/60 hover:border-slate-300 cursor-pointer group"
+                  title="Open Dedicated Profile Dashboard"
+                >
+                  <div className="relative">
+                    <div className="w-7 h-7 rounded-full overflow-hidden ring-1 ring-slate-300 flex-shrink-0">
+                      <img
+                        src={effectiveUser.avatar || profile?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80"}
+                        alt={effectiveUser.name || "Developer"}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-white bg-emerald-500" />
+                  </div>
+                  <div className="hidden lg:flex flex-col text-left pr-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-slate-900 leading-tight">
+                        {effectiveUser.name || "Developer"}
+                      </span>
+                      <span className="text-[9px] font-mono uppercase bg-slate-900 text-white px-1.5 py-0.2 rounded font-semibold">
+                        {effectiveUser.role || "developer"}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono leading-tight truncate max-w-[85px]">
+                      @{effectiveUser.username || "dev"}
                     </span>
-                  )}
-                </div>
-                <span className="text-[10px] text-slate-500 font-mono leading-tight truncate max-w-[85px]">
-                  {profile?.status?.message ? profile.status.message : "@" + (profile?.username || "arneldev")}
-                </span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="text-[11px] font-mono text-slate-400 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Sign Out
+                </button>
               </div>
-            </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onOpenAuthModal}
+                className="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-900 hover:bg-black text-white text-xs font-medium shadow-xs transition cursor-pointer"
+              >
+                <span>Sign In</span>
+              </button>
+            )}
 
             {/* Vibrant Green Pill Button (Desktop md+ only) */}
             <motion.button
@@ -558,53 +597,63 @@ export function Navbar({
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
               className="relative w-full max-w-lg mx-auto bg-white rounded-2xl border border-slate-200 shadow-2xl p-4 text-slate-900 z-50 space-y-4 max-h-[85vh] overflow-y-auto"
             >
-              {/* Profile Bar */}
-              <div 
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  if (pathname !== "/profile") {
-                    router.push("/profile");
-                  }
-                }}
-                className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="relative shrink-0">
-                    <img
-                      src={profile?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80"}
-                      alt={profile?.name || "Developer"}
-                      className="w-8 h-8 rounded-full object-cover ring-1 ring-slate-200"
-                    />
-                    <span
-                      className={cn(
-                        "absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white",
-                        profile?.status?.isBusy
-                          ? "bg-amber-500"
-                          : profile?.status?.statusType === "offline"
-                          ? "bg-slate-400"
-                          : "bg-emerald-500"
-                      )}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-slate-900 truncate">
-                        {profile?.name || "Arnel Rivera"}
-                      </span>
-                      <span className="text-[10px] font-mono text-slate-500 truncate">
-                        @{profile?.username || "arneldev"}
+              {/* Profile Bar / Auth Section */}
+              {effectiveUser ? (
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <div 
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      if (pathname !== "/profile") {
+                        router.push("/profile");
+                      }
+                    }}
+                    className="flex items-center gap-2.5 min-w-0 cursor-pointer flex-1"
+                  >
+                    <div className="relative shrink-0">
+                      <img
+                        src={effectiveUser.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80"}
+                        alt={effectiveUser.name || "Developer"}
+                        className="w-8 h-8 rounded-full object-cover ring-1 ring-slate-200"
+                      />
+                      <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white bg-emerald-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-slate-900 truncate">
+                          {effectiveUser.name || "Developer"}
+                        </span>
+                        <span className="text-[9px] font-mono uppercase bg-slate-200 text-slate-700 px-1 py-0.2 rounded font-semibold">
+                          {effectiveUser.role || "developer"}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-500 truncate block">
+                        @{effectiveUser.username || "dev"}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 truncate">
-                      {profile?.status?.message || "Developer Profile"}
-                    </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      handleSignOut();
+                    }}
+                    className="text-[11px] font-mono text-slate-600 hover:text-slate-900 px-2 py-1 rounded bg-slate-200/60 ml-2 cursor-pointer"
+                  >
+                    Sign Out
+                  </button>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-slate-500 font-medium shrink-0 pl-2">
-                  <span>Profile</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </div>
-              </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onOpenAuthModal?.();
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white font-medium text-xs shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span>Sign In with GitHub / Email</span>
+                </button>
+              )}
 
               {/* Navigation Links */}
               <div className="space-y-1">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   X, 
   ExternalLink, 
@@ -17,13 +17,15 @@ import {
   Layers,
   Zap,
   BookOpen,
-  Sparkles
+  Sparkles,
+  AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Portfolio, CommentItem, RatingBreakdown } from "@/types/portfolio";
 import { RatingWidget } from "./RatingWidget";
 import { cn, formatNumber, timeAgo, formatRating } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
+import { validateCommentContent, MIN_COMMENT_LENGTH } from "@/lib/guardrails";
 
 interface PortfolioDetailModalProps {
   portfolio: Portfolio | null;
@@ -32,6 +34,8 @@ interface PortfolioDetailModalProps {
   onAddComment: (portfolioId: string, content: string) => void;
   onDeleteComment: (portfolioId: string, commentId: string) => void;
   onRatePortfolio: (portfolioId: string, rating: number, breakdown: RatingBreakdown) => void;
+  currentUser?: any;
+  onRequireAuth?: (intent: string) => void;
 }
 
 export function PortfolioDetailModal({
@@ -41,13 +45,19 @@ export function PortfolioDetailModal({
   onAddComment,
   onDeleteComment,
   onRatePortfolio,
+  currentUser,
+  onRequireAuth,
 }: PortfolioDetailModalProps) {
   const [commentText, setCommentText] = useState("");
+  const [commentError, setCommentError] = useState<string | null>(null);
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const [userRating, setUserRating] = useState<number | null>(null);
   const [reportedComments, setReportedComments] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<"overview" | "reviews" | "discussion">("overview");
+
+  const modalRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const [criteria, setCriteria] = useState<RatingBreakdown>({
     codeQuality: 5,
@@ -75,20 +85,68 @@ export function PortfolioDetailModal({
     }
   }, [portfolio]);
 
-  // Handle ESC key
+  // Handle ESC key & lock body scrolling
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         onClose();
       }
     };
+    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = "unset";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [onClose]);
+
+  // Isolate scroll so ONLY the modal content scrolls when cursor is inside modal (matching Notification pattern)
+  useEffect(() => {
+    if (!portfolio) return;
+    const modalEl = modalRef.current;
+    const scrollEl = scrollRef.current;
+    if (!modalEl || !scrollEl) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.stopPropagation();
+
+      const deltaY = e.deltaY;
+      const isDirectlyOnScroll = e.target && scrollEl.contains(e.target as Node);
+
+      if (!isDirectlyOnScroll) {
+        e.preventDefault();
+        scrollEl.scrollTop += deltaY;
+        return;
+      }
+
+      const atTop = scrollEl.scrollTop <= 0;
+      const atBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight <= 1;
+
+      if ((deltaY < 0 && atTop) || (deltaY > 0 && atBottom)) {
+        e.preventDefault();
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.stopPropagation();
+    };
+
+    modalEl.addEventListener("wheel", handleWheel, { passive: false });
+    modalEl.addEventListener("touchmove", handleTouchMove, { passive: true });
+
+    return () => {
+      modalEl.removeEventListener("wheel", handleWheel);
+      modalEl.removeEventListener("touchmove", handleTouchMove);
+    };
+  }, [portfolio, activeTab]);
 
   if (!portfolio) return null;
 
   const handleLike = () => {
+    if (!currentUser) {
+      onRequireAuth?.("Sign in with GitHub or Email to heart and like portfolios.");
+      return;
+    }
     const nextState = !isLiked;
     setIsLiked(nextState);
     const nextCount = nextState ? likesCount + 1 : Math.max(0, likesCount - 1);
@@ -102,7 +160,22 @@ export function PortfolioDetailModal({
 
   const handleCommentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setCommentError(null);
+
+    if (!currentUser) {
+      onRequireAuth?.("Sign in with GitHub or Email to submit critique and join the discussion.");
+      return;
+    }
+
     if (!commentText.trim()) return;
+
+    // Strict guardrails check
+    const check = validateCommentContent(commentText);
+    if (!check.isValid) {
+      setCommentError(check.error || `Comments must be at least ${MIN_COMMENT_LENGTH} characters of constructive feedback.`);
+      return;
+    }
+
     onAddComment(portfolio.id, commentText.trim());
     trackEvent("portfolio_comment", {
       portfolioId: portfolio.id,
@@ -111,6 +184,10 @@ export function PortfolioDetailModal({
   };
 
   const handleCriteriaRate = (key: keyof RatingBreakdown, value: number) => {
+    if (!currentUser) {
+      onRequireAuth?.("Sign in with GitHub or Email to rate developer portfolios.");
+      return;
+    }
     const next = { ...criteria, [key]: value };
     setCriteria(next);
     const avg = Number(
@@ -130,7 +207,7 @@ export function PortfolioDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2 sm:p-5 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 overflow-hidden">
       {/* Frosted Backdrop */}
       <motion.div 
         initial={{ opacity: 0 }}
@@ -142,20 +219,23 @@ export function PortfolioDetailModal({
 
       {/* Editorial Sheet Modal */}
       <motion.div 
+        ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="portfolio-modal-title"
+        data-lenis-prevent="true"
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 15 }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-4xl max-h-[92vh] sm:max-h-[90vh] flex flex-col bg-white rounded-t-2xl sm:rounded-2xl border border-slate-200 shadow-2xl overflow-hidden z-10"
+        className="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden z-10"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Specular Edge */}
         <div className="absolute top-0 inset-x-12 h-[1px] bg-gradient-to-r from-transparent via-slate-200 to-transparent pointer-events-none" />
 
         {/* Header Bar */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 bg-slate-50/80">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 bg-slate-50/80 shrink-0">
           <div className="flex items-center gap-2.5">
             <span className="text-xs font-mono text-slate-500 uppercase tracking-wider">
               Architecture Analysis
@@ -178,7 +258,7 @@ export function PortfolioDetailModal({
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+        <div ref={scrollRef} data-lenis-prevent="true" className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5">
           
           {/* Top Showcase Spotlight Banner if present */}
           {portfolio.isShowcase && (
@@ -530,10 +610,34 @@ export function PortfolioDetailModal({
             <div className="space-y-6">
               {/* Comment Input */}
               <form onSubmit={handleCommentSubmit} className="space-y-3">
+                {commentError && (
+                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{commentError}</span>
+                  </div>
+                )}
+
+                {!currentUser && (
+                  <div className="p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-800 text-xs flex items-center justify-between">
+                    <span>You are browsing as a guest. Sign in with GitHub or Email to post peer critiques and rating breakdown.</span>
+                    <button
+                      type="button"
+                      onClick={() => onRequireAuth?.("Sign in with GitHub or Email to join developer discussions.")}
+                      className="px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-medium text-[11px] shrink-0"
+                    >
+                      Sign In
+                    </button>
+                  </div>
+                )}
+
                 <div className="relative">
                   <textarea
                     rows={3}
-                    placeholder="Leave technical critique, query architectural choices, or compliment craft..."
+                    placeholder={
+                      currentUser
+                        ? "Leave technical critique, query architectural choices, or compliment craft (min 10 characters)..."
+                        : "Sign in with GitHub or Email to post comments and join technical critique..."
+                    }
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white resize-none transition-colors"
@@ -598,7 +702,13 @@ export function PortfolioDetailModal({
                             <Flag className="w-3.5 h-3.5" />
                           </button>
 
-                          {(comment.isUserOwner || comment.authorUsername === "arneldev") && (
+                          {(comment.isUserOwner || 
+                            comment.authorUsername === "arneldev" || 
+                            (currentUser && (
+                              currentUser.username === comment.authorUsername || 
+                              currentUser.role === "moderator" || 
+                              currentUser.role === "admin"
+                            ))) && (
                             <button
                               type="button"
                               onClick={() => onDeleteComment(portfolio.id, comment.id)}
@@ -631,7 +741,7 @@ export function PortfolioDetailModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between text-xs text-slate-500">
+        <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between text-xs text-slate-500 shrink-0">
           <span className="font-mono text-[11px]">
             Registry ID: {portfolio.id} • Indexed {timeAgo(portfolio.createdAt)}
           </span>

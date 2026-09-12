@@ -1,157 +1,128 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React from "react";
 import Link from "next/link";
-import { ArrowLeft, Sparkles, User, ShieldCheck } from "lucide-react";
-import { Navbar } from "@/components/Navbar";
-import { Footer } from "@/components/Footer";
-import { DeveloperDashboard } from "@/components/dashboard/DeveloperDashboard";
-import { PortfolioDetailModal } from "@/components/PortfolioDetailModal";
-import { SubmitPortfolioModal } from "@/components/SubmitPortfolioModal";
-import { INITIAL_DEVELOPER_PROFILE } from "@/data/mockProfile";
-import { INITIAL_PORTFOLIOS } from "@/data/mockPortfolios";
-import { INITIAL_NOTIFICATIONS } from "@/data/mockNotifications";
-import { DeveloperProfile } from "@/types/profile";
-import { Portfolio, NotificationItem } from "@/types/portfolio";
+import { ArrowLeft, User, ShieldCheck } from "lucide-react";
+import { Navbar, Footer } from "@/components/layout";
+import { DeveloperDashboard, useDeveloperProfile } from "@/features/dashboard";
+import {
+  PortfolioDetailModal,
+  SubmitPortfolioModal,
+  usePortfolios,
+} from "@/features/portfolios";
+import { AuthModal, useAuth } from "@/features/auth";
+import { useNotifications } from "@/features/notifications";
+import { useToast } from "@/hooks/useToast";
 
 export default function ProfilePage() {
-  // Developer Profile State
-  const [developerProfile, setDeveloperProfile] = useState<DeveloperProfile>(INITIAL_DEVELOPER_PROFILE);
-  const [portfolios, setPortfolios] = useState<Portfolio[]>(INITIAL_PORTFOLIOS);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
-  const [selectedPortfolio, setSelectedPortfolio] = useState<Portfolio | null>(null);
-  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  // 1. Unified Authentication State
+  const {
+    currentUser,
+    isAuthModalOpen,
+    setIsAuthModalOpen,
+    authIntentMessage,
+    requireAuth,
+    handleAuthSuccess,
+    handleSignOut,
+  } = useAuth({
+    onAuthSuccess: (u) => {
+      toast.success(`Authenticated as @${u.username || u.name} (${(u.role || "developer").toUpperCase()})`);
+    },
+    onSignOut: () => {
+      toast.info("Signed out. You are now browsing as a guest.");
+    },
+  });
 
-  // Load persisted profile and custom portfolios
-  useEffect(() => {
-    try {
-      const savedProfile = localStorage.getItem("ratefactor_dev_profile");
-      if (savedProfile) {
-        setDeveloperProfile(JSON.parse(savedProfile));
+  // 2. Developer Profile State
+  const {
+    developerProfile,
+    updateProfile,
+    updatePins,
+  } = useDeveloperProfile(currentUser);
+
+  // 3. Real-time Notifications State
+  const {
+    notifications,
+    unreadCount,
+    isNotificationOpen,
+    setIsNotificationOpen,
+    markAllAsRead,
+    markAsRead,
+  } = useNotifications();
+
+  // 4. Portfolios State & Operations
+  const {
+    portfolios,
+    selectedPortfolio,
+    setSelectedPortfolio,
+    isSubmitModalOpen,
+    setIsSubmitModalOpen,
+    myPortfolios,
+    handleLikeToggle,
+    handleRatePortfolio,
+    handleAddComment,
+    handleDeleteComment,
+    handleSubmitPortfolio,
+    handleDeletePortfolio,
+  } = usePortfolios({
+    currentUser,
+    currentUsername: developerProfile.username,
+    onRequireAuth: requireAuth,
+    onToast: (msg) => toast.info(msg),
+    onAutoPin: (newPortfolio) => {
+      if (
+        developerProfile.pinnedPortfolioIds.length < 6 &&
+        !developerProfile.pinnedPortfolioIds.includes(newPortfolio.id)
+      ) {
+        updatePins(
+          [newPortfolio.id, ...developerProfile.pinnedPortfolioIds],
+          developerProfile.spotlightPortfolioId || newPortfolio.id
+        );
       }
-      const savedPortfolios = localStorage.getItem("ratefactor_portfolios");
-      if (savedPortfolios) {
-        setPortfolios(JSON.parse(savedPortfolios));
+    },
+    onUnpin: (portfolioId) => {
+      if (developerProfile.pinnedPortfolioIds.includes(portfolioId)) {
+        const nextPinned = developerProfile.pinnedPortfolioIds.filter((id) => id !== portfolioId);
+        updatePins(
+          nextPinned,
+          developerProfile.spotlightPortfolioId === portfolioId
+            ? nextPinned[0] || undefined
+            : developerProfile.spotlightPortfolioId
+        );
       }
-    } catch (e) {
-      // ignore
-    }
-  }, []);
-
-  const handleUpdateProfile = (updated: DeveloperProfile) => {
-    setDeveloperProfile(updated);
-    try {
-      localStorage.setItem("ratefactor_dev_profile", JSON.stringify(updated));
-    } catch (e) {
-      // ignore
-    }
-  };
-
-  // User's own portfolios
-  const myPortfolios = useMemo(() => {
-    return portfolios.filter(
-      (p) =>
-        p.author.username === developerProfile.username ||
-        p.author.username === "arneldev"
-    );
-  }, [portfolios, developerProfile.username]);
-
-  // Handle deleting portfolio
-  const handleDeletePortfolio = (id: string) => {
-    setPortfolios((prev) => {
-      const filtered = prev.filter((p) => p.id !== id);
-      try {
-        localStorage.setItem("ratefactor_portfolios", JSON.stringify(filtered));
-      } catch (e) {
-        // ignore
-      }
-      return filtered;
-    });
-    setDeveloperProfile((prev) => {
-      const updated = {
-        ...prev,
-        pinnedPortfolioIds: prev.pinnedPortfolioIds.filter((pId) => pId !== id),
-        spotlightPortfolioId: prev.spotlightPortfolioId === id ? undefined : prev.spotlightPortfolioId,
-      };
-      try {
-        localStorage.setItem("ratefactor_dev_profile", JSON.stringify(updated));
-      } catch (e) {
-        // ignore
-      }
-      return updated;
-    });
-    showToast("Portfolio removed from your catalog.");
-  };
-
-  // Handle new submitted portfolio
-  const handleSubmitPortfolio = (newPortfolio: Portfolio) => {
-    setPortfolios((prev) => {
-      const updated = [newPortfolio, ...prev];
-      try {
-        localStorage.setItem("ratefactor_portfolios", JSON.stringify(updated));
-      } catch (e) {
-        // ignore
-      }
-      return updated;
-    });
-
-    if (
-      newPortfolio.author.username === developerProfile.username ||
-      newPortfolio.author.username === "arneldev"
-    ) {
-      setDeveloperProfile((prev) => {
-        if (
-          prev.pinnedPortfolioIds.length < 6 &&
-          !prev.pinnedPortfolioIds.includes(newPortfolio.id)
-        ) {
-          const updated = {
-            ...prev,
-            pinnedPortfolioIds: [newPortfolio.id, ...prev.pinnedPortfolioIds],
-            spotlightPortfolioId: prev.spotlightPortfolioId || newPortfolio.id,
-          };
-          try {
-            localStorage.setItem("ratefactor_dev_profile", JSON.stringify(updated));
-          } catch (e) {
-            // ignore
-          }
-          return updated;
-        }
-        return prev;
-      });
-    }
-
-    showToast(`"${newPortfolio.title}" submitted and added to your profile.`);
-  };
-
-  // Unread notification count
-  const unreadCount = useMemo(() => {
-    return notifications.filter((n) => !n.isRead).length;
-  }, [notifications]);
+    },
+  });
 
   return (
     <div className="min-h-screen bg-white flex flex-col selection:bg-slate-900 selection:text-white">
-      {/* Floating Modern Header with Wide Margins */}
+      {/* Floating Modern Header */}
       <Navbar
         unreadCount={unreadCount}
         isNotificationOpen={isNotificationOpen}
         setIsNotificationOpen={setIsNotificationOpen}
         notifications={notifications}
-        onMarkAllAsRead={() => setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))}
-        onMarkAsRead={(id) => setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)))}
-        onOpenSubmitModal={() => setIsSubmitModalOpen(true)}
+        onMarkAllAsRead={markAllAsRead}
+        onMarkAsRead={markAsRead}
+        onOpenSubmitModal={() => {
+          if (!currentUser) {
+            requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
+            return;
+          }
+          setIsSubmitModalOpen(true);
+        }}
         onOpenDashboard={() => window.scrollTo({ top: 0, behavior: "smooth" })}
         activeNavTab="dashboard"
         setActiveNavTab={() => {}}
         searchQuery=""
         setSearchQuery={() => {}}
         profile={developerProfile}
+        currentUser={currentUser}
+        onOpenAuthModal={() =>
+          requireAuth("Sign in with GitHub or Email to access your developer portfolio.")
+        }
+        onSignOut={handleSignOut}
       />
 
       {/* Main Content Area */}
@@ -184,11 +155,17 @@ export default function ProfilePage() {
           <div className="bg-slate-50/70 rounded-3xl border border-slate-200 p-4 sm:p-8 lg:p-10 shadow-xs w-full min-w-0 max-w-full overflow-hidden">
             <DeveloperDashboard
               profile={developerProfile}
-              onUpdateProfile={handleUpdateProfile}
+              onUpdateProfile={updateProfile}
               myPortfolios={myPortfolios}
               onSelectPortfolio={(p) => setSelectedPortfolio(p)}
               onDeletePortfolio={handleDeletePortfolio}
-              onOpenSubmitModal={() => setIsSubmitModalOpen(true)}
+              onOpenSubmitModal={() => {
+                if (!currentUser) {
+                  requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
+                  return;
+                }
+                setIsSubmitModalOpen(true);
+              }}
             />
           </div>
         </div>
@@ -201,27 +178,28 @@ export default function ProfilePage() {
         onSubmit={handleSubmitPortfolio}
         existingPortfolios={portfolios}
         profile={developerProfile}
+        currentUser={currentUser}
       />
 
       {/* Portfolio Detail Modal */}
       <PortfolioDetailModal
         portfolio={selectedPortfolio}
         onClose={() => setSelectedPortfolio(null)}
-        onLikeToggle={() => {}}
-        onAddComment={() => {}}
-        onDeleteComment={() => {}}
-        onRatePortfolio={() => {}}
+        onLikeToggle={handleLikeToggle}
+        onAddComment={handleAddComment}
+        onDeleteComment={handleDeleteComment}
+        onRatePortfolio={handleRatePortfolio}
+        currentUser={currentUser}
+        onRequireAuth={requireAuth}
       />
 
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="bg-slate-900 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-lg border border-slate-800 flex items-center gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{toastMessage}</span>
-          </div>
-        </div>
-      )}
+      {/* Better Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthSuccess={handleAuthSuccess}
+        intentMessage={authIntentMessage}
+      />
 
       <Footer />
     </div>

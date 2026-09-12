@@ -108,43 +108,28 @@ export function ShowcaseBanner({
               Peer-evaluated developer architectures, top-voted projects, and latest submissions.
             </p>
           </div>
-
-          {/* Simulation Cron Controls */}
-          {onTriggerAlgorithm && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => onTriggerAlgorithm("daily")}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:py-1 rounded-md bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-mono transition-colors shadow-xs cursor-pointer min-h-[32px] sm:min-h-0"
-                title="Run Daily Showcase election algorithm"
-              >
-                <Flame className="w-3 h-3 text-amber-600" />
-                <span className="hidden sm:inline">Simulate Daily Cron</span>
-                <span className="sm:hidden">Daily Cron</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onTriggerAlgorithm("weekly")}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:py-1 rounded-md bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-mono transition-colors shadow-xs cursor-pointer min-h-[32px] sm:min-h-0"
-                title="Run Weekly Showcase election algorithm"
-              >
-                <Award className="w-3 h-3 text-amber-600" />
-                <span className="hidden sm:inline">Simulate Weekly Cron</span>
-                <span className="sm:hidden">Weekly Cron</span>
-              </button>
-            </div>
-          )}
         </div>
 
-        {/* Bento Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-
-          {/* ========================================================================= */}
-          {/* BENTO CARD 1: Featured Spotlight (7 Cols)                                 */}
-          {/* ========================================================================= */}
-          {currentShowcase && (
-            <article className="lg:col-span-7 bg-white rounded-xl p-4 sm:p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
+        {portfolios.length === 0 ? (
+          <div className="bg-white rounded-2xl p-8 sm:p-12 border border-dashed border-slate-200 text-center shadow-xs">
+            <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center mx-auto text-slate-400 mb-4">
+              <Award className="w-6 h-6 text-slate-400" />
+            </div>
+            <h3 className="text-base sm:text-lg font-bold text-slate-900">
+              No developer portfolios indexed yet
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1.5 leading-relaxed">
+              Be the first to showcase your codebases, receive peer critiques across our 4-factor rubric, and compete for the Daily and Weekly Showcase!
+            </p>
+          </div>
+        ) : (
+          /* Bento Grid */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            {/* ========================================================================= */}
+            {/* BENTO CARD 1: Featured Spotlight (7 Cols)                                 */}
+            {/* ========================================================================= */}
+            {currentShowcase && (
+              <article className="lg:col-span-7 bg-white rounded-xl p-4 sm:p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
               
               {/* Card Header & Stage Switcher */}
               <div className="flex items-center justify-between gap-2 flex-wrap pb-3 border-b border-slate-100">
@@ -568,8 +553,8 @@ export function ShowcaseBanner({
               <span>100% Peer Reviewed Rubric</span>
             </div>
           </article>
-
         </div>
+      )}
 
       </div>
     </section>

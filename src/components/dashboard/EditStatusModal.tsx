@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, Smile, Check, Sparkles, Clock, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { UserStatus } from "@/types/profile";
@@ -35,6 +35,9 @@ export function EditStatusModal({
   );
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
+  const modalRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLFormElement>(null);
+
   useEffect(() => {
     if (isOpen) {
       setEmoji(currentStatus.emoji !== undefined ? currentStatus.emoji : "🚀");
@@ -50,10 +53,54 @@ export function EditStatusModal({
       if (e.key === "Escape") onClose();
     };
     if (isOpen) {
+      document.body.style.overflow = "hidden";
       window.addEventListener("keydown", handleKeyDown);
-      return () => window.removeEventListener("keydown", handleKeyDown);
     }
+    return () => {
+      document.body.style.overflow = "unset";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [isOpen, onClose]);
+
+  // Isolate scroll so ONLY the modal content scrolls when cursor is inside modal (matching Notification pattern)
+  useEffect(() => {
+    if (!isOpen) return;
+    const modalEl = modalRef.current;
+    const scrollEl = scrollRef.current;
+    if (!modalEl || !scrollEl) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.stopPropagation();
+
+      const deltaY = e.deltaY;
+      const isDirectlyOnScroll = e.target && scrollEl.contains(e.target as Node);
+
+      if (!isDirectlyOnScroll) {
+        e.preventDefault();
+        scrollEl.scrollTop += deltaY;
+        return;
+      }
+
+      const atTop = scrollEl.scrollTop <= 0;
+      const atBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight <= 1;
+
+      if ((deltaY < 0 && atTop) || (deltaY > 0 && atBottom)) {
+        e.preventDefault();
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.stopPropagation();
+    };
+
+    modalEl.addEventListener("wheel", handleWheel, { passive: false });
+    modalEl.addEventListener("touchmove", handleTouchMove, { passive: true });
+
+    return () => {
+      modalEl.removeEventListener("wheel", handleWheel);
+      modalEl.removeEventListener("touchmove", handleTouchMove);
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -92,7 +139,7 @@ export function EditStatusModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-hidden">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -102,17 +149,20 @@ export function EditStatusModal({
       />
 
       <motion.div
+        ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="status-modal-title"
+        data-lenis-prevent="true"
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-md bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden z-10"
+        className="relative w-full max-w-md bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden z-10 max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80 shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-base">💬</span>
             <h3 id="status-modal-title" className="font-bold text-slate-900 text-sm">
@@ -128,7 +178,7 @@ export function EditStatusModal({
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="p-6 space-y-5">
+        <form ref={scrollRef} data-lenis-prevent="true" onSubmit={handleSave} className="p-6 space-y-5 overflow-y-auto overscroll-contain flex-1">
           {/* Live Status Preview Bubble */}
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3">
             <div className="relative">
@@ -280,7 +330,7 @@ export function EditStatusModal({
           </div>
 
           {/* Actions */}
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between shrink-0">
             <button
               type="button"
               onClick={handleClearStatus}
