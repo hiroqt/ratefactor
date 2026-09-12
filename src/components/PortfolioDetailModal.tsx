@@ -28,10 +28,25 @@ import { trackEvent } from "@/lib/analytics";
 import { validateCommentContent, MIN_COMMENT_LENGTH } from "@/lib/guardrails";
 import { EmojiReaction } from "@/components/ui/emoji-reaction";
 
+export const EMOJI_MAP: Record<string, string> = {
+  "star-struck": "🤩",
+  "smiling-face-with-hearts": "🥰",
+  "neutral-face": "😐",
+  "thumbs-up": "👍",
+  "fire": "🔥",
+  "rocket": "🚀",
+};
+
+export function getEmojiDisplay(name?: string) {
+  if (!name) return "🤩";
+  return EMOJI_MAP[name] || name;
+}
+
 interface PortfolioDetailModalProps {
   portfolio: Portfolio | null;
   onClose: () => void;
   onLikeToggle: (id: string, liked: boolean) => void;
+  onReact?: (id: string, emojiName: string) => void;
   onAddComment: (portfolioId: string, content: string) => void;
   onDeleteComment: (portfolioId: string, commentId: string) => void;
   onRatePortfolio: (portfolioId: string, rating: number, breakdown: RatingBreakdown) => void;
@@ -43,6 +58,7 @@ export function PortfolioDetailModal({
   portfolio,
   onClose,
   onLikeToggle,
+  onReact,
   onAddComment,
   onDeleteComment,
   onRatePortfolio,
@@ -130,10 +146,14 @@ export function PortfolioDetailModal({
       onRequireAuth?.("Sign in with GitHub or Email to react to developer portfolios.");
       return;
     }
-    if (!isLiked) {
-      setIsLiked(true);
-      setLikesCount((prev) => prev + 1);
-      onLikeToggle(portfolio.id, true);
+    if (onReact) {
+      onReact(portfolio.id, emojiName);
+    } else {
+      if (!isLiked) {
+        setIsLiked(true);
+        setLikesCount((prev) => prev + 1);
+        onLikeToggle(portfolio.id, true);
+      }
     }
     trackEvent("portfolio_reaction", {
       portfolioId: portfolio.id,
@@ -320,7 +340,30 @@ export function PortfolioDetailModal({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0 ml-auto sm:ml-0">
+            <div className="flex items-center gap-1.5 shrink-0 ml-auto sm:ml-0 flex-wrap">
+              {/* Active Emoji Badges with counts if > 0 */}
+              {portfolio.reactions &&
+                Object.entries(portfolio.reactions)
+                  .filter(([_, count]) => count > 0)
+                  .map(([emoji, count]) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => handleReact(emoji)}
+                      className={cn(
+                        "flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-mono transition-all cursor-pointer",
+                        portfolio.userReaction === emoji
+                          ? "bg-slate-900 border-slate-900 text-white shadow-xs"
+                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                      )}
+                      title={`Reacted ${getEmojiDisplay(emoji)} (${count})`}
+                    >
+                      <span className="text-sm">{getEmojiDisplay(emoji)}</span>
+                      <span className="tabular-nums font-semibold">{count}</span>
+                    </button>
+                  ))}
+
+              {/* Main Reaction Trigger */}
               <EmojiReaction
                 size="md"
                 align="right"
@@ -329,17 +372,20 @@ export function PortfolioDetailModal({
               >
                 <button
                   type="button"
-                  onClick={handleLike}
                   className={cn(
                     "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-xs font-medium transition-all cursor-pointer",
                     isLiked
-                      ? "bg-rose-50 border-rose-200 text-rose-600 shadow-sm"
-                      : "bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                      ? "bg-amber-50 border-amber-300 text-amber-900 shadow-xs font-semibold"
+                      : "bg-slate-50 border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100"
                   )}
-                  aria-label="React or like portfolio"
+                  aria-label="React to architecture"
                 >
-                  <Heart className={cn("w-4 h-4", isLiked && "fill-rose-500 text-rose-500")} />
-                  <span className="font-mono tabular-nums">{formatNumber(likesCount)}</span>
+                  <span className="text-sm">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>
+                  {likesCount > 0 ? (
+                    <span className="font-mono tabular-nums font-semibold">{formatNumber(likesCount)}</span>
+                  ) : (
+                    <span className="font-medium text-slate-600">React</span>
+                  )}
                 </button>
               </EmojiReaction>
             </div>

@@ -11,6 +11,7 @@ export interface PortfolioGridProps {
   portfolios: Portfolio[];
   onSelectPortfolio: (p: Portfolio) => void;
   onLikeToggle?: (portfolioId: string, isLiked: boolean) => void;
+  onReact?: (portfolioId: string, emojiName: string) => void;
   isLoading?: boolean;
   emptyTitle?: string;
   emptyDescription?: string;
@@ -25,6 +26,7 @@ export function PortfolioGrid({
   portfolios,
   onSelectPortfolio,
   onLikeToggle,
+  onReact,
   isLoading = false,
   emptyTitle = "No portfolios found",
   emptyDescription = "Try adjusting your search query, filter criteria, or submit the first project!",
@@ -82,6 +84,7 @@ export function PortfolioGrid({
           index={index}
           onSelect={onSelectPortfolio}
           onLikeToggle={onLikeToggle}
+          onReact={onReact}
         />
       ))}
     </div>

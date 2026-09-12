@@ -9,14 +9,22 @@ import {
   ChevronUp, 
   MessageSquare, 
   Clock, 
-  CheckCircle2
+  CheckCircle2,
+  Search,
+  X,
+  User,
+  ArrowRight
 } from "lucide-react";
 import { Portfolio, PortfolioCategory } from "@/types/portfolio";
+import { DeveloperProfile } from "@/types/profile";
 import { formatRating, formatNumber, timeAgo } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
+import { getEmojiDisplay } from "./PortfolioDetailModal";
+import { createProfileFromAuthor } from "./PublicProfileModal";
 
 interface ShowcaseBannerProps {
   portfolios?: Portfolio[];
+  allPortfolios?: Portfolio[];
   dailyShowcase?: Portfolio | null;
   weeklyShowcase?: Portfolio | null;
   onSelectPortfolio: (p: Portfolio) => void;
@@ -24,10 +32,15 @@ interface ShowcaseBannerProps {
   onTriggerAlgorithm?: (type: "daily" | "weekly") => void;
   onCategorySelect?: (category: PortfolioCategory) => void;
   isCompact?: boolean;
+  searchQuery?: string;
+  onSearchQueryChange?: (query: string) => void;
+  onVisitUser?: (userProfile: DeveloperProfile) => void;
+  baseProfile?: DeveloperProfile;
 }
 
 export function ShowcaseBanner({
   portfolios = [],
+  allPortfolios,
   dailyShowcase,
   weeklyShowcase,
   onSelectPortfolio,
@@ -35,9 +48,45 @@ export function ShowcaseBanner({
   onTriggerAlgorithm,
   onCategorySelect,
   isCompact = false,
+  searchQuery = "",
+  onSearchQueryChange,
+  onVisitUser,
+  baseProfile,
 }: ShowcaseBannerProps) {
   const [activeSpotlightTab, setActiveSpotlightTab] = useState<"daily" | "weekly">("daily");
   const [boardTab, setBoardTab] = useState<"today" | "week" | "all">("today");
+
+  const matchedUsers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    const source = allPortfolios && allPortfolios.length > 0 ? allPortfolios : portfolios;
+    const authorMap = new Map<string, { author: Portfolio["author"]; count: number }>();
+    source.forEach((p) => {
+      const username = p.author?.username || p.author?.name;
+      if (!username) return;
+      const key = username.toLowerCase();
+      if (authorMap.has(key)) {
+        authorMap.get(key)!.count += 1;
+      } else {
+        authorMap.set(key, { author: p.author, count: 1 });
+      }
+    });
+
+    const results: { author: Portfolio["author"]; count: number; profile: DeveloperProfile }[] = [];
+    authorMap.forEach(({ author, count }) => {
+      const authorName = (author.name || "").toLowerCase();
+      const authorUser = (author.username || "").toLowerCase();
+      const authorRole = (author.role || "").toLowerCase();
+      if (authorName.includes(q) || authorUser.includes(q) || authorRole.includes(q)) {
+        results.push({
+          author,
+          count,
+          profile: createProfileFromAuthor(author, source, baseProfile),
+        });
+      }
+    });
+    return results;
+  }, [searchQuery, allPortfolios, portfolios, baseProfile]);
 
   const currentShowcase = activeSpotlightTab === "daily" 
     ? dailyShowcase || weeklyShowcase 
@@ -98,8 +147,8 @@ export function ShowcaseBanner({
       <div id="discovery-grid" className="-mt-20 pt-20" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        {/* Section Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        {/* Section Header & Search */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
               Showcase &amp; Leaderboard
@@ -108,7 +157,106 @@ export function ShowcaseBanner({
               Peer-evaluated developer architectures, top-voted projects, and latest submissions.
             </p>
           </div>
+
+          {/* Quick Search Bar */}
+          {onSearchQueryChange && (
+            <div className="relative w-full md:w-80 lg:w-96">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search domain, author (@username), title..."
+                value={searchQuery}
+                onChange={(e) => onSearchQueryChange(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 shadow-xs transition-all"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => onSearchQueryChange("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-0.5"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
+
+        {/* Search Filter Indicator */}
+        {searchQuery.trim() && (
+          <div className="mb-4 p-2.5 px-3.5 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-between gap-2 text-xs">
+            <span className="text-slate-700">
+              Showing matching architectures for <strong className="text-slate-900 font-semibold">"{searchQuery}"</strong> ({portfolios.length} found)
+            </span>
+            <button
+              type="button"
+              onClick={() => onSearchQueryChange?.("")}
+              className="text-xs text-slate-500 hover:text-slate-900 font-mono underline cursor-pointer"
+            >
+              Reset
+            </button>
+          </div>
+        )}
+
+        {/* Matched Developers Banner (When searching) */}
+        {searchQuery.trim() && matchedUsers.length > 0 && (
+          <div className="mb-6 p-4 rounded-2xl bg-white border border-slate-200 shadow-xs">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-indigo-600" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 font-mono">
+                  Matched Developers ({matchedUsers.length})
+                </h3>
+              </div>
+              <span className="text-[11px] font-mono text-slate-500">
+                Click Visit to view public developer profile
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {matchedUsers.map(({ author, count, profile: devProfile }) => (
+                <div
+                  key={author.username || author.name}
+                  className="flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-all"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <img
+                      src={author.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80"}
+                      alt={author.name}
+                      className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-slate-900 truncate">
+                          {author.name}
+                        </span>
+                        {author.isVerified && (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        )}
+                      </div>
+                      <div className="text-[11px] font-mono text-slate-500 truncate">
+                        @{author.username?.replace(/^@/, "")}
+                      </div>
+                      <div className="text-[10px] text-slate-500 truncate mt-0.5">
+                        {count} {count === 1 ? "architecture" : "architectures"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => onVisitUser?.(devProfile)}
+                    className="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0"
+                  >
+                    <User className="w-3.5 h-3.5" />
+                    <span>Visit</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {portfolios.length === 0 ? (
           <div className="bg-white rounded-2xl p-8 sm:p-12 border border-dashed border-slate-200 text-center shadow-xs">
@@ -314,15 +462,15 @@ export function ShowcaseBanner({
                   <button
                     type="button"
                     onClick={(e) => handleVote(e, currentShowcase)}
-                    aria-label={`Upvote ${currentShowcase.title}`}
-                    className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md border text-xs font-mono font-medium transition-colors cursor-pointer ${
+                    aria-label={`React to ${currentShowcase.title}`}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-mono font-medium transition-colors cursor-pointer ${
                       currentShowcase.isLiked
-                        ? "bg-slate-900 border-slate-900 text-white"
+                        ? "bg-amber-50 border-amber-300 text-amber-900 font-semibold shadow-xs"
                         : "bg-white border-slate-200 text-slate-800 hover:bg-slate-50"
                     }`}
                   >
-                    <ChevronUp className="w-3.5 h-3.5" />
-                    <span>{formatNumber(currentShowcase.likesCount)}</span>
+                    <span className="text-sm">{getEmojiDisplay(currentShowcase.userReaction || "star-struck")}</span>
+                    {currentShowcase.likesCount > 0 && <span>{formatNumber(currentShowcase.likesCount)}</span>}
                   </button>
 
                   <button
@@ -452,15 +600,15 @@ export function ShowcaseBanner({
                         <button
                           type="button"
                           onClick={(e) => handleVote(e, item)}
-                          aria-label={`Upvote ${item.title}`}
+                          aria-label={`React to ${item.title}`}
                           className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-xs font-mono transition-colors cursor-pointer min-h-[28px] sm:min-h-0 ${
                             item.isLiked
-                              ? "bg-slate-900 border-slate-900 text-white"
+                              ? "bg-amber-50 border-amber-300 text-amber-900 font-semibold shadow-xs"
                               : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
                           }`}
                         >
-                          <ChevronUp className="w-3 h-3" />
-                          <span>{formatNumber(item.likesCount)}</span>
+                          <span className="text-xs">{getEmojiDisplay(item.userReaction || "star-struck")}</span>
+                          {item.likesCount > 0 && <span>{formatNumber(item.likesCount)}</span>}
                         </button>
                       </div>
                     </div>

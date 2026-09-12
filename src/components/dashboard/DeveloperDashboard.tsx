@@ -39,6 +39,7 @@ import { ShowcaseShelf } from "./ShowcaseShelf";
 import { PublicProfilePreview } from "./PublicProfilePreview";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { INITIAL_DEVELOPER_PROFILE } from "@/data/mockProfile";
+import { getEmojiDisplay } from "../PortfolioDetailModal";
 
 interface DeveloperDashboardProps {
   profile?: DeveloperProfile;
@@ -436,8 +437,9 @@ export function DeveloperDashboard({
                 </div>
                 <div className="p-2.5 rounded-xl bg-white border border-slate-200">
                   <div className="text-[10px] text-slate-400 font-mono">Peer Likes</div>
-                  <div className="text-lg font-mono font-bold text-slate-900 mt-0.5">
-                    {formatNumber(totalLikes)} ♥
+                  <div className="text-lg font-mono font-bold text-slate-900 mt-0.5 flex items-center gap-1">
+                    <span>{formatNumber(totalLikes)}</span>
+                    {totalLikes > 0 && <span className="text-sm">🤩</span>}
                   </div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-white border border-slate-200">
@@ -609,8 +611,13 @@ export function DeveloperDashboard({
                     <div className="flex items-center gap-2.5 self-end sm:self-auto flex-wrap">
                       <div className="flex items-center gap-3 font-mono text-xs text-slate-500 mr-2">
                         <span className="text-amber-800 font-semibold">★ {formatRating(portfolio.rating)}</span>
-                        <span>{portfolio.likesCount} ♥</span>
-                        <span>{portfolio.commentsCount} 💬</span>
+                        {portfolio.likesCount > 0 && (
+                          <span className="flex items-center gap-0.5">
+                            <span className="text-xs">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>
+                            <span>{portfolio.likesCount}</span>
+                          </span>
+                        )}
+                        {portfolio.commentsCount > 0 && <span>{portfolio.commentsCount} 💬</span>}
                       </div>
 
                       {/* Pin to Showcase Button */}

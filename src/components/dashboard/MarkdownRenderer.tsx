@@ -1,207 +1,138 @@
 "use client";
 
-import React from "react";
-import { ExternalLink } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { marked } from "marked";
+import { Code, Eye, Copy, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface MarkdownRendererProps {
   content?: string;
   className?: string;
+  showToolbar?: boolean;
 }
 
-// Helper to parse inline markdown: **bold**, `code`, [link](url), *italic*
-function parseInline(text: string): React.ReactNode[] {
-  const nodes: React.ReactNode[] = [];
-  // Match links, code, bold, italic
-  const tokenRegex = /(\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
-  const parts = text.split(tokenRegex);
+// Configure marked with GFM support
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+});
 
-  parts.forEach((part, index) => {
-    if (!part) return;
-
-    // Link: [text](url)
-    const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-    if (linkMatch) {
-      const [, label, url] = linkMatch;
-      nodes.push(
-        <a
-          key={index}
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sky-600 hover:text-sky-700 hover:underline font-medium inline-flex items-center gap-0.5"
-        >
-          <span>{label}</span>
-          <ExternalLink className="w-2.5 h-2.5 opacity-70" />
-        </a>
-      );
-      return;
-    }
-
-    // Inline code: `code`
-    const codeMatch = part.match(/^`([^`]+)`$/);
-    if (codeMatch) {
-      nodes.push(
-        <code
-          key={index}
-          className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 font-mono text-[11px]"
-        >
-          {codeMatch[1]}
-        </code>
-      );
-      return;
-    }
-
-    // Bold: **text**
-    const boldMatch = part.match(/^\*\*([^*]+)\*\*$/);
-    if (boldMatch) {
-      nodes.push(
-        <strong key={index} className="font-bold text-slate-900">
-          {boldMatch[1]}
-        </strong>
-      );
-      return;
-    }
-
-    // Italic: *text*
-    const italicMatch = part.match(/^\*([^*]+)\*$/);
-    if (italicMatch) {
-      nodes.push(
-        <em key={index} className="italic text-slate-700">
-          {italicMatch[1]}
-        </em>
-      );
-      return;
-    }
-
-    // Plain text
-    nodes.push(<span key={index}>{part}</span>);
-  });
-
-  return nodes;
+/**
+ * Sanitizes markdown/HTML string to strip malicious execution scripts
+ * while preserving styling, alignments, badges, images, SVGs, tables, and links.
+ */
+function sanitizeHtmlOutput(html: string): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, "")
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, "")
+    .replace(/\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "") // strip event handlers (onclick, onerror, etc)
+    .replace(/href\s*=\s*["']?javascript:[^"'>]+/gi, 'href="#"');
 }
 
-export function MarkdownRenderer({ content = "", className = "" }: MarkdownRendererProps) {
-  if (!content.trim()) {
-    return <p className="text-xs text-slate-400 italic">No README.md content provided.</p>;
-  }
+export function MarkdownRenderer({
+  content = "",
+  className = "",
+  showToolbar = true,
+}: MarkdownRendererProps) {
+  const [viewMode, setViewMode] = useState<"visual" | "html">("visual");
+  const [copied, setCopied] = useState(false);
 
-  const lines = content.split("\n");
-  const blocks: React.ReactNode[] = [];
-  let currentList: string[] = [];
-  let inCodeBlock = false;
-  let codeBlockContent: string[] = [];
-
-  const flushList = (key: number) => {
-    if (currentList.length > 0) {
-      blocks.push(
-        <ul key={`list-${key}`} className="space-y-1.5 my-2.5 list-none pl-1">
-          {currentList.map((item, idx) => (
-            <li key={idx} className="text-xs text-slate-700 flex items-start gap-2">
-              <span className="text-slate-400 select-none mt-0.5">•</span>
-              <div className="flex-1 leading-relaxed">{parseInline(item)}</div>
-            </li>
-          ))}
-        </ul>
-      );
-      currentList = [];
+  const parsedHtml = useMemo(() => {
+    if (!content || !content.trim()) return "";
+    try {
+      const rawHtml = marked.parse(content) as string;
+      return sanitizeHtmlOutput(rawHtml);
+    } catch {
+      return sanitizeHtmlOutput(content);
     }
+  }, [content]);
+
+  const handleCopySource = () => {
+    if (!content) return;
+    navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  const flushCodeBlock = (key: number) => {
-    if (codeBlockContent.length > 0) {
-      blocks.push(
-        <pre
-          key={`code-${key}`}
-          className="my-3 p-3 rounded-xl bg-slate-900 text-slate-100 text-[11px] font-mono overflow-x-auto border border-slate-800"
-        >
-          <code>{codeBlockContent.join("\n")}</code>
-        </pre>
-      );
-      codeBlockContent = [];
-    }
-  };
-
-  lines.forEach((line, index) => {
-    // Code block toggle
-    if (line.trim().startsWith("```")) {
-      if (inCodeBlock) {
-        inCodeBlock = false;
-        flushCodeBlock(index);
-      } else {
-        flushList(index);
-        inCodeBlock = true;
-      }
-      return;
-    }
-
-    if (inCodeBlock) {
-      codeBlockContent.push(line);
-      return;
-    }
-
-    const trimmed = line.trim();
-
-    // Empty line
-    if (!trimmed) {
-      flushList(index);
-      return;
-    }
-
-    // Horizontal rule
-    if (trimmed === "---" || trimmed === "***") {
-      flushList(index);
-      blocks.push(<hr key={`hr-${index}`} className="my-4 border-slate-200" />);
-      return;
-    }
-
-    // Headings
-    if (trimmed.startsWith("### ")) {
-      flushList(index);
-      blocks.push(
-        <h3 key={`h3-${index}`} className="text-sm sm:text-base font-bold text-slate-900 mt-4 mb-2 flex items-center gap-1.5">
-          {parseInline(trimmed.slice(4))}
-        </h3>
-      );
-      return;
-    }
-
-    if (trimmed.startsWith("## ")) {
-      flushList(index);
-      blocks.push(
-        <h2 key={`h2-${index}`} className="text-base sm:text-lg font-bold text-slate-900 mt-5 mb-2 pb-1 border-b border-slate-100">
-          {parseInline(trimmed.slice(3))}
-        </h2>
-      );
-      return;
-    }
-
-    if (trimmed.startsWith("# ")) {
-      flushList(index);
-      blocks.push(
-        <h1 key={`h1-${index}`} className="text-lg sm:text-xl font-extrabold text-slate-900 mt-6 mb-2 pb-1.5 border-b border-slate-200">
-          {parseInline(trimmed.slice(2))}
-        </h1>
-      );
-      return;
-    }
-
-    // List item
-    if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-      currentList.push(trimmed.slice(2));
-      return;
-    }
-
-    // Regular paragraph
-    flushList(index);
-    blocks.push(
-      <p key={`p-${index}`} className="text-xs text-slate-700 leading-relaxed my-1.5">
-        {parseInline(line)}
+  if (!content || !content.trim()) {
+    return (
+      <p className="text-xs text-slate-400 italic py-2">
+        No README content provided.
       </p>
     );
-  });
+  }
 
-  flushList(lines.length);
-  flushCodeBlock(lines.length);
+  return (
+    <div className="w-full space-y-2">
+      {showToolbar && (
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 text-xs">
+          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setViewMode("visual")}
+              className={cn(
+                "px-2.5 py-1 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer",
+                viewMode === "visual"
+                  ? "bg-white text-slate-900 shadow-xs font-semibold"
+                  : "text-slate-600 hover:text-slate-900"
+              )}
+            >
+              <Eye className="w-3 h-3" />
+              <span>Rendered Preview</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("html")}
+              className={cn(
+                "px-2.5 py-1 rounded-md text-[11px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer",
+                viewMode === "html"
+                  ? "bg-white text-slate-900 shadow-xs font-semibold"
+                  : "text-slate-600 hover:text-slate-900"
+              )}
+            >
+              <Code className="w-3 h-3" />
+              <span>HTML / Source Reader</span>
+            </button>
+          </div>
 
-  return <div className={`prose-sm max-w-none ${className}`}>{blocks}</div>;
+          <button
+            type="button"
+            onClick={handleCopySource}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+            title="Copy raw markdown / HTML"
+          >
+            {copied ? (
+              <>
+                <Check className="w-3 h-3 text-emerald-600" />
+                <span className="text-emerald-600 font-medium">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3 h-3" />
+                <span>Copy Source</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {viewMode === "visual" ? (
+        <div
+          className={cn(
+            "github-readme-render text-xs sm:text-sm text-slate-800 leading-relaxed max-w-full overflow-hidden break-words",
+            className
+          )}
+          dangerouslySetInnerHTML={{ __html: parsedHtml }}
+        />
+      ) : (
+        <div className="relative">
+          <pre className="p-4 rounded-2xl bg-slate-950 text-slate-100 text-[11px] font-mono overflow-x-auto border border-slate-800 leading-relaxed max-h-[500px]">
+            <code>{content}</code>
+          </pre>
+        </div>
+      )}
+    </div>
+  );
 }

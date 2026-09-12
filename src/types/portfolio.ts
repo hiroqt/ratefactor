@@ -51,6 +51,8 @@ export interface Portfolio {
   ratingBreakdown: RatingBreakdown;
   likesCount: number;
   isLiked?: boolean;
+  userReaction?: string;
+  reactions?: Record<string, number>;
   userRating?: number;
   userRatingBreakdown?: RatingBreakdown;
   commentsCount: number;

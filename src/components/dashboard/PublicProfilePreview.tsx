@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { 
   Copy, 
   Check, 
@@ -21,8 +22,10 @@ import {
 } from "lucide-react";
 import { DeveloperProfile } from "@/types/profile";
 import { Portfolio } from "@/types/portfolio";
-import { formatRating } from "@/lib/utils";
+import { formatRating, formatJoinedDate } from "@/lib/utils";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { ActivityHeatmap } from "./ActivityHeatmap";
+import { getEmojiDisplay } from "../PortfolioDetailModal";
 
 interface PublicProfilePreviewProps {
   profile: DeveloperProfile;
@@ -49,7 +52,7 @@ export function PublicProfilePreview({
     null;
 
   const handleCopyLink = () => {
-    const url = `https://ratefactor.dev/@${profile.username}`;
+    const url = typeof window !== "undefined" ? `${window.location.origin}/u/${profile.username}` : `https://ratefactor.dev/u/${profile.username}`;
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(url);
       setCopied(true);
@@ -67,29 +70,36 @@ export function PublicProfilePreview({
           </div>
           <div>
             <div className="text-xs font-semibold">Public Showcase Live Preview</div>
-            <div className="text-[11px] text-slate-300 font-mono">
-              ratefactor.dev/@{profile.username}
-            </div>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleCopyLink}
-          className="px-3.5 py-1.5 rounded-full bg-white text-slate-900 hover:bg-slate-100 text-xs font-semibold flex items-center gap-1.5 transition-colors self-start sm:self-auto cursor-pointer"
-        >
-          {copied ? (
-            <>
-              <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
-              <span>Link Copied!</span>
-            </>
-          ) : (
-            <>
-              <Copy className="w-3.5 h-3.5" />
-              <span>Copy Public Link</span>
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          <Link
+            href={`/u/${profile.username}`}
+            className="px-3.5 py-1.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <span>Open Full Page</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </Link>
+
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            className="px-3.5 py-1.5 rounded-full bg-white text-slate-900 hover:bg-slate-100 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            {copied ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+                <span>Link Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy Link</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Simulated Public Page Layout */}
@@ -210,7 +220,7 @@ export function PublicProfilePreview({
 
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-slate-400 bg-slate-50 px-3 py-1 rounded-full border border-slate-200">
-              Joined {profile.joinedDate}
+              Joined {formatJoinedDate(profile.joinedDate)}
             </span>
           </div>
         </div>
@@ -269,7 +279,12 @@ export function PublicProfilePreview({
                     <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between">
                       <div className="flex items-center gap-3 text-xs font-mono text-slate-500">
                         <span className="text-amber-800 font-semibold">★ {formatRating(p.rating)}</span>
-                        <span>{p.likesCount} ♥</span>
+                        {p.likesCount > 0 && (
+                          <span className="flex items-center gap-0.5">
+                            <span className="text-xs">{getEmojiDisplay(p.userReaction || "star-struck")}</span>
+                            <span>{p.likesCount}</span>
+                          </span>
+                        )}
                       </div>
 
                       <button
@@ -285,6 +300,11 @@ export function PublicProfilePreview({
               })}
             </div>
           )}
+        </div>
+
+        {/* GitHub-Style Activity / Contribution Heatmap */}
+        <div className="pt-2 border-t border-slate-100">
+          <ActivityHeatmap profile={profile} readOnly={true} />
         </div>
 
         {/* GitHub Style README.md Section */}

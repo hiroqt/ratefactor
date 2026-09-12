@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { 
   Activity, 
   Flame, 
@@ -11,7 +11,10 @@ import {
   BookOpen, 
   Users,
   AlertCircle,
-  Lock
+  Lock,
+  ChevronLeft,
+  ChevronRight,
+  Settings
 } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
 import { DeveloperProfile } from "@/types/profile";
@@ -27,12 +30,13 @@ interface ActivityHeatmapProps {
   profile?: DeveloperProfile;
   onUpdateProfile?: (updated: DeveloperProfile) => void;
   onRequireAuth?: (intent: string) => void;
+  readOnly?: boolean;
 }
 
 function generateEmptyHeatmap(): ActivityDay[] {
   const days: ActivityDay[] = [];
   const today = new Date();
-  for (let i = 139; i >= 0; i--) {
+  for (let i = 370; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
     days.push({
@@ -44,39 +48,54 @@ function generateEmptyHeatmap(): ActivityDay[] {
   return days;
 }
 
-function getHeatmapMonths(days: ActivityDay[]): string[] {
-  if (days.length === 0) return ["May", "Jun", "Jul", "Aug", "Sep"];
-  const months: string[] = [];
-  const step = Math.floor(days.length / 5);
-  for (let i = 0; i < days.length; i += step) {
-    const d = new Date(days[i].date);
-    const m = d.toLocaleString("default", { month: "short" });
-    if (!months.includes(m)) {
-      months.push(m);
-    }
+function formatDayTooltip(dateStr: string, count: number): { label: string; dateFormatted: string } {
+  try {
+    const d = new Date(dateStr + "T00:00:00");
+    const dateFormatted = d.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const label = count === 0 ? "No contributions" : `${count} contribution${count === 1 ? "" : "s"}`;
+    return { label, dateFormatted };
+  } catch {
+    return { label: `${count} contributions`, dateFormatted: dateStr };
   }
-  return months.slice(0, 5);
 }
 
 export function ActivityHeatmap({
   profile,
   onUpdateProfile,
   onRequireAuth,
+  readOnly = false,
 }: ActivityHeatmapProps) {
   const [heatmapDays, setHeatmapDays] = useState<ActivityDay[]>(generateEmptyHeatmap());
-  const [hoveredDay, setHoveredDay] = useState<ActivityDay | null>(null);
+  const [hoveredDay, setHoveredDay] = useState<{ day: ActivityDay; x: number; y: number } | null>(null);
+  const [selectedYear, setSelectedYear] = useState<string>("2026");
   const [isLoading, setIsLoading] = useState(false);
   const [githubInput, setGithubInput] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
   const [stats, setStats] = useState<{
     totalContributions?: number;
     currentStreak?: number;
     publicRepos?: number;
     followers?: number;
     lastSyncedAt?: string;
-  }>({});
+  }>({
+    totalContributions: profile?.githubSync?.totalContributions,
+    currentStreak: profile?.githubSync?.currentStreak,
+    publicRepos: profile?.githubSync?.publicRepos,
+    followers: profile?.githubSync?.followers,
+    lastSyncedAt: profile?.githubSync?.lastSyncedAt,
+  });
 
-  // Extract GitHub username from profile.githubSync, profile.github, or profile.username
+  const lastFetchedUserRef = useRef<string | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
+
+  // Extract GitHub username
   const rawGithub =
     profile?.githubSync?.username ||
     profile?.github ||
@@ -95,14 +114,36 @@ export function ActivityHeatmap({
       activeGithubUsername !== "user-default"
   );
 
+  // Auto-scroll to latest month (far right)
+  const scrollToLatest = useCallback(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth;
+    }
+  }, []);
+
+  const handleScrollLeft = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: -260, behavior: "smooth" });
+    }
+  };
+
+  const handleScrollRight = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: 260, behavior: "smooth" });
+    }
+  };
+
   const fetchContributions = useCallback(
-    async (usernameToFetch: string) => {
+    async (usernameToFetch: string, force = false) => {
       if (!usernameToFetch || usernameToFetch === "developer" || usernameToFetch === "user-default") return;
+      if (!force && lastFetchedUserRef.current === usernameToFetch) return;
+      lastFetchedUserRef.current = usernameToFetch;
+
       setIsLoading(true);
       setErrorMsg(null);
       try {
         const res = await fetch(
-          `/api/github/contributions?username=${encodeURIComponent(usernameToFetch)}`
+          `/api/github/contributions?username=${encodeURIComponent(usernameToFetch)}${force ? "&force=true" : ""}`
         );
         const data = await res.json();
         if (!res.ok) {
@@ -165,10 +206,16 @@ export function ActivityHeatmap({
   );
 
   useEffect(() => {
-    if (isConnected) {
+    if (isConnected && lastFetchedUserRef.current !== activeGithubUsername) {
       fetchContributions(activeGithubUsername);
     }
-  }, [activeGithubUsername, isConnected]);
+  }, [activeGithubUsername, isConnected, fetchContributions]);
+
+  useEffect(() => {
+    scrollToLatest();
+    const t = setTimeout(scrollToLatest, 150);
+    return () => clearTimeout(t);
+  }, [heatmapDays, scrollToLatest]);
 
   const handleConnectByUsername = (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,7 +232,7 @@ export function ActivityHeatmap({
       };
       onUpdateProfile(updated);
     }
-    fetchContributions(target);
+    fetchContributions(target, true);
     setGithubInput("");
   };
 
@@ -278,233 +325,369 @@ export function ActivityHeatmap({
     profile?.githubSync?.totalContributions ??
     heatmapDays.reduce((acc, d) => acc + d.count, 0);
   const streak = stats.currentStreak ?? profile?.githubSync?.currentStreak ?? 0;
-  const monthLabels = getHeatmapMonths(heatmapDays);
+
+  // Month positions aligned with week columns (GitHub Standard)
+  const monthLabelsWithPositions = useMemo(() => {
+    const labels: { month: string; colIndex: number }[] = [];
+    let lastMonth = "";
+    const totalWeeks = Math.ceil(heatmapDays.length / 7);
+
+    for (let w = 0; w < totalWeeks; w++) {
+      const day = heatmapDays[w * 7];
+      if (day) {
+        const d = new Date(day.date + "T00:00:00");
+        const m = d.toLocaleString("en-US", { month: "short" });
+        if (m !== lastMonth) {
+          labels.push({ month: m, colIndex: w });
+          lastMonth = m;
+        }
+      }
+    }
+
+    return labels;
+  }, [heatmapDays]);
+
+  const handleCellMouseEnter = (day: ActivityDay, e: React.MouseEvent<HTMLDivElement>) => {
+    if (chartRef.current) {
+      const rect = chartRef.current.getBoundingClientRect();
+      const cellRect = e.currentTarget.getBoundingClientRect();
+      setHoveredDay({
+        day,
+        x: cellRect.left - rect.left + cellRect.width / 2,
+        y: cellRect.top - rect.top,
+      });
+    }
+  };
 
   return (
-    <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-4 w-full min-w-0 max-w-full overflow-hidden">
+    <div className="w-full space-y-3 font-sans">
       {errorMsg && (
-        <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-center justify-between gap-2">
+        <div className="p-3 rounded-md bg-[#ffebe9] border border-[#ff8182]/40 text-[#cf222e] text-xs font-medium flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <AlertCircle className="w-4 h-4 text-[#cf222e] shrink-0" />
             <span>{errorMsg}</span>
           </div>
           <button
             onClick={() => setErrorMsg(null)}
-            className="text-rose-500 hover:text-rose-800 text-[11px] cursor-pointer"
+            className="text-[#cf222e] hover:underline text-[11px] cursor-pointer"
           >
             Dismiss
           </button>
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      {/* GitHub Section Header: "{Count} contributions in {Year}" */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">
-            <Activity className="w-4 h-4" />
-          </div>
-          <div>
-            <h4 className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-1.5">
+          <h3 className="text-sm sm:text-base font-semibold text-[#1f2328] tracking-tight">
+            {isConnected ? (
               <span>
-                {isConnected ? "GitHub Contributions & Activity" : "GitHub Contribution Graph"}
+                {formatNumber(totalContribs)} contributions in {selectedYear === "2026" ? "the last year" : selectedYear}
               </span>
-              {isConnected && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
-            </h4>
-            <p className="text-[11px] text-slate-500">
-              {isConnected
-                ? `Live verified contribution graph from @${activeGithubUsername}`
-                : "Connect your GitHub account or specify handle to embed your live contributions."}
-            </p>
-          </div>
-        </div>
-
-        {isConnected && (
-          <div className="flex items-center gap-2 text-[11px] font-mono">
-            {streak > 0 && (
-              <span className="flex items-center gap-1 text-slate-700 font-semibold px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200">
-                <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                <span>{streak}-day streak</span>
-              </span>
+            ) : (
+              <span>GitHub Contribution Graph</span>
             )}
-            <button
-              type="button"
-              onClick={handleSync}
-              disabled={isLoading}
-              className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer border border-slate-200"
-              title="Sync latest GitHub data"
-            >
-              <RefreshCw
-                className={cn("w-3 h-3", isLoading && "animate-spin text-emerald-600")}
-              />
-              <span>{isLoading ? "Syncing..." : "Sync GitHub"}</span>
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* CENTER PIECE: If NOT Connected -> Prominent Center Connect Box */}
-      {!isConnected ? (
-        <div className="relative rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-6 sm:p-8 flex flex-col items-center justify-center text-center my-2">
-          <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-md mb-3">
-            <Github className="w-6 h-6" />
-          </div>
-          <h5 className="text-sm font-bold text-slate-900">Embed Your GitHub Contributions</h5>
-          <p className="text-xs text-slate-500 max-w-md mt-1 mb-5">
-            Link your GitHub username to embed your live activity chart directly into your RateFactor showcase.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-md justify-center">
-            <button
-              type="button"
-              onClick={handleConnectOAuth}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-sm transition active:scale-95 cursor-pointer"
-            >
-              <Github className="w-4 h-4" />
-              <span>Sign In with GitHub</span>
-            </button>
-
-            <span className="text-xs text-slate-400 font-mono">or</span>
-
-            <form onSubmit={handleConnectByUsername} className="flex items-center gap-1.5 w-full sm:w-auto">
-              <input
-                type="text"
-                value={githubInput}
-                onChange={(e) => setGithubInput(e.target.value)}
-                placeholder="Enter GitHub handle..."
-                className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-900 flex-1 sm:w-44 transition shadow-xs"
-              />
-              <button
-                type="submit"
-                disabled={isLoading || !githubInput.trim()}
-                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition disabled:opacity-50 cursor-pointer shadow-xs shrink-0"
-              >
-                Embed
-              </button>
-            </form>
-          </div>
-        </div>
-      ) : (
-        /* Connected State: Metadata Bar + Native SVG Heatmap Grid */
-        <div className="space-y-3">
-          {/* Metadata bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
-            <div className="flex items-center gap-2">
-              <Github className="w-4 h-4 text-slate-900 shrink-0" />
-              <a
-                href={`https://github.com/${activeGithubUsername}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-bold text-slate-900 hover:underline flex items-center gap-1"
-              >
-                <span>@{activeGithubUsername}</span>
-                <ExternalLink className="w-3 h-3 text-slate-400" />
-              </a>
-            </div>
-
-            <div className="flex items-center gap-3 text-[11px] text-slate-500 flex-wrap">
-              {totalContribs !== undefined && (
-                <span className="font-semibold text-slate-800">
-                  {formatNumber(totalContribs)} contributions in 2026
-                </span>
-              )}
-              {stats.publicRepos !== undefined && stats.publicRepos > 0 && (
-                <span className="flex items-center gap-1">
-                  <BookOpen className="w-3 h-3 text-slate-400" />
-                  {stats.publicRepos} repos
-                </span>
-              )}
-              {stats.followers !== undefined && stats.followers > 0 && (
-                <span className="flex items-center gap-1">
-                  <Users className="w-3 h-3 text-slate-400" />
-                  {stats.followers} followers
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Native SVG Contribution Heatmap Grid */}
-          <div className="overflow-x-auto pb-1 max-w-full overscroll-x-contain">
-            <div className="min-w-[620px]">
-              {/* Months header aligned with weeks */}
-              <div className="flex justify-between text-[10px] font-mono text-slate-400 mb-1.5 pl-7 pr-2">
-                {monthLabels.map((m, idx) => (
-                  <span key={`${m}-${idx}`}>{m}</span>
-                ))}
-              </div>
-
-              <div className="flex items-start gap-1.5">
-                {/* Weekday labels (Mon / Wed / Fri) */}
-                <div
-                  className="grid grid-flow-row gap-1 text-[9px] font-mono text-slate-400 select-none pr-1 pt-0.5"
-                  style={{ gridTemplateRows: "repeat(7, 12px)" }}
-                >
-                  <span className="h-3 leading-3" />
-                  <span className="h-3 leading-3">Mon</span>
-                  <span className="h-3 leading-3" />
-                  <span className="h-3 leading-3">Wed</span>
-                  <span className="h-3 leading-3" />
-                  <span className="h-3 leading-3">Fri</span>
-                  <span className="h-3 leading-3" />
-                </div>
-
-                {/* 7 rows for days of week, 20 columns for weeks */}
-                <div
-                  className="grid grid-flow-col gap-1 flex-1"
-                  style={{ gridTemplateRows: "repeat(7, 12px)" }}
-                >
-                  {heatmapDays.map((day) => {
-                    let colorClass = "bg-[#ebedf0]";
-                    if (day.level === 1) colorClass = "bg-[#9be9a8]";
-                    else if (day.level === 2) colorClass = "bg-[#40c463]";
-                    else if (day.level === 3) colorClass = "bg-[#30a14e]";
-                    else if (day.level === 4) colorClass = "bg-[#216e39]";
-
-                    return (
-                      <div
-                        key={day.date}
-                        onMouseEnter={() => setHoveredDay(day)}
-                        onMouseLeave={() => setHoveredDay(null)}
-                        className={cn(
-                          "w-3 h-3 rounded-[2px] transition-all cursor-pointer hover:ring-1 hover:ring-slate-900/40",
-                          colorClass
-                        )}
-                        title={`${day.count} contributions on ${day.date}`}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Footer */}
-      <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-slate-500 gap-2">
-        <div className="h-4">
-          {isConnected && hoveredDay ? (
-            <span className="text-slate-900 font-mono">
-              <strong>{hoveredDay.count}</strong> contribution{hoveredDay.count === 1 ? "" : "s"} on{" "}
-              {hoveredDay.date}
-            </span>
-          ) : isConnected ? (
-            <span className="text-slate-400">Hover over any square for activity details</span>
-          ) : (
-            <span className="text-slate-400 flex items-center gap-1">
-              <Lock className="w-3 h-3" /> Connect GitHub to embed live activity
+          </h3>
+          {isConnected && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#1a7f37] bg-[#dafbe1] px-2 py-0.5 rounded-full border border-[#4ac26b]/30">
+              <CheckCircle2 className="w-3 h-3" />
+              Verified
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-1 font-mono text-[10px]">
-          <span>Less</span>
-          <span className="w-2.5 h-2.5 rounded-[2px] bg-[#ebedf0] border border-slate-200" />
-          <span className="w-2.5 h-2.5 rounded-[2px] bg-[#9be9a8]" />
-          <span className="w-2.5 h-2.5 rounded-[2px] bg-[#40c463]" />
-          <span className="w-2.5 h-2.5 rounded-[2px] bg-[#30a14e]" />
-          <span className="w-2.5 h-2.5 rounded-[2px] bg-[#216e39]" />
-          <span>More</span>
-        </div>
+        {isConnected && (
+          <div className="flex items-center gap-2">
+            {streak > 0 && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-[#9a6700] bg-[#fff8c5] px-2.5 py-1 rounded-md border border-[#d4a72c]/40">
+                <Flame className="w-3.5 h-3.5 fill-[#d4a72c] text-[#d4a72c]" />
+                <span>{streak} day streak</span>
+              </span>
+            )}
+
+            {!readOnly && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleSync}
+                  disabled={isLoading}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-[#1f2328] bg-[#f6f8fa] hover:bg-[#eaeef2] border border-[#d0d7de] rounded-md shadow-xs transition disabled:opacity-50 cursor-pointer"
+                  title="Sync latest GitHub data"
+                >
+                  <RefreshCw className={cn("w-3 h-3", isLoading && "animate-spin text-[#0969da]")} />
+                  <span>{isLoading ? "Syncing..." : "Sync"}</span>
+                </button>
+
+                {/* Contribution Settings Dropdown */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#656d76] hover:text-[#1f2328] bg-[#f6f8fa] hover:bg-[#eaeef2] border border-[#d0d7de] rounded-md transition cursor-pointer"
+                  >
+                    <Settings className="w-3 h-3" />
+                    <span className="hidden sm:inline">Settings</span>
+                  </button>
+
+                  {showSettingsDropdown && (
+                    <div className="absolute right-0 mt-1 w-56 bg-white border border-[#d0d7de] rounded-md shadow-lg p-2 z-30 text-xs text-[#1f2328] space-y-1">
+                      <div className="font-semibold text-[#656d76] px-2 py-1 text-[11px] uppercase tracking-wider">
+                        Contribution settings
+                      </div>
+                      <a
+                        href={`https://github.com/${activeGithubUsername}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between px-2 py-1.5 hover:bg-[#f6f8fa] rounded-md text-[#0969da]"
+                      >
+                        <span>View GitHub Profile</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                      <button
+                        onClick={() => {
+                          setShowSettingsDropdown(false);
+                          handleSync();
+                        }}
+                        className="w-full text-left px-2 py-1.5 hover:bg-[#f6f8fa] rounded-md"
+                      >
+                        Force Fresh Resync
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* GitHub Card Container */}
+      <div 
+        ref={chartRef}
+        className="relative bg-white border border-[#d0d7de] rounded-md p-4 shadow-xs"
+      >
+        {!isConnected ? (
+          /* Empty / Unconnected State */
+          readOnly ? (
+            <div className="py-8 px-4 flex flex-col items-center justify-center text-center space-y-2">
+              <div className="w-10 h-10 rounded-full bg-[#f6f8fa] border border-[#d0d7de] flex items-center justify-center text-[#1f2328]">
+                <Github className="w-5 h-5" />
+              </div>
+              <h4 className="text-sm font-semibold text-[#1f2328]">No GitHub Activity Linked</h4>
+              <p className="text-xs text-[#656d76] max-w-sm">
+                @{profile?.username || "This developer"} has not linked a public GitHub account yet.
+              </p>
+            </div>
+          ) : (
+            <div className="py-8 px-4 flex flex-col items-center justify-center text-center space-y-3">
+              <div className="w-10 h-10 rounded-full bg-[#f6f8fa] border border-[#d0d7de] flex items-center justify-center text-[#1f2328]">
+                <Github className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-[#1f2328]">Display GitHub Contributions</h4>
+                <p className="text-xs text-[#656d76] max-w-sm mt-0.5">
+                  Sign in with GitHub or enter your username to render your live activity calendar.
+                </p>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleConnectOAuth}
+                  className="px-3.5 py-1.5 bg-[#1f2328] hover:bg-[#24292f] text-white text-xs font-semibold rounded-md flex items-center gap-2 transition cursor-pointer"
+                >
+                  <Github className="w-3.5 h-3.5" />
+                  <span>Sign in with GitHub</span>
+                </button>
+
+                <span className="text-xs text-[#656d76]">or</span>
+
+                <form onSubmit={handleConnectByUsername} className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={githubInput}
+                    onChange={(e) => setGithubInput(e.target.value)}
+                    placeholder="GitHub username"
+                    className="px-2.5 py-1.5 bg-white border border-[#d0d7de] rounded-md text-xs text-[#1f2328] placeholder-[#656d76] focus:outline-none focus:ring-2 focus:ring-[#0969da] focus:border-transparent w-36"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isLoading || !githubInput.trim()}
+                    className="px-3 py-1.5 bg-[#1f883d] hover:bg-[#1a7f37] text-white text-xs font-semibold rounded-md transition disabled:opacity-50 cursor-pointer"
+                  >
+                    Connect
+                  </button>
+                </form>
+              </div>
+            </div>
+          )
+        ) : (
+          /* GitHub-Accurate Heatmap Layout */
+          <div className="space-y-3">
+            {/* Scroll Navigation Controls */}
+            <div className="flex items-center justify-between text-[11px] text-[#656d76] pb-1">
+              <div className="flex items-center gap-2">
+                <a
+                  href={`https://github.com/${activeGithubUsername}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-[#0969da] hover:underline flex items-center gap-1 text-xs"
+                >
+                  <span>@{activeGithubUsername}</span>
+                  <ExternalLink className="w-3 h-3 text-[#656d76]" />
+                </a>
+                {stats.publicRepos !== undefined && stats.publicRepos > 0 && (
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[#656d76]">
+                    • <BookOpen className="w-3 h-3" /> {stats.publicRepos} repos
+                  </span>
+                )}
+                {stats.followers !== undefined && stats.followers > 0 && (
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[#656d76]">
+                    • <Users className="w-3 h-3" /> {stats.followers} followers
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handleScrollLeft}
+                  className="p-1 rounded-md text-[#656d76] hover:text-[#1f2328] hover:bg-[#f6f8fa] border border-[#d0d7de] transition cursor-pointer"
+                  title="Scroll to earlier months"
+                >
+                  <ChevronLeft className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleScrollRight}
+                  className="p-1 rounded-md text-[#656d76] hover:text-[#1f2328] hover:bg-[#f6f8fa] border border-[#d0d7de] transition cursor-pointer"
+                  title="Scroll to later months"
+                >
+                  <ChevronRight className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={scrollToLatest}
+                  className="px-2 py-0.5 text-[10px] font-medium text-[#1f2328] bg-[#f6f8fa] hover:bg-[#eaeef2] border border-[#d0d7de] rounded-md transition cursor-pointer"
+                >
+                  Latest
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Contribution Calendar Grid */}
+            <div
+              ref={scrollContainerRef}
+              className="overflow-x-auto pb-2 pt-1 max-w-full overscroll-x-contain select-none scrollbar-thin"
+            >
+              <div className="inline-block min-w-max">
+                {/* Month Labels aligned to 53 week columns */}
+                <div className="relative h-4 text-[10px] font-normal text-[#656d76] mb-1 pl-8">
+                  {monthLabelsWithPositions.map((item, idx) => (
+                    <span
+                      key={`${item.month}-${idx}`}
+                      className="absolute whitespace-nowrap"
+                      style={{ left: `${32 + item.colIndex * 13.5}px` }}
+                    >
+                      {item.month}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex items-start gap-1.5">
+                  {/* Weekday Labels (Mon, Wed, Fri) */}
+                  <div
+                    className="grid grid-flow-row text-[9px] font-normal text-[#656d76] select-none pr-1 sticky left-0 bg-white z-10"
+                    style={{ gridTemplateRows: "repeat(7, 10.5px)", rowGap: "3px" }}
+                  >
+                    <span className="h-[10.5px] leading-[10.5px]" />
+                    <span className="h-[10.5px] leading-[10.5px]">Mon</span>
+                    <span className="h-[10.5px] leading-[10.5px]" />
+                    <span className="h-[10.5px] leading-[10.5px]">Wed</span>
+                    <span className="h-[10.5px] leading-[10.5px]" />
+                    <span className="h-[10.5px] leading-[10.5px]">Fri</span>
+                    <span className="h-[10.5px] leading-[10.5px]" />
+                  </div>
+
+                  {/* 7 rows x 53 columns SVG/Grid */}
+                  <div
+                    className="grid grid-flow-col"
+                    style={{ 
+                      gridTemplateRows: "repeat(7, 10.5px)",
+                      rowGap: "3px",
+                      columnGap: "3px"
+                    }}
+                  >
+                    {heatmapDays.map((day) => {
+                      let bgClass = "bg-[#ebedf0] outline outline-1 outline-[#1b1f230f] -outline-offset-1";
+                      if (day.level === 1) bgClass = "bg-[#9be9a8]";
+                      else if (day.level === 2) bgClass = "bg-[#40c463]";
+                      else if (day.level === 3) bgClass = "bg-[#30a14e]";
+                      else if (day.level === 4) bgClass = "bg-[#216e39]";
+
+                      return (
+                        <div
+                          key={day.date}
+                          onMouseEnter={(e) => handleCellMouseEnter(day, e)}
+                          onMouseLeave={() => setHoveredDay(null)}
+                          className={cn(
+                            "w-[10.5px] h-[10.5px] rounded-[2px] transition-transform cursor-pointer hover:outline hover:outline-1 hover:outline-[#1f2328] hover:scale-125 z-0 hover:z-20",
+                            bgClass
+                          )}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* GitHub Floating Tooltip */}
+            {hoveredDay && (
+              <div
+                className="absolute z-40 -translate-x-1/2 -translate-y-full pointer-events-none transition-all duration-75"
+                style={{
+                  left: `${hoveredDay.x}px`,
+                  top: `${hoveredDay.y - 8}px`,
+                }}
+              >
+                <div className="bg-[#1f2328] text-white px-2.5 py-1.5 rounded-md text-[11px] font-medium shadow-md whitespace-nowrap text-center">
+                  <div>{formatDayTooltip(hoveredDay.day.date, hoveredDay.day.count).label}</div>
+                  <div className="text-[10px] text-[#8c959f]">
+                    {formatDayTooltip(hoveredDay.day.date, hoveredDay.day.count).dateFormatted}
+                  </div>
+                </div>
+                {/* Tooltip Caret Arrow */}
+                <div className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-[#1f2328] mx-auto" />
+              </div>
+            )}
+
+            {/* GitHub Footer & Legend */}
+            <div className="pt-2 border-t border-[#d0d7de] flex flex-col sm:flex-row sm:items-center justify-between text-xs text-[#656d76] gap-2">
+              <a
+                href="https://docs.github.com/en/account-and-profile/setting-up-and-managing-your-github-profile/managing-contribution-settings-on-your-profile/why-are-my-contributions-not-showing-up-on-my-profile"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#0969da] hover:underline text-[11px]"
+              >
+                Learn how we count contributions
+              </a>
+
+              {/* GitHub 5-Tier Color Scale Legend */}
+              <div className="flex items-center gap-1.5 text-[11px] text-[#656d76]">
+                <span>Less</span>
+                <div className="flex items-center gap-[3px]">
+                  <span className="w-[10px] h-[10px] rounded-[2px] bg-[#ebedf0] outline outline-1 outline-[#1b1f230f] -outline-offset-1" />
+                  <span className="w-[10px] h-[10px] rounded-[2px] bg-[#9be9a8]" />
+                  <span className="w-[10px] h-[10px] rounded-[2px] bg-[#40c463]" />
+                  <span className="w-[10px] h-[10px] rounded-[2px] bg-[#30a14e]" />
+                  <span className="w-[10px] h-[10px] rounded-[2px] bg-[#216e39]" />
+                </div>
+                <span>More</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

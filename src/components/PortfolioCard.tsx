@@ -14,11 +14,13 @@ import { Portfolio } from "@/types/portfolio";
 import { cn, formatNumber, formatRating } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
 import { EmojiReaction } from "@/components/ui/emoji-reaction";
+import { getEmojiDisplay } from "./PortfolioDetailModal";
 
 export interface PortfolioCardProps {
   portfolio: Portfolio;
   onSelect: (portfolio: Portfolio) => void;
   onLikeToggle?: (id: string, liked: boolean) => void;
+  onReact?: (id: string, emojiName: string) => void;
   viewMode?: "grid" | "list" | "mosaic";
   index?: number;
 }
@@ -27,6 +29,7 @@ export function PortfolioCard({
   portfolio,
   onSelect,
   onLikeToggle,
+  onReact,
   viewMode = "mosaic",
   index = 0,
 }: PortfolioCardProps) {
@@ -52,14 +55,18 @@ export function PortfolioCard({
   };
 
   const handleReact = (emojiName: string) => {
-    if (!isLiked) {
-      setIsLiked(true);
-      setLikesCount((prev) => prev + 1);
+    if (onReact) {
+      onReact(portfolio.id, emojiName);
+    } else {
+      if (!isLiked) {
+        setIsLiked(true);
+        setLikesCount((prev) => prev + 1);
+      }
+      if (onLikeToggle) {
+        onLikeToggle(portfolio.id, true);
+      }
     }
     trackEvent("portfolio_reaction", { portfolioId: portfolio.id, reaction: emojiName });
-    if (onLikeToggle) {
-      onLikeToggle(portfolio.id, true);
-    }
   };
 
   const getCategoryColor = (cat: string) => {
@@ -166,17 +173,16 @@ export function PortfolioCard({
             >
               <button
                 type="button"
-                onClick={handleLike}
                 className={cn(
                   "flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors cursor-pointer font-mono",
                   isLiked
-                    ? "bg-slate-900 border-slate-900 text-white"
+                    ? "bg-amber-50 border-amber-300 text-amber-900 font-semibold shadow-xs"
                     : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                 )}
-                aria-label="React or like portfolio"
+                aria-label="React to architecture"
               >
-                <Heart className={cn("w-3 h-3", isLiked && "fill-rose-400 text-rose-400")} />
-                <span className="tabular-nums">{likesCount}</span>
+                <span className="text-sm">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>
+                {likesCount > 0 && <span className="tabular-nums font-semibold">{likesCount}</span>}
               </button>
             </EmojiReaction>
           </div>
@@ -295,17 +301,16 @@ export function PortfolioCard({
                   >
                     <button
                       type="button"
-                      onClick={handleLike}
                       className={cn(
                         "flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors cursor-pointer font-mono",
                         isLiked
-                          ? "bg-slate-900 border-slate-900 text-white"
+                          ? "bg-amber-50 border-amber-300 text-amber-900 font-semibold shadow-xs"
                           : "bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50"
                       )}
-                      aria-label="React or like portfolio"
+                      aria-label="React to architecture"
                     >
-                      <Heart className={cn("w-3 h-3", isLiked && "fill-rose-400 text-rose-400")} />
-                      <span className="tabular-nums">{likesCount}</span>
+                      <span className="text-sm">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>
+                      {likesCount > 0 && <span className="tabular-nums font-semibold">{likesCount}</span>}
                     </button>
                   </EmojiReaction>
                 </div>
@@ -423,17 +428,16 @@ export function PortfolioCard({
               >
                 <button
                   type="button"
-                  onClick={handleLike}
                   className={cn(
                     "flex items-center gap-1 text-xs px-2 py-0.5 rounded-md border transition-colors cursor-pointer font-mono",
                     isLiked
-                      ? "bg-slate-900 border-slate-900 text-white"
+                      ? "bg-amber-50 border-amber-300 text-amber-900 font-semibold shadow-xs"
                       : "bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50"
                   )}
-                  aria-label="React or like portfolio"
+                  aria-label="React to architecture"
                 >
-                  <Heart className={cn("w-3 h-3", isLiked && "fill-rose-400 text-rose-400")} />
-                  <span className="text-[11px] tabular-nums">{formatNumber(likesCount)}</span>
+                  <span className="text-sm">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>
+                  {likesCount > 0 && <span className="text-[11px] tabular-nums font-semibold">{formatNumber(likesCount)}</span>}
                 </button>
               </EmojiReaction>
             </div>

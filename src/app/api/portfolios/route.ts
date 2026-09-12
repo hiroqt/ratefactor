@@ -23,16 +23,31 @@ export async function GET(req: NextRequest) {
       filtered = filtered.filter((p) => p.category === category);
     }
 
-    // Filter by Search Query
+    // Filter by Search Query (Primary Domain, Username, Title, Tech Stack)
     if (query) {
-      filtered = filtered.filter(
-        (p) =>
-          p.title.toLowerCase().includes(query) ||
-          p.tagline.toLowerCase().includes(query) ||
-          p.author.name.toLowerCase().includes(query) ||
-          p.author.username.toLowerCase().includes(query) ||
-          p.techStack.some((t) => t.toLowerCase().includes(query))
-      );
+      filtered = filtered.filter((p) => {
+        let domain = "";
+        try {
+          if (p.portfolioUrl) {
+            domain = new URL(
+              p.portfolioUrl.startsWith("http") ? p.portfolioUrl : `https://${p.portfolioUrl}`
+            ).hostname.toLowerCase();
+          }
+        } catch {}
+
+        return (
+          p.title?.toLowerCase().includes(query) ||
+          p.tagline?.toLowerCase().includes(query) ||
+          p.description?.toLowerCase().includes(query) ||
+          p.author?.name?.toLowerCase().includes(query) ||
+          p.author?.username?.toLowerCase().includes(query) ||
+          p.category?.toLowerCase().includes(query) ||
+          (domain && domain.includes(query)) ||
+          p.portfolioUrl?.toLowerCase().includes(query) ||
+          (p.demoUrl && p.demoUrl.toLowerCase().includes(query)) ||
+          p.techStack?.some((t) => t.toLowerCase().includes(query))
+        );
+      });
     }
 
     // Sort order

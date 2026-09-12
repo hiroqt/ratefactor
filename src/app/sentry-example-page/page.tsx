@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import React, { useState, useEffect } from "react";
 import * as Sentry from "@sentry/nextjs";
 import { triggerServerActionError } from "./actions";

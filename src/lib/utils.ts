@@ -65,3 +65,20 @@ export function formatRating(val?: number | null, fallback = 5.0): string {
   return val.toFixed(2);
 }
 
+/**
+ * Formats a joined date into 'MMM DD, YYYY' format (e.g. 'Sep 12, 2026', 'Jan 01, 2026').
+ */
+export function formatJoinedDate(dateStr?: string | Date | null): string {
+  if (!dateStr) return "Jan 01, 2026";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) {
+    return String(dateStr);
+  }
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = months[d.getUTCMonth()];
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const year = d.getUTCFullYear();
+  return `${month} ${day}, ${year}`;
+}
+
+

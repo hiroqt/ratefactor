@@ -1,8 +1,10 @@
 import { pool } from "@/lib/auth/better-auth";
 import { githubFetch } from "./client";
+import { githubCache, CACHE_TTL } from "./cache";
+import { safeDbQuery } from "./db";
 
 export interface GithubRepoData {
-  id: string;
+  id?: string;
   githubRepoId: number;
   name: string;
   fullName: string;
@@ -21,66 +23,79 @@ export interface GithubRepoData {
 }
 
 /**
- * Fetches public repositories for the authenticated user or target username.
+ * Fetches user repositories from GitHub with in-memory caching.
  */
 export async function fetchGithubRepositories(
   token?: string | null,
-  fallbackUsername?: string
+  fallbackUsername?: string,
+  bypassCache = false
 ): Promise<GithubRepoData[]> {
   const targetUsername = (fallbackUsername || "").trim().replace(/^@/, "");
+  const cacheKey = `repos:${(targetUsername || "viewer").toLowerCase()}`;
 
-  let rawRepos: any[] = [];
+  if (!bypassCache) {
+    const cached = githubCache.get<GithubRepoData[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
 
-  // 1. Try authenticated /user/repos
+  let repos: any[] = [];
+
+  // 1. Try Authenticated /user/repos
   if (token) {
     try {
-      rawRepos = await githubFetch(
+      const data = await githubFetch(
         token,
-        "/user/repos?visibility=public&affiliation=owner,collaborator&sort=pushed&per_page=100"
+        "/user/repos?per_page=100&sort=pushed&affiliation=owner,collaborator"
       );
-    } catch (err) {
-      console.warn("[fetchGithubRepositories] Authenticated /user/repos failed:", err);
+      if (Array.isArray(data)) {
+        repos = data;
+      }
+    } catch {
+      // Fallback
     }
   }
 
-  // 2. Fallback to public /users/{username}/repos
-  if ((!rawRepos || rawRepos.length === 0) && targetUsername) {
+  // 2. Try Public /users/{username}/repos
+  if (repos.length === 0 && targetUsername) {
     try {
-      rawRepos = await githubFetch(
+      const data = await githubFetch(
         null,
-        `/users/${encodeURIComponent(targetUsername)}/repos?sort=pushed&per_page=100`
+        `/users/${encodeURIComponent(targetUsername)}/repos?per_page=100&sort=pushed`
       );
-    } catch (err) {
-      console.warn("[fetchGithubRepositories] Public /users/repos failed:", err);
+      if (Array.isArray(data)) {
+        repos = data;
+      }
+    } catch {
+      // Fallback
     }
   }
 
-  if (!Array.isArray(rawRepos)) return [];
+  const mapped: GithubRepoData[] = repos.map((r) => ({
+    githubRepoId: r.id,
+    name: r.name,
+    fullName: r.full_name,
+    description: r.description || undefined,
+    htmlUrl: r.html_url,
+    homepage: r.homepage || undefined,
+    language: r.language || undefined,
+    topics: Array.isArray(r.topics) ? r.topics : [],
+    stars: r.stargazers_count || 0,
+    forks: r.forks_count || 0,
+    isPrivate: Boolean(r.private),
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    pushedAt: r.pushed_at,
+    lastSyncedAt: new Date().toISOString(),
+  }));
 
-  return rawRepos
-    .filter((r) => !r.private && !r.fork)
-    .map((r) => ({
-      id: String(r.id),
-      githubRepoId: r.id,
-      name: r.name,
-      fullName: r.full_name,
-      description: r.description || undefined,
-      htmlUrl: r.html_url,
-      homepage: r.homepage || undefined,
-      language: r.language || undefined,
-      topics: Array.isArray(r.topics) ? r.topics : [],
-      stars: r.stargazers_count || 0,
-      forks: r.forks_count || 0,
-      isPrivate: Boolean(r.private),
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
-      pushedAt: r.pushed_at,
-      lastSyncedAt: new Date().toISOString(),
-    }));
+  githubCache.set(cacheKey, mapped, CACHE_TTL.REPOSITORIES);
+  return mapped;
 }
 
 /**
- * Saves and caches repositories in PostgreSQL.
+ * Saves and caches repositories in PostgreSQL safely.
  */
 export async function saveGithubRepositories(
   userId: string,
@@ -88,49 +103,45 @@ export async function saveGithubRepositories(
 ): Promise<void> {
   if (!userId || repos.length === 0) return;
 
-  try {
-    for (const r of repos) {
-      await pool.query(
-        `INSERT INTO public.github_repositories (
-          user_id, github_repo_id, name, full_name, description, html_url,
-          homepage, language, topics, stars, forks, is_private, created_at,
-          updated_at, pushed_at, last_synced_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
-        ON CONFLICT (user_id, github_repo_id) DO UPDATE SET
-          name = EXCLUDED.name,
-          full_name = EXCLUDED.full_name,
-          description = EXCLUDED.description,
-          html_url = EXCLUDED.html_url,
-          homepage = EXCLUDED.homepage,
-          language = EXCLUDED.language,
-          topics = EXCLUDED.topics,
-          stars = EXCLUDED.stars,
-          forks = EXCLUDED.forks,
-          is_private = EXCLUDED.is_private,
-          updated_at = EXCLUDED.updated_at,
-          pushed_at = EXCLUDED.pushed_at,
-          last_synced_at = NOW()`,
-        [
-          userId,
-          r.githubRepoId,
-          r.name,
-          r.fullName,
-          r.description || null,
-          r.htmlUrl,
-          r.homepage || null,
-          r.language || null,
-          r.topics,
-          r.stars,
-          r.forks,
-          r.isPrivate,
-          r.createdAt ? new Date(r.createdAt) : null,
-          r.updatedAt ? new Date(r.updatedAt) : null,
-          r.pushedAt ? new Date(r.pushedAt) : null,
-        ]
-      );
-    }
-  } catch (err) {
-    console.warn("[saveGithubRepositories] DB error:", err);
+  for (const r of repos) {
+    await safeDbQuery(
+      `INSERT INTO public.github_repositories (
+        user_id, github_repo_id, name, full_name, description, html_url,
+        homepage, language, topics, stars, forks, is_private, created_at,
+        updated_at, pushedAt, last_synced_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
+      ON CONFLICT (user_id, github_repo_id) DO UPDATE SET
+        name = EXCLUDED.name,
+        full_name = EXCLUDED.full_name,
+        description = EXCLUDED.description,
+        html_url = EXCLUDED.html_url,
+        homepage = EXCLUDED.homepage,
+        language = EXCLUDED.language,
+        topics = EXCLUDED.topics,
+        stars = EXCLUDED.stars,
+        forks = EXCLUDED.forks,
+        is_private = EXCLUDED.is_private,
+        updated_at = EXCLUDED.updated_at,
+        pushed_at = EXCLUDED.pushed_at,
+        last_synced_at = NOW()`,
+      [
+        userId,
+        r.githubRepoId,
+        r.name,
+        r.fullName,
+        r.description || null,
+        r.htmlUrl,
+        r.homepage || null,
+        r.language || null,
+        r.topics,
+        r.stars,
+        r.forks,
+        r.isPrivate,
+        r.createdAt ? new Date(r.createdAt) : null,
+        r.updatedAt ? new Date(r.updatedAt) : null,
+        r.pushedAt ? new Date(r.pushedAt) : null,
+      ]
+    );
   }
 }
 
@@ -140,34 +151,32 @@ export async function saveGithubRepositories(
 export async function getCachedGithubRepositories(userId: string): Promise<GithubRepoData[]> {
   if (!userId) return [];
 
-  try {
-    const res = await pool.query(
-      `SELECT * FROM public.github_repositories
-       WHERE user_id = $1
-       ORDER BY pushed_at DESC NULLS LAST, stars DESC
-       LIMIT 100`,
-      [userId]
-    );
+  const res = await safeDbQuery(
+    `SELECT * FROM public.github_repositories
+     WHERE user_id = $1
+     ORDER BY pushed_at DESC NULLS LAST, stars DESC
+     LIMIT 100`,
+    [userId]
+  );
 
-    return res.rows.map((r) => ({
-      id: r.id,
-      githubRepoId: Number(r.github_repo_id),
-      name: r.name,
-      fullName: r.full_name,
-      description: r.description || undefined,
-      htmlUrl: r.html_url,
-      homepage: r.homepage || undefined,
-      language: r.language || undefined,
-      topics: r.topics || [],
-      stars: r.stars || 0,
-      forks: r.forks || 0,
-      isPrivate: Boolean(r.is_private),
-      createdAt: r.created_at ? new Date(r.created_at).toISOString() : undefined,
-      updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : undefined,
-      pushedAt: r.pushed_at ? new Date(r.pushed_at).toISOString() : undefined,
-      lastSyncedAt: r.last_synced_at ? new Date(r.last_synced_at).toISOString() : undefined,
-    }));
-  } catch {
-    return [];
-  }
+  if (!res || !res.rows) return [];
+
+  return res.rows.map((r: any) => ({
+    id: r.id,
+    githubRepoId: Number(r.github_repo_id),
+    name: r.name,
+    fullName: r.full_name,
+    description: r.description || undefined,
+    htmlUrl: r.html_url,
+    homepage: r.homepage || undefined,
+    language: r.language || undefined,
+    topics: r.topics || [],
+    stars: r.stars || 0,
+    forks: r.forks || 0,
+    isPrivate: Boolean(r.is_private),
+    createdAt: r.created_at ? new Date(r.created_at).toISOString() : undefined,
+    updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : undefined,
+    pushedAt: r.pushed_at ? new Date(r.pushed_at).toISOString() : undefined,
+    lastSyncedAt: r.last_synced_at ? new Date(r.last_synced_at).toISOString() : undefined,
+  }));
 }

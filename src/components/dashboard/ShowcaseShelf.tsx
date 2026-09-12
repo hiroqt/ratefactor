@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Portfolio } from "@/types/portfolio";
 import { cn, formatNumber, formatRating } from "@/lib/utils";
+import { getEmojiDisplay } from "../PortfolioDetailModal";
 
 interface ShowcaseShelfProps {
   myPortfolios: Portfolio[];
@@ -168,14 +169,18 @@ export function ShowcaseShelf({
                         ({spotlightPortfolio.ratingCount} reviews)
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 text-rose-400">
-                      <Heart className="w-3.5 h-3.5 fill-rose-400" />
-                      {spotlightPortfolio.likesCount}
-                    </div>
-                    <div className="flex items-center gap-1 text-slate-300">
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      {spotlightPortfolio.commentsCount}
-                    </div>
+                    {spotlightPortfolio.likesCount > 0 && (
+                      <div className="flex items-center gap-1 text-amber-300">
+                        <span className="text-sm">{getEmojiDisplay(spotlightPortfolio.userReaction || "star-struck")}</span>
+                        <span>{spotlightPortfolio.likesCount}</span>
+                      </div>
+                    )}
+                    {spotlightPortfolio.commentsCount > 0 && (
+                      <div className="flex items-center gap-1 text-slate-300">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>{spotlightPortfolio.commentsCount}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -274,8 +279,13 @@ export function ShowcaseShelf({
                       <span className="text-amber-800 font-semibold">
                         ★ {formatRating(portfolio.rating)}
                       </span>
-                      <span>{portfolio.likesCount} ♥</span>
-                      <span>{portfolio.commentsCount} 💬</span>
+                      {portfolio.likesCount > 0 && (
+                        <span className="flex items-center gap-0.5">
+                          <span className="text-xs">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>
+                          <span>{portfolio.likesCount}</span>
+                        </span>
+                      )}
+                      {portfolio.commentsCount > 0 && <span>{portfolio.commentsCount} 💬</span>}
                     </div>
 
                     <div className="flex items-center gap-1.5">

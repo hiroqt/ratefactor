@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   Portfolio,
   PortfolioCategory,
@@ -61,10 +61,46 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
   const [activeSort, setActiveSort] = useState<SortOption>("highest_rated");
   const [showcaseHistoryIds, setShowcaseHistoryIds] = useState<string[]>([]);
 
-  // Persist portfolios changes to localStorage
+  // Cooldown tracker per portfolio to prevent spam clicking / rapid toggles
+  const lastActionTimestamps = useRef<Map<string, number>>(new Map());
+
+  // Listen for cross-tab and cross-component portfolio updates for true real-time sync
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "ratefactor_portfolios" && e.newValue) {
+        try {
+          const updated = JSON.parse(e.newValue);
+          if (Array.isArray(updated)) {
+            setPortfolios(updated);
+          }
+        } catch {}
+      }
+    };
+
+    const handleCustomUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<Portfolio[]>;
+      if (customEvent.detail && Array.isArray(customEvent.detail)) {
+        setPortfolios(customEvent.detail);
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("ratefactor_portfolios_updated", handleCustomUpdate);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("ratefactor_portfolios_updated", handleCustomUpdate);
+    };
+  }, []);
+
+  // Persist portfolios changes to localStorage and broadcast real-time event
   useEffect(() => {
     try {
       localStorage.setItem("ratefactor_portfolios", JSON.stringify(portfolios));
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("ratefactor_portfolios_updated", { detail: portfolios })
+        );
+      }
     } catch (e) {}
   }, [portfolios]);
 
@@ -82,34 +118,150 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
     );
   }, [portfolios]);
 
-  // User's own portfolios
+  // User's own portfolios (real-time recalculation based on author match)
   const myPortfolios = useMemo(() => {
-    const username = options?.currentUsername || options?.currentUser?.username;
-    if (!username) return [];
-    return portfolios.filter(
-      (p) =>
-        (options?.currentUser?.username && p.author.username === options.currentUser.username) ||
-        p.author.username === username
-    );
+    const username = (options?.currentUsername || options?.currentUser?.username || "").toLowerCase().trim();
+    const name = (options?.currentUser?.name || "").toLowerCase().trim();
+    if (!username && !name) return [];
+
+    return portfolios.filter((p) => {
+      const pUser = (p.author?.username || "").toLowerCase().trim();
+      const pName = (p.author?.name || "").toLowerCase().trim();
+      return (username && pUser === username) || (name && pName === name);
+    });
   }, [portfolios, options?.currentUsername, options?.currentUser]);
 
-  // Like toggle
+  // Multi-attribute search & filter: Primary Domain, Username, Portfolio Title, Tech Stack
+  const filteredPortfolios = useMemo(() => {
+    let result = [...portfolios];
+
+    // 1. Category Filter
+    if (activeCategory !== "All") {
+      result = result.filter((p) => p.category === activeCategory);
+    }
+
+    // 2. Search Query Filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter((p) => {
+        // Extract domain hostname if portfolioUrl exists
+        let domain = "";
+        try {
+          if (p.portfolioUrl) {
+            const urlObj = new URL(
+              p.portfolioUrl.startsWith("http") ? p.portfolioUrl : `https://${p.portfolioUrl}`
+            );
+            domain = urlObj.hostname.toLowerCase();
+          }
+        } catch {}
+
+        let demoDomain = "";
+        try {
+          if (p.demoUrl) {
+            const urlObj = new URL(
+              p.demoUrl.startsWith("http") ? p.demoUrl : `https://${p.demoUrl}`
+            );
+            demoDomain = urlObj.hostname.toLowerCase();
+          }
+        } catch {}
+
+        const matchesTitle = p.title?.toLowerCase().includes(q) || false;
+        const matchesTagline = p.tagline?.toLowerCase().includes(q) || false;
+        const matchesDescription = p.description?.toLowerCase().includes(q) || false;
+        const matchesUsername = p.author?.username?.toLowerCase().includes(q) || false;
+        const matchesAuthorName = p.author?.name?.toLowerCase().includes(q) || false;
+        const matchesCategory = p.category?.toLowerCase().includes(q) || false;
+        const matchesDomain =
+          (domain && domain.includes(q)) ||
+          (demoDomain && demoDomain.includes(q)) ||
+          p.portfolioUrl?.toLowerCase().includes(q) ||
+          p.demoUrl?.toLowerCase().includes(q) ||
+          false;
+        const matchesTech = p.techStack?.some((t) => t.toLowerCase().includes(q)) || false;
+
+        return (
+          matchesTitle ||
+          matchesTagline ||
+          matchesDescription ||
+          matchesUsername ||
+          matchesAuthorName ||
+          matchesCategory ||
+          matchesDomain ||
+          matchesTech
+        );
+      });
+    }
+
+    // 3. Sorting
+    if (activeSort === "highest_rated") {
+      result.sort((a, b) => b.rating - a.rating || (b.likesCount || 0) - (a.likesCount || 0));
+    } else if (activeSort === "most_liked") {
+      result.sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0) || b.rating - a.rating);
+    } else if (activeSort === "most_discussed") {
+      result.sort((a, b) => (b.commentsCount || 0) - (a.commentsCount || 0));
+    } else if (activeSort === "latest") {
+      result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (activeSort === "showcase") {
+      result.sort((a, b) => (b.isShowcase ? 1 : 0) - (a.isShowcase ? 1 : 0));
+    }
+
+    return result;
+  }, [portfolios, activeCategory, searchQuery, activeSort]);
+
+  // Like toggle with anti-abuse rate limit / cooldown
   const handleLikeToggle = useCallback(
-    (portfolioId: string, isLiked: boolean) => {
+    (portfolioId: string, isLiked?: boolean) => {
       if (!options?.currentUser) {
         options?.onRequireAuth?.("Sign in with GitHub or Email to heart and like portfolios.");
         return;
       }
 
+      // Rate limit check: Min 1.2s cooldown between toggles on the same portfolio
+      const now = Date.now();
+      const lastAction = lastActionTimestamps.current.get(portfolioId) || 0;
+      if (now - lastAction < 1200) {
+        const remaining = Math.ceil((1200 - (now - lastAction)) / 1000);
+        options?.onToast?.(`Action cooldown: Please wait ${remaining}s before liking/unliking again.`);
+        return;
+      }
+      lastActionTimestamps.current.set(portfolioId, now);
+
+      let targetAuthorMe = false;
+      let targetTitle = "";
+
       setPortfolios((prev) =>
         prev.map((p) => {
           if (p.id === portfolioId) {
-            const nextCount = isLiked ? p.likesCount + 1 : Math.max(0, p.likesCount - 1);
-            const updated = {
+            const nextLiked = isLiked !== undefined ? isLiked : !p.isLiked;
+            const currentReactions = { ...(p.reactions || {}) };
+            const defaultEmoji = p.userReaction || "star-struck";
+
+            if (nextLiked) {
+              currentReactions[defaultEmoji] = (currentReactions[defaultEmoji] || 0) + 1;
+            } else if (p.userReaction && currentReactions[p.userReaction]) {
+              currentReactions[p.userReaction] = Math.max(0, currentReactions[p.userReaction] - 1);
+              if (currentReactions[p.userReaction] === 0) {
+                delete currentReactions[p.userReaction];
+              }
+            }
+
+            const totalReactionsCount = Object.values(currentReactions).reduce((a, b) => a + b, 0);
+            const nextCount = nextLiked
+              ? Math.max(p.likesCount + 1, totalReactionsCount)
+              : Math.max(0, p.likesCount - 1);
+
+            const updated: Portfolio = {
               ...p,
-              isLiked,
+              isLiked: nextLiked,
+              userReaction: nextLiked ? defaultEmoji : undefined,
+              reactions: currentReactions,
               likesCount: nextCount,
             };
+
+            const myUname = (options?.currentUsername || options?.currentUser?.username || "").toLowerCase();
+            targetAuthorMe = Boolean(myUname && p.author?.username?.toLowerCase() === myUname);
+            targetTitle = p.title;
+
             if (selectedPortfolio && selectedPortfolio.id === portfolioId) {
               setSelectedPortfolio(updated);
             }
@@ -119,30 +271,129 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         })
       );
 
-      if (isLiked) {
-        const target = portfolios.find((p) => p.id === portfolioId);
-        if (target) {
-          const isTargetAuthorMe =
-            Boolean((options?.currentUser?.username || options?.currentUsername) &&
-            target.author.username === (options?.currentUser?.username || options?.currentUsername));
-          const newNotif: NotificationItem = {
-            id: "notif-like-" + Date.now(),
-            type: "like",
-            actorName: options?.currentUser?.name || "Developer",
-            actorAvatar:
-              options?.currentUser?.avatar ||
-              "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
-            portfolioId: target.id,
-            portfolioTitle: target.title,
-            message: isTargetAuthorMe ? "liked your portfolio." : `appreciated ${target.title}.`,
-            timestamp: new Date().toISOString(),
-            isRead: false,
-          };
-          options?.onNotify?.(newNotif);
-        }
+      // Trigger asynchronous API call to server
+      fetch(`/api/portfolios/${portfolioId}/like`, { method: "POST" })
+        .then((res) => {
+          if (res.status === 429) {
+            options?.onToast?.("Rate limit reached. Please slow down like actions.");
+          }
+        })
+        .catch(() => {});
+
+      if (isLiked !== false) {
+        const newNotif: NotificationItem = {
+          id: "notif-like-" + Date.now(),
+          type: "like",
+          actorName: options?.currentUser?.name || "Developer",
+          actorAvatar:
+            options?.currentUser?.avatar ||
+            "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
+          portfolioId,
+          portfolioTitle: targetTitle,
+          message: targetAuthorMe ? "liked your portfolio." : `appreciated ${targetTitle || "your architecture"}.`,
+          timestamp: new Date().toISOString(),
+          isRead: false,
+        };
+        options?.onNotify?.(newNotif);
       }
     },
-    [options, portfolios, selectedPortfolio]
+    [options, selectedPortfolio]
+  );
+
+  // Emoji reaction with rate limit & toggling
+  const handleReact = useCallback(
+    (portfolioId: string, emojiName: string) => {
+      if (!options?.currentUser) {
+        options?.onRequireAuth?.("Sign in with GitHub or Email to react to developer portfolios.");
+        return;
+      }
+
+      // Rate limit check: Min 1.2s cooldown
+      const now = Date.now();
+      const lastAction = lastActionTimestamps.current.get(portfolioId) || 0;
+      if (now - lastAction < 1200) {
+        const remaining = Math.ceil((1200 - (now - lastAction)) / 1000);
+        options?.onToast?.(`Action cooldown: Please wait ${remaining}s before reacting again.`);
+        return;
+      }
+      lastActionTimestamps.current.set(portfolioId, now);
+
+      let targetAuthorMe = false;
+      let targetTitle = "";
+
+      setPortfolios((prev) =>
+        prev.map((p) => {
+          if (p.id === portfolioId) {
+            const currentReactions = { ...(p.reactions || {}) };
+            const prevUserEmoji = p.userReaction;
+            let nextUserEmoji: string | undefined = emojiName;
+            let nextLiked = true;
+
+            if (prevUserEmoji === emojiName) {
+              // Clicking the same emoji toggles it off
+              currentReactions[emojiName] = Math.max(0, (currentReactions[emojiName] || 1) - 1);
+              if (currentReactions[emojiName] === 0) {
+                delete currentReactions[emojiName];
+              }
+              nextUserEmoji = undefined;
+              nextLiked = false;
+            } else {
+              // Switching from previous emoji to new emoji
+              if (prevUserEmoji && currentReactions[prevUserEmoji]) {
+                currentReactions[prevUserEmoji] = Math.max(0, currentReactions[prevUserEmoji] - 1);
+                if (currentReactions[prevUserEmoji] === 0) {
+                  delete currentReactions[prevUserEmoji];
+                }
+              }
+              currentReactions[emojiName] = (currentReactions[emojiName] || 0) + 1;
+              nextUserEmoji = emojiName;
+              nextLiked = true;
+            }
+
+            const totalReactionsCount = Object.values(currentReactions).reduce((a, b) => a + b, 0);
+
+            const updated: Portfolio = {
+              ...p,
+              isLiked: nextLiked,
+              userReaction: nextUserEmoji,
+              reactions: currentReactions,
+              likesCount: Math.max(0, totalReactionsCount),
+            };
+
+            const myUname = (options?.currentUsername || options?.currentUser?.username || "").toLowerCase();
+            targetAuthorMe = Boolean(myUname && p.author?.username?.toLowerCase() === myUname);
+            targetTitle = p.title;
+
+            if (selectedPortfolio && selectedPortfolio.id === portfolioId) {
+              setSelectedPortfolio(updated);
+            }
+            return updated;
+          }
+          return p;
+        })
+      );
+
+      // Async API like sync
+      fetch(`/api/portfolios/${portfolioId}/like`, { method: "POST" }).catch(() => {});
+
+      trackEvent("portfolio_reaction", { portfolioId, reaction: emojiName });
+
+      const newNotif: NotificationItem = {
+        id: "notif-react-" + Date.now(),
+        type: "like",
+        actorName: options?.currentUser?.name || "Developer",
+        actorAvatar:
+          options?.currentUser?.avatar ||
+          "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
+        portfolioId,
+        portfolioTitle: targetTitle,
+        message: targetAuthorMe ? `reacted with ${emojiName} on your portfolio.` : `reacted with ${emojiName} on ${targetTitle || "your architecture"}.`,
+        timestamp: new Date().toISOString(),
+        isRead: false,
+      };
+      options?.onNotify?.(newNotif);
+    },
+    [options, selectedPortfolio]
   );
 
   // Rate portfolio
@@ -482,6 +733,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
 
   return {
     portfolios,
+    filteredPortfolios,
     setPortfolios,
     selectedPortfolio,
     setSelectedPortfolio,
@@ -497,6 +749,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
     weeklyShowcase,
     myPortfolios,
     handleLikeToggle,
+    handleReact,
     handleRatePortfolio,
     handleAddComment,
     handleDeleteComment,

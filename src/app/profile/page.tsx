@@ -13,9 +13,13 @@ import {
 import { AuthModal, useAuth } from "@/features/auth";
 import { useNotifications } from "@/features/notifications";
 import { useToast } from "@/hooks/useToast";
+import { PublicProfileModal } from "@/components/PublicProfileModal";
+import { DeveloperProfile } from "@/types/profile";
 
 export default function ProfilePage() {
   const { toast } = useToast();
+  const [visitedUser, setVisitedUser] = React.useState<DeveloperProfile | null>(null);
+  const [searchQuery, setSearchQuery] = React.useState("");
 
   // 1. Unified Authentication State
   const {
@@ -61,6 +65,7 @@ export default function ProfilePage() {
     setIsSubmitModalOpen,
     myPortfolios,
     handleLikeToggle,
+    handleReact,
     handleRatePortfolio,
     handleAddComment,
     handleDeleteComment,
@@ -105,6 +110,10 @@ export default function ProfilePage() {
         notifications={notifications}
         onMarkAllAsRead={markAllAsRead}
         onMarkAsRead={markAsRead}
+        onSelectPortfolioById={(id) => {
+          const found = portfolios.find((p) => p.id === id);
+          if (found) setSelectedPortfolio(found);
+        }}
         onOpenSubmitModal={() => {
           if (!currentUser) {
             requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
@@ -115,10 +124,12 @@ export default function ProfilePage() {
         onOpenDashboard={() => window.scrollTo({ top: 0, behavior: "smooth" })}
         activeNavTab="dashboard"
         setActiveNavTab={() => {}}
-        searchQuery=""
-        setSearchQuery={() => {}}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
         profile={developerProfile}
         currentUser={currentUser}
+        portfolios={portfolios}
+        onVisitUser={setVisitedUser}
         onOpenAuthModal={() =>
           requireAuth("Sign in with GitHub or Email to access your developer portfolio.")
         }
@@ -182,11 +193,29 @@ export default function ProfilePage() {
         currentUser={currentUser}
       />
 
+      {/* Public Profile Modal */}
+      <PublicProfileModal
+        userProfile={visitedUser}
+        isOpen={Boolean(visitedUser)}
+        onClose={() => setVisitedUser(null)}
+        userPortfolios={
+          visitedUser
+            ? portfolios.filter(
+                (p) =>
+                  p.author?.username?.toLowerCase() === visitedUser.username.toLowerCase() ||
+                  p.author?.name?.toLowerCase() === visitedUser.name.toLowerCase()
+              )
+            : []
+        }
+        onSelectPortfolio={(p) => setSelectedPortfolio(p)}
+      />
+
       {/* Portfolio Detail Modal */}
       <PortfolioDetailModal
         portfolio={selectedPortfolio}
         onClose={() => setSelectedPortfolio(null)}
         onLikeToggle={handleLikeToggle}
+        onReact={handleReact}
         onAddComment={handleAddComment}
         onDeleteComment={handleDeleteComment}
         onRatePortfolio={handleRatePortfolio}

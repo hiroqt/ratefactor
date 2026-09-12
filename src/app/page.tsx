@@ -18,11 +18,14 @@ import { AuthModal, useAuth } from "@/features/auth";
 import { useNotifications } from "@/features/notifications";
 import { useToast } from "@/hooks/useToast";
 import { PortfolioCategory } from "@/types/portfolio";
+import { DeveloperProfile } from "@/types/profile";
+import { PublicProfileModal } from "@/components/PublicProfileModal";
 import { Terminal, ArrowLeft } from "lucide-react";
 
 export default function Home() {
   const { toast } = useToast();
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const [visitedUser, setVisitedUser] = useState<DeveloperProfile | null>(null);
   const [activeNavTab, setActiveNavTab] = useState("discover");
 
   // 1. Unified Authentication State
@@ -64,6 +67,7 @@ export default function Home() {
   // 4. Portfolios State & Operations
   const {
     portfolios,
+    filteredPortfolios,
     selectedPortfolio,
     setSelectedPortfolio,
     isSubmitModalOpen,
@@ -78,6 +82,7 @@ export default function Home() {
     weeklyShowcase,
     myPortfolios,
     handleLikeToggle,
+    handleReact,
     handleRatePortfolio,
     handleAddComment,
     handleDeleteComment,
@@ -175,6 +180,8 @@ export default function Home() {
         onSelectSort={setActiveSort}
         profile={developerProfile}
         currentUser={currentUser}
+        portfolios={portfolios}
+        onVisitUser={setVisitedUser}
         onOpenAuthModal={() =>
           requireAuth("Sign in with GitHub or Email to access your developer portfolio.")
         }
@@ -245,11 +252,16 @@ export default function Home() {
 
             {/* Bento Showcase Grid: Daily Spotlight, Leaderboard, Fresh from Developers */}
             <ShowcaseBanner
-              portfolios={portfolios}
+              portfolios={filteredPortfolios}
+              allPortfolios={portfolios}
               dailyShowcase={dailyShowcase}
               weeklyShowcase={weeklyShowcase}
               onSelectPortfolio={(p) => setSelectedPortfolio(p)}
               onLikeToggle={handleLikeToggle}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
+              onVisitUser={setVisitedUser}
+              baseProfile={developerProfile}
               onCategorySelect={(cat) => {
                 setActiveCategory(cat);
                 const el = document.getElementById("showcase-bento");
@@ -265,10 +277,27 @@ export default function Home() {
       <Footer />
 
       {/* Modals & Drawers */}
+      <PublicProfileModal
+        userProfile={visitedUser}
+        isOpen={Boolean(visitedUser)}
+        onClose={() => setVisitedUser(null)}
+        userPortfolios={
+          visitedUser
+            ? portfolios.filter(
+                (p) =>
+                  p.author?.username?.toLowerCase() === visitedUser.username.toLowerCase() ||
+                  p.author?.name?.toLowerCase() === visitedUser.name.toLowerCase()
+              )
+            : []
+        }
+        onSelectPortfolio={(p) => setSelectedPortfolio(p)}
+      />
+
       <PortfolioDetailModal
         portfolio={selectedPortfolio}
         onClose={() => setSelectedPortfolio(null)}
         onLikeToggle={handleLikeToggle}
+        onReact={handleReact}
         onAddComment={handleAddComment}
         onDeleteComment={handleDeleteComment}
         onRatePortfolio={handleRatePortfolio}

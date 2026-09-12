@@ -9,14 +9,18 @@ import {
   X, 
   ArrowRight,
   Command,
-  Menu
+  Menu,
+  User,
+  CheckCircle2,
+  ExternalLink
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { PortfolioCategory, SortOption, NotificationItem } from "@/types/portfolio";
+import { Portfolio, PortfolioCategory, SortOption, NotificationItem } from "@/types/portfolio";
 import { DeveloperProfile } from "@/types/profile";
 import { cn } from "@/lib/utils";
 import { NotificationDropdown } from "@/components/NotificationDropdown";
 import { authClient, useSession, normalizeUsername } from "@/lib/auth/client";
+import { createProfileFromAuthor } from "./PublicProfileModal";
 
 export interface NavbarProps {
   unreadCount?: number;
@@ -40,6 +44,8 @@ export interface NavbarProps {
   currentUser?: any;
   onOpenAuthModal?: () => void;
   onSignOut?: () => void;
+  portfolios?: Portfolio[];
+  onVisitUser?: (userProfile: DeveloperProfile) => void;
 }
 
 export function Navbar({
@@ -64,6 +70,8 @@ export function Navbar({
   currentUser,
   onOpenAuthModal,
   onSignOut,
+  portfolios = [],
+  onVisitUser,
 }: NavbarProps) {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [localNotificationOpen, setLocalNotificationOpen] = useState(false);
@@ -205,10 +213,60 @@ export function Navbar({
     }
   };
 
+  // Compute matched developers and portfolios for search modal
+  const { matchedUsers, matchedPortfolios } = React.useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return { matchedUsers: [], matchedPortfolios: [] };
+
+    const authorMap = new Map<string, { author: Portfolio["author"]; count: number }>();
+    portfolios.forEach((p) => {
+      const username = p.author?.username || p.author?.name;
+      if (!username) return;
+      const key = username.toLowerCase();
+      if (authorMap.has(key)) {
+        authorMap.get(key)!.count += 1;
+      } else {
+        authorMap.set(key, { author: p.author, count: 1 });
+      }
+    });
+
+    const userResults: { author: Portfolio["author"]; count: number; profile: DeveloperProfile }[] = [];
+    authorMap.forEach(({ author, count }) => {
+      const authorName = (author.name || "").toLowerCase();
+      const authorUser = (author.username || "").toLowerCase();
+      const authorRole = (author.role || "").toLowerCase();
+      if (authorName.includes(q) || authorUser.includes(q) || authorRole.includes(q)) {
+        userResults.push({
+          author,
+          count,
+          profile: createProfileFromAuthor(author, portfolios, profile),
+        });
+      }
+    });
+
+    const portfolioResults = portfolios.filter((p) => {
+      const titleMatch = p.title.toLowerCase().includes(q);
+      const taglineMatch = p.tagline.toLowerCase().includes(q);
+      const catMatch = p.category.toLowerCase().includes(q);
+      const techMatch = p.techStack.some((t) => t.toLowerCase().includes(q));
+      let domainMatch = false;
+      try {
+        if (p.portfolioUrl) domainMatch = new URL(p.portfolioUrl).hostname.toLowerCase().includes(q);
+        if (!domainMatch && p.demoUrl) domainMatch = new URL(p.demoUrl).hostname.toLowerCase().includes(q);
+      } catch {
+        // ignore
+      }
+      return titleMatch || taglineMatch || catMatch || techMatch || domainMatch;
+    });
+
+    return { matchedUsers: userResults, matchedPortfolios: portfolioResults };
+  }, [searchQuery, portfolios, profile]);
+
   return (
     <>
       {/* Top Floating Tab Navigation with Generous Left and Right Margin Gap */}
       <header className="fixed top-0 left-0 right-0 z-50 flex justify-center pointer-events-none px-2 sm:px-6 md:px-12 lg:px-16">
+
         <div className="pointer-events-auto relative bg-white text-slate-900 rounded-b-2xl sm:rounded-b-[28px] shadow-[0_10px_30px_rgba(0,0,0,0.08)] border-b border-x border-slate-200/90 w-full max-w-[1400px] h-14 sm:h-16 px-3.5 sm:px-6 md:px-10 lg:px-14 flex items-center justify-between transition-all">
           
           {/* Inverted Concave Corner (Left Tab Fillet with seamless border) */}
@@ -649,28 +707,144 @@ export function Navbar({
                 </button>
               </div>
 
-              <div className="pt-3">
-                <div className="text-[11px] font-mono text-slate-400 mb-2 uppercase tracking-wider">
-                  Quick Filters
+              {/* Search Results or Quick Filters */}
+              {searchQuery.trim().length > 0 ? (
+                <div className="pt-3 max-h-[60vh] overflow-y-auto space-y-4 pr-1">
+                  {/* Matched Developers Section */}
+                  {matchedUsers.length > 0 && (
+                    <div>
+                      <div className="text-[11px] font-mono text-slate-400 mb-2 uppercase tracking-wider flex items-center justify-between">
+                        <span>Developers Found ({matchedUsers.length})</span>
+                        <span className="text-[10px] text-slate-400 lowercase">click visit for public preview</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {matchedUsers.map(({ author, count, profile: devProfile }) => (
+                          <div
+                            key={author.username || author.name}
+                            className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/90 border border-slate-200/80 transition-colors"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <img
+                                src={author.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80"}
+                                alt={author.name}
+                                className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-bold text-slate-900 truncate">
+                                    {author.name}
+                                  </span>
+                                  {author.isVerified && (
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                  )}
+                                  <span className="text-[11px] font-mono text-slate-500 truncate">
+                                    @{author.username?.replace(/^@/, "")}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-slate-500 truncate">
+                                  {author.role || "Developer"} • {count} {count === 1 ? "architecture" : "architectures"}
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowSearchModal(false);
+                                if (onVisitUser) {
+                                  onVisitUser(devProfile);
+                                }
+                              }}
+                              className="ml-2 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0"
+                            >
+                              <User className="w-3.5 h-3.5" />
+                              <span>Visit</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Matched Architectures / Portfolios */}
+                  {matchedPortfolios.length > 0 && (
+                    <div>
+                      <div className="text-[11px] font-mono text-slate-400 mb-2 uppercase tracking-wider">
+                        Architectures &amp; Projects ({matchedPortfolios.length})
+                      </div>
+                      <div className="space-y-1.5">
+                        {matchedPortfolios.slice(0, 6).map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => {
+                              setShowSearchModal(false);
+                              onSelectPortfolioById(item.id);
+                            }}
+                            className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/90 border border-slate-200/80 transition-colors cursor-pointer group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <img
+                                src={item.thumbnail}
+                                alt={item.title}
+                                className="w-9 h-9 rounded-lg object-cover border border-slate-200 shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate transition-colors">
+                                  {item.title}
+                                </div>
+                                <div className="text-[11px] text-slate-500 truncate">
+                                  {item.category} • by {item.author.name} (@{item.author.username?.replace(/^@/, "")})
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0 ml-2">
+                              <span className="text-[11px] font-mono text-amber-700 font-medium">
+                                ★{item.rating.toFixed(1)}
+                              </span>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-slate-200 text-xs text-slate-700 font-medium group-hover:bg-slate-900 group-hover:text-white transition-colors">
+                                <span>Inspect</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empty state */}
+                  {matchedUsers.length === 0 && matchedPortfolios.length === 0 && (
+                    <div className="py-8 text-center text-slate-500">
+                      <p className="text-sm font-medium text-slate-700">No matching developers or architectures found</p>
+                      <p className="text-xs text-slate-400 mt-1">Try searching by developer username (@handle), primary domain, title, or tech stack (e.g. Next.js, Rust).</p>
+                    </div>
+                  )}
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {["Systems", "Frontend", "Fullstack", "AI / ML", "Rust", "Next.js", "WebGL"].map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => {
-                        setSearchQuery(tag);
-                        setShowSearchModal(false);
-                        const el = document.getElementById("discovery-grid");
-                        el?.scrollIntoView({ behavior: "smooth" });
-                      }}
-                      className="text-xs px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono transition-colors"
-                    >
-                      #{tag}
-                    </button>
-                  ))}
+              ) : (
+                <div className="pt-3">
+                  <div className="text-[11px] font-mono text-slate-400 mb-2 uppercase tracking-wider">
+                    Quick Filters
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {["Systems", "Frontend", "Fullstack", "AI / ML", "Rust", "Next.js", "WebGL"].map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => {
+                          setSearchQuery(tag);
+                          setShowSearchModal(false);
+                          const el = document.getElementById("discovery-grid");
+                          el?.scrollIntoView({ behavior: "smooth" });
+                        }}
+                        className="text-xs px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono transition-colors cursor-pointer"
+                      >
+                        #{tag}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] font-mono text-slate-400">
                 <span>Press <kbd className="px-1 py-0.5 rounded bg-slate-100 border border-slate-200">ESC</kbd> to close</span>

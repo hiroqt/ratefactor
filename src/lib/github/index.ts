@@ -1,4 +1,6 @@
 export * from "./client";
+export * from "./cache";
+export * from "./db";
 export * from "./profile";
 export * from "./repositories";
 export * from "./readme";

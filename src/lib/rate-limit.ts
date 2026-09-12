@@ -5,11 +5,11 @@ export interface RateLimitConfig {
 }
 
 export const RATE_LIMIT_PRESETS: Record<string, RateLimitConfig> = {
-  // Likes: Max 20 per minute, at least 1 second cooldown
+  // Likes: Max 15 per minute, at least 1.5 seconds cooldown
   LIKE: {
-    limit: 20,
+    limit: 15,
     windowSeconds: 60,
-    debounceSeconds: 1,
+    debounceSeconds: 1.5,
   },
   // Comments: Max 3 per minute, at least 10 seconds cooldown between comments
   COMMENT: {

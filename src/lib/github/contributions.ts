@@ -1,5 +1,7 @@
 import { pool } from "@/lib/auth/better-auth";
 import { githubGraphQL } from "./client";
+import { githubCache, CACHE_TTL } from "./cache";
+import { safeDbQuery } from "./db";
 
 export interface ActivityDay {
   date: string;
@@ -16,10 +18,13 @@ export interface GithubContributionsData {
   lastSyncedAt?: string;
 }
 
-function generateEmptyHeatmap(): ActivityDay[] {
+/**
+ * Generates empty placeholder days for the whole year (53 weeks = 371 days).
+ */
+export function generateEmptyHeatmap(): ActivityDay[] {
   const days: ActivityDay[] = [];
   const today = new Date();
-  for (let i = 139; i >= 0; i--) {
+  for (let i = 370; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
     days.push({
@@ -97,64 +102,95 @@ function parseGitHubContributionsHtml(html: string): ActivityDay[] {
 }
 
 /**
- * Fetches contribution activity calendar from GitHub (GraphQL with REST/Scraper fallback).
+ * Fetches whole year contribution activity calendar from GitHub (GraphQL with REST/Scraper fallback),
+ * with memory cache support.
  */
 export async function fetchGithubContributions(
   token?: string | null,
-  fallbackUsername?: string
+  fallbackUsername?: string,
+  bypassCache = false
 ): Promise<GithubContributionsData> {
   const targetUsername = (fallbackUsername || "").trim().replace(/^@/, "");
+  const cacheKey = `contributions:${(targetUsername || "viewer").toLowerCase()}`;
+
+  if (!bypassCache) {
+    const cached = githubCache.get<GithubContributionsData>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
 
   let days: ActivityDay[] = [];
   let totalContributions = 0;
 
-  // 1. Try Authenticated GraphQL viewer.contributionsCollection
-  if (token) {
-    try {
-      const toDate = new Date();
-      const fromDate = new Date();
-      fromDate.setDate(toDate.getDate() - 140);
-
-      const query = `
-        query Contributions($from: DateTime!, $to: DateTime!) {
-          viewer {
-            login
-            contributionsCollection(from: $from, to: $to) {
-              contributionCalendar {
-                totalContributions
-                weeks {
-                  contributionDays {
-                    contributionCount
-                    date
-                    contributionLevel
-                  }
-                }
+  // 1. GraphQL API Query
+  const graphqlQuery = `
+    query($login: String) {
+      user(login: $login) {
+        contributionsCollection {
+          contributionCalendar {
+            totalContributions
+            weeks {
+              contributionDays {
+                contributionCount
+                date
+                contributionLevel
               }
             }
           }
         }
-      `;
+      }
+      viewer {
+        login
+        contributionsCollection {
+          contributionCalendar {
+            totalContributions
+            weeks {
+              contributionDays {
+                contributionCount
+                date
+                contributionLevel
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
 
-      const gqlData: any = await githubGraphQL(token, query, {
-        from: fromDate.toISOString(),
-        to: toDate.toISOString(),
-      });
+  if (token) {
+    try {
+      const variables = targetUsername ? { login: targetUsername } : {};
+      const data: any = await githubGraphQL(token, graphqlQuery, variables);
+      const calendar =
+        data?.user?.contributionsCollection?.contributionCalendar ||
+        data?.viewer?.contributionsCollection?.contributionCalendar;
 
-      const cal = gqlData?.viewer?.contributionsCollection?.contributionCalendar;
-      if (cal && Array.isArray(cal.weeks)) {
-        totalContributions = cal.totalContributions || 0;
-        const rawDays: ActivityDay[] = [];
-        for (const w of cal.weeks) {
-          if (Array.isArray(w.contributionDays)) {
-            for (const d of w.contributionDays) {
+      if (calendar && Array.isArray(calendar.weeks)) {
+        totalContributions = calendar.totalContributions || 0;
+        const allDays: ActivityDay[] = [];
+
+        for (const week of calendar.weeks) {
+          if (Array.isArray(week.contributionDays)) {
+            for (const d of week.contributionDays) {
               let level: 0 | 1 | 2 | 3 | 4 = 0;
-              if (d.contributionLevel === "FIRST_QUARTILE") level = 1;
-              else if (d.contributionLevel === "SECOND_QUARTILE") level = 2;
-              else if (d.contributionLevel === "THIRD_QUARTILE") level = 3;
-              else if (d.contributionLevel === "FOURTH_QUARTILE") level = 4;
-              else if (d.contributionCount > 0) level = 1;
-
-              rawDays.push({
+              switch (d.contributionLevel) {
+                case "FOURTH_QUARTILE":
+                  level = 4;
+                  break;
+                case "THIRD_QUARTILE":
+                  level = 3;
+                  break;
+                case "SECOND_QUARTILE":
+                  level = 2;
+                  break;
+                case "FIRST_QUARTILE":
+                  level = 1;
+                  break;
+                default:
+                  level = 0;
+              }
+              allDays.push({
                 date: d.date,
                 count: d.contributionCount || 0,
                 level,
@@ -162,39 +198,45 @@ export async function fetchGithubContributions(
             }
           }
         }
-        if (rawDays.length > 0) {
-          days = rawDays.slice(-140);
-        }
+
+        // Take full year of activity (up to 371 days = 53 weeks)
+        days = allDays.length > 371 ? allDays.slice(-371) : allDays;
       }
-    } catch (err) {
-      console.warn("[fetchGithubContributions] GraphQL failed, falling back:", err);
+    } catch {
+      // Fallback
     }
   }
 
-  // 2. Fallback: Public API or scrape
+  // 2. Fallback to GitHub SVG/HTML scraping endpoint if GraphQL failed
   if (days.length === 0 && targetUsername) {
     try {
-      const contribRes = await fetch(
-        `https://github-contributions-api.jogruber.de/v4/${encodeURIComponent(targetUsername)}?y=last`,
-        { headers: { "User-Agent": "RateFactor-App" }, next: { revalidate: 300 } }
+      const calendarRes = await fetch(
+        `https://github.com/users/${encodeURIComponent(targetUsername)}/contributions`,
+        {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          },
+          next: { revalidate: 300 },
+        }
       );
 
-      if (contribRes.ok) {
-        const data = await contribRes.json();
-        const rawDays = data.contributions || [];
-        days = rawDays.slice(-140).map((d: any) => ({
-          date: d.date,
-          count: d.count || 0,
-          level: Math.min(Math.max(d.level || 0, 0), 4) as 0 | 1 | 2 | 3 | 4,
-        }));
-        totalContributions = data.total?.lastYear || rawDays.reduce((acc: number, d: any) => acc + (d.count || 0), 0);
+      if (calendarRes.ok) {
+        const html = await calendarRes.text();
+        const parsed = parseGitHubContributionsHtml(html);
+        if (parsed.length > 0) {
+          days = parsed.length > 371 ? parsed.slice(-371) : parsed;
+          totalContributions = days.reduce((acc, d) => acc + d.count, 0);
+        }
       }
-    } catch {}
+    } catch {
+      // Ignore
+    }
 
     if (days.length === 0) {
       try {
         const htmlRes = await fetch(
-          `https://github.com/users/${encodeURIComponent(targetUsername)}/contributions`,
+          `https://github.com/${encodeURIComponent(targetUsername)}`,
           {
             headers: {
               "User-Agent":
@@ -207,7 +249,7 @@ export async function fetchGithubContributions(
           const html = await htmlRes.text();
           const parsed = parseGitHubContributionsHtml(html);
           if (parsed.length > 0) {
-            days = parsed.slice(-140);
+            days = parsed.length > 371 ? parsed.slice(-371) : parsed;
             totalContributions = days.reduce((acc, d) => acc + d.count, 0);
           }
         }
@@ -221,7 +263,7 @@ export async function fetchGithubContributions(
 
   const { currentStreak, longestStreak } = computeStreaks(days);
 
-  return {
+  const result: GithubContributionsData = {
     username: targetUsername || "developer",
     totalContributions,
     currentStreak,
@@ -229,10 +271,13 @@ export async function fetchGithubContributions(
     days,
     lastSyncedAt: new Date().toISOString(),
   };
+
+  githubCache.set(cacheKey, result, CACHE_TTL.CONTRIBUTIONS);
+  return result;
 }
 
 /**
- * Saves and caches contributions in PostgreSQL.
+ * Saves and caches contributions in PostgreSQL with error suppression.
  */
 export async function saveGithubContributions(
   userId: string,
@@ -240,99 +285,91 @@ export async function saveGithubContributions(
 ): Promise<void> {
   if (!userId || data.days.length === 0) return;
 
-  try {
-    const currentYear = new Date().getFullYear();
+  const currentYear = new Date().getFullYear();
 
-    // 1. Save summary
-    await pool.query(
-      `INSERT INTO public.github_contribution_summaries (
-        user_id, year, total_contributions, current_streak, longest_streak, last_synced_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-      ON CONFLICT (user_id, year) DO UPDATE SET
-        total_contributions = EXCLUDED.total_contributions,
-        current_streak = EXCLUDED.current_streak,
-        longest_streak = EXCLUDED.longest_streak,
-        last_synced_at = NOW(),
-        updated_at = NOW()`,
-      [
-        userId,
-        currentYear,
-        data.totalContributions,
-        data.currentStreak,
-        data.longestStreak,
-      ]
+  // 1. Save summary
+  await safeDbQuery(
+    `INSERT INTO public.github_contribution_summaries (
+      user_id, year, total_contributions, current_streak, longest_streak, last_synced_at, updated_at
+    ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+    ON CONFLICT (user_id, year) DO UPDATE SET
+      total_contributions = EXCLUDED.total_contributions,
+      current_streak = EXCLUDED.current_streak,
+      longest_streak = EXCLUDED.longest_streak,
+      last_synced_at = NOW(),
+      updated_at = NOW()`,
+    [
+      userId,
+      currentYear,
+      data.totalContributions,
+      data.currentStreak,
+      data.longestStreak,
+    ]
+  );
+
+  // 2. Batch upsert daily counts
+  for (const d of data.days) {
+    await safeDbQuery(
+      `INSERT INTO public.github_contributions (user_id, date, contribution_count, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (user_id, date) DO UPDATE SET
+         contribution_count = EXCLUDED.contribution_count,
+         updated_at = NOW()`,
+      [userId, d.date, d.count]
     );
-
-    // 2. Batch upsert daily counts
-    for (const d of data.days) {
-      await pool.query(
-        `INSERT INTO public.github_contributions (user_id, date, contribution_count, updated_at)
-         VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (user_id, date) DO UPDATE SET
-           contribution_count = EXCLUDED.contribution_count,
-           updated_at = NOW()`,
-        [userId, d.date, d.count]
-      );
-    }
-  } catch (err) {
-    console.warn("[saveGithubContributions] DB error:", err);
   }
 }
 
 /**
- * Retrieves cached contributions from PostgreSQL.
+ * Retrieves cached contributions from PostgreSQL for the whole year.
  */
 export async function getCachedGithubContributions(
   userId: string
 ): Promise<GithubContributionsData | null> {
   if (!userId) return null;
 
-  try {
-    const summaryRes = await pool.query(
-      `SELECT * FROM public.github_contribution_summaries
-       WHERE user_id = $1
-       ORDER BY year DESC
-       LIMIT 1`,
-      [userId]
-    );
+  const summaryRes = await safeDbQuery(
+    `SELECT * FROM public.github_contribution_summaries
+     WHERE user_id = $1
+     ORDER BY year DESC
+     LIMIT 1`,
+    [userId]
+  );
 
-    const daysRes = await pool.query(
-      `SELECT date::text, contribution_count FROM public.github_contributions
-       WHERE user_id = $1
-       ORDER BY date DESC
-       LIMIT 140`,
-      [userId]
-    );
+  const daysRes = await safeDbQuery(
+    `SELECT date::text, contribution_count FROM public.github_contributions
+     WHERE user_id = $1
+     ORDER BY date DESC
+     LIMIT 371`,
+    [userId]
+  );
 
-    if (daysRes.rows.length === 0) return null;
+  if (!daysRes || !daysRes.rows || daysRes.rows.length === 0) return null;
 
-    const days: ActivityDay[] = daysRes.rows.reverse().map((r) => {
-      const count = Number(r.contribution_count) || 0;
-      let level: 0 | 1 | 2 | 3 | 4 = 0;
-      if (count > 8) level = 4;
-      else if (count > 5) level = 3;
-      else if (count > 2) level = 2;
-      else if (count > 0) level = 1;
-
-      return {
-        date: r.date,
-        count,
-        level,
-      };
-    });
-
-    const summary = summaryRes.rows[0];
-    const { currentStreak, longestStreak } = computeStreaks(days);
+  const days: ActivityDay[] = daysRes.rows.reverse().map((r: any) => {
+    const count = Number(r.contribution_count) || 0;
+    let level: 0 | 1 | 2 | 3 | 4 = 0;
+    if (count > 8) level = 4;
+    else if (count > 5) level = 3;
+    else if (count > 2) level = 2;
+    else if (count > 0) level = 1;
 
     return {
-      username: "developer",
-      totalContributions: summary ? Number(summary.total_contributions) : days.reduce((a, d) => a + d.count, 0),
-      currentStreak: summary ? Number(summary.current_streak) : currentStreak,
-      longestStreak: summary ? Number(summary.longest_streak) : longestStreak,
-      days,
-      lastSyncedAt: summary?.last_synced_at ? new Date(summary.last_synced_at).toISOString() : undefined,
+      date: r.date,
+      count,
+      level,
     };
-  } catch {
-    return null;
-  }
+  });
+
+  const summary = summaryRes?.rows?.[0];
+  const { currentStreak, longestStreak } = computeStreaks(days);
+
+  return {
+    username: "developer",
+    totalContributions: summary ? Number(summary.total_contributions) : days.reduce((a, d) => a + d.count, 0),
+    currentStreak: summary ? Number(summary.current_streak) : currentStreak,
+    longestStreak: summary ? Number(summary.longest_streak) : longestStreak,
+    days,
+    lastSyncedAt: summary?.last_synced_at ? new Date(summary.last_synced_at).toISOString() : undefined,
+  };
 }
