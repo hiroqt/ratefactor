@@ -6,6 +6,19 @@ export interface UserStatus {
   updatedAt?: string;
 }
 
+export interface GitHubSyncDetails {
+  connected: boolean;
+  username?: string;
+  avatarUrl?: string;
+  profileUrl?: string;
+  totalContributions?: number;
+  currentStreak?: number;
+  longestStreak?: number;
+  publicRepos?: number;
+  followers?: number;
+  lastSyncedAt?: string;
+}
+
 export interface DeveloperProfile {
   id: string;
   name: string;
@@ -19,6 +32,7 @@ export interface DeveloperProfile {
   location?: string;
   website?: string;
   github?: string;
+  githubSync?: GitHubSyncDetails;
   twitter?: string;
   linkedin?: string;
   readmeMarkdown?: string;

@@ -168,7 +168,7 @@ export function HeroSection({
 
               {/* Subtitle Paragraph directly quoting PRD Section 1 Core Value */}
               <p className="text-sm sm:text-[15px] text-slate-600 leading-relaxed font-normal">
-                Discover great developer work, get your work seen, and improve through community feedback. At <strong className="text-slate-950 font-semibold">RateFactor</strong>, engineers showcase codebases, earn authentic peer ratings across our 4-factor rubric, and compete for Daily &amp; Weekly Showcases.
+                Discover great developer work, get your work seen, and improve through community feedback. At <strong className="text-slate-950 font-semibold">RateFactor</strong>, engineers showcase codebases, earn authentic peer ratings across our 3-factor rubric, and compete for Daily &amp; Weekly Showcases.
               </p>
 
               {/* Editorial Action Buttons Row (Submit Portfolio & Explore Feed) */}

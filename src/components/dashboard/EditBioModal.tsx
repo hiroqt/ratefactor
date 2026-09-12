@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useModalSmoothScroll } from "@/hooks/useModalSmoothScroll";
 import { 
   X, 
   User, 
@@ -134,45 +135,12 @@ export function EditBioModal({
     };
   }, [isOpen, onClose]);
 
-  // Isolate scroll so ONLY the modal content scrolls when cursor is inside modal (matching Notification pattern)
-  useEffect(() => {
-    if (!isOpen) return;
-    const modalEl = modalRef.current;
-    const scrollEl = scrollRef.current;
-    if (!modalEl || !scrollEl) return;
-
-    const handleWheel = (e: WheelEvent) => {
-      e.stopPropagation();
-
-      const deltaY = e.deltaY;
-      const isDirectlyOnScroll = e.target && scrollEl.contains(e.target as Node);
-
-      if (!isDirectlyOnScroll) {
-        e.preventDefault();
-        scrollEl.scrollTop += deltaY;
-        return;
-      }
-
-      const atTop = scrollEl.scrollTop <= 0;
-      const atBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight <= 1;
-
-      if ((deltaY < 0 && atTop) || (deltaY > 0 && atBottom)) {
-        e.preventDefault();
-      }
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      e.stopPropagation();
-    };
-
-    modalEl.addEventListener("wheel", handleWheel, { passive: false });
-    modalEl.addEventListener("touchmove", handleTouchMove, { passive: true });
-
-    return () => {
-      modalEl.removeEventListener("wheel", handleWheel);
-      modalEl.removeEventListener("touchmove", handleTouchMove);
-    };
-  }, [isOpen, activeTab]);
+  useModalSmoothScroll({
+    isOpen,
+    modalRef,
+    scrollRef,
+    deps: [activeTab],
+  });
 
   if (!isOpen) return null;
 

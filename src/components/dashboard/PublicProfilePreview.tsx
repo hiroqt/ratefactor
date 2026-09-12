@@ -100,9 +100,13 @@ export function PublicProfilePreview({
             <div className="relative">
               <div className="w-20 h-20 rounded-full overflow-hidden ring-4 ring-slate-100 shadow-md">
                 <img
-                  src={profile.avatar}
+                  src={profile.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"}
                   alt={profile.name}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80";
+                  }}
                 />
               </div>
 

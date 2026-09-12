@@ -146,7 +146,6 @@ export async function POST(req: NextRequest) {
         design: 5.0,
         codeQuality: 5.0,
         performance: 5.0,
-        documentation: 5.0,
       },
       likesCount: 1,
       isLiked: true,

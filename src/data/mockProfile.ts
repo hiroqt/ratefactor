@@ -7,7 +7,7 @@ export const INITIAL_DEVELOPER_PROFILE: DeveloperProfile = {
   avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
   role: "Software Engineer",
   pronouns: "",
-  bio: "Software Engineer & Builder. Ready to share architectures and engage in peer reviews.",
+  bio: "",
   status: {
     emoji: "👋",
     message: "Exploring developer architectures",
@@ -21,14 +21,7 @@ export const INITIAL_DEVELOPER_PROFILE: DeveloperProfile = {
   github: "",
   twitter: "",
   linkedin: "",
-  readmeMarkdown: `### Welcome to My Profile 👋
-
-Software engineer and architecture enthusiast on RateFactor.
-
-- 🔭 **Currently Building:** Modern web and backend systems.
-- ⚡ **Engineering Principles:** Clean code, robust guardrails, and mechanical sympathy.
-- 🎯 **Showcase:** Explore my submitted architectures and peer reviews below.
-`,
+  readmeMarkdown: "",
   pinnedPortfolioIds: [],
   spotlightPortfolioId: undefined,
   skills: [],

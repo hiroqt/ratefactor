@@ -876,3 +876,103 @@ DROP TRIGGER IF EXISTS tr_on_better_auth_user_sync ON public."user";
 CREATE TRIGGER tr_on_better_auth_user_sync
   AFTER INSERT OR UPDATE OF name, image, role ON public."user"
   FOR EACH ROW EXECUTE FUNCTION public.handle_better_auth_user_sync();
+
+-- ==========================================================
+-- 16. GITHUB INTEGRATION TABLES & CACHE (Section 16)
+-- ==========================================================
+
+CREATE TABLE IF NOT EXISTS public.github_profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  github_id BIGINT NOT NULL,
+  username TEXT NOT NULL,
+  display_name TEXT,
+  bio TEXT,
+  avatar_url TEXT,
+  profile_url TEXT,
+  public_repository_count INTEGER NOT NULL DEFAULT 0,
+  followers INTEGER NOT NULL DEFAULT 0,
+  following INTEGER NOT NULL DEFAULT 0,
+  last_synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_github_profiles_user UNIQUE (user_id),
+  CONSTRAINT uq_github_profiles_github_id UNIQUE (github_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_github_profiles_user_id ON public.github_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_github_profiles_username ON public.github_profiles(username);
+
+CREATE TABLE IF NOT EXISTS public.github_repositories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  github_repo_id BIGINT NOT NULL,
+  name TEXT NOT NULL,
+  full_name TEXT NOT NULL,
+  description TEXT,
+  html_url TEXT NOT NULL,
+  homepage TEXT,
+  language TEXT,
+  topics TEXT[] NOT NULL DEFAULT '{}',
+  stars INTEGER NOT NULL DEFAULT 0,
+  forks INTEGER NOT NULL DEFAULT 0,
+  is_private BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ,
+  pushed_at TIMESTAMPTZ,
+  last_synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_github_repos_user_repo UNIQUE (user_id, github_repo_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_github_repos_user_id ON public.github_repositories(user_id);
+CREATE INDEX IF NOT EXISTS idx_github_repos_full_name ON public.github_repositories(full_name);
+
+CREATE TABLE IF NOT EXISTS public.github_readmes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  repository_id UUID REFERENCES public.github_repositories(id) ON DELETE CASCADE,
+  repository_full_name TEXT NOT NULL,
+  content_markdown TEXT NOT NULL,
+  content_sha TEXT,
+  source_url TEXT NOT NULL,
+  last_synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_github_readmes_user_repo UNIQUE (user_id, repository_full_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_github_readmes_user_id ON public.github_readmes(user_id);
+CREATE INDEX IF NOT EXISTS idx_github_readmes_repo_full_name ON public.github_readmes(repository_full_name);
+
+CREATE TABLE IF NOT EXISTS public.github_contributions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  contribution_count INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_github_contributions_user_date UNIQUE (user_id, date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_github_contributions_user_date ON public.github_contributions(user_id, date);
+
+CREATE TABLE IF NOT EXISTS public.github_contribution_summaries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  year INTEGER NOT NULL,
+  total_contributions INTEGER NOT NULL DEFAULT 0,
+  current_streak INTEGER NOT NULL DEFAULT 0,
+  longest_streak INTEGER NOT NULL DEFAULT 0,
+  last_synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_github_summaries_user_year UNIQUE (user_id, year)
+);
+
+CREATE INDEX IF NOT EXISTS idx_github_summaries_user_year ON public.github_contribution_summaries(user_id, year);
+
+ALTER TABLE public.github_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.github_repositories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.github_readmes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.github_contributions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.github_contribution_summaries ENABLE ROW LEVEL SECURITY;

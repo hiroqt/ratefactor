@@ -78,7 +78,7 @@ export const ratingSubmissionSchema = z.object({
   design: z.number().min(1).max(5),
   codeQuality: z.number().min(1).max(5),
   performance: z.number().min(1).max(5),
-  documentation: z.number().min(1).max(5),
+  documentation: z.number().min(1).max(5).optional(),
 });
 
 export const otpRequestSchema = z.object({

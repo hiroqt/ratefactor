@@ -160,6 +160,7 @@ export function PortfolioCard({
           <div onClick={(e) => e.stopPropagation()} className="relative inline-flex items-center">
             <EmojiReaction
               size="sm"
+              align="right"
               asChild
               onReact={handleReact}
             >
@@ -202,7 +203,7 @@ export function PortfolioCard({
     return (
       <article
         onClick={() => onSelect(portfolio)}
-        className="col-span-1 md:col-span-2 lg:col-span-3 bg-white rounded-xl p-5 border border-slate-200 hover:border-slate-300 cursor-pointer group transition-colors overflow-hidden"
+        className="col-span-1 md:col-span-2 lg:col-span-3 bg-white rounded-xl p-5 border border-slate-200 hover:border-slate-300 cursor-pointer group transition-colors relative"
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
           {/* Visual Column */}
@@ -258,7 +259,7 @@ export function PortfolioCard({
 
             {/* Rubric mini summary */}
             {portfolio.ratingBreakdown && (
-              <div className="grid grid-cols-4 gap-2 py-2.5 border-y border-slate-100 text-center font-mono text-xs">
+              <div className="grid grid-cols-3 gap-2 py-2.5 border-y border-slate-100 text-center font-mono text-xs">
                 <div>
                   <div className="text-[10px] text-slate-500">Code</div>
                   <div className="font-bold text-slate-900">{portfolio.ratingBreakdown.codeQuality.toFixed(1)}★</div>
@@ -270,10 +271,6 @@ export function PortfolioCard({
                 <div>
                   <div className="text-[10px] text-slate-500">UX</div>
                   <div className="font-bold text-amber-700">{portfolio.ratingBreakdown.design.toFixed(1)}★</div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-slate-500">Docs</div>
-                  <div className="font-bold text-indigo-700">{portfolio.ratingBreakdown.documentation.toFixed(1)}★</div>
                 </div>
               </div>
             )}
@@ -292,6 +289,7 @@ export function PortfolioCard({
                 <div onClick={(e) => e.stopPropagation()} className="relative inline-flex items-center">
                   <EmojiReaction
                     size="sm"
+                    align="right"
                     asChild
                     onReact={handleReact}
                   >
@@ -328,10 +326,10 @@ export function PortfolioCard({
   return (
     <article
       onClick={() => onSelect(portfolio)}
-      className="group relative flex flex-col rounded-xl bg-white border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer overflow-hidden"
+      className="group relative flex flex-col rounded-xl bg-white border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer"
     >
       {/* Card Header Media */}
-      <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100 border-b border-slate-200">
+      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-t-xl bg-slate-100 border-b border-slate-200">
         <img
           src={portfolio.thumbnail}
           alt={portfolio.title}
@@ -419,6 +417,7 @@ export function PortfolioCard({
             <div onClick={(e) => e.stopPropagation()} className="relative inline-flex items-center">
               <EmojiReaction
                 size="sm"
+                align="right"
                 asChild
                 onReact={handleReact}
               >

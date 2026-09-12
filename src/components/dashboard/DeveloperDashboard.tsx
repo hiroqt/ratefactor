@@ -47,6 +47,7 @@ interface DeveloperDashboardProps {
   onSelectPortfolio: (p: Portfolio) => void;
   onDeletePortfolio: (id: string) => void;
   onOpenSubmitModal: () => void;
+  onRequireAuth?: (intent: string) => void;
   onClose?: () => void;
 }
 
@@ -57,6 +58,7 @@ export function DeveloperDashboard({
   onSelectPortfolio,
   onDeletePortfolio,
   onOpenSubmitModal,
+  onRequireAuth,
   onClose,
 }: DeveloperDashboardProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "submissions" | "preview">("overview");
@@ -238,9 +240,13 @@ export function DeveloperDashboard({
                 <div className="relative group">
                   <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden ring-4 ring-slate-100 shadow-sm">
                     <img
-                      src={profile.avatar}
+                      src={profile.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"}
                       alt={profile.name}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src =
+                          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80";
+                      }}
                     />
                   </div>
 
@@ -463,7 +469,11 @@ export function DeveloperDashboard({
             />
 
             {/* 2. GitHub-Style Activity / Contribution Heatmap */}
-            <ActivityHeatmap />
+            <ActivityHeatmap
+              profile={profile}
+              onUpdateProfile={onUpdateProfile}
+              onRequireAuth={onRequireAuth}
+            />
 
             {/* 3. GitHub Profile README.md Card */}
             <div className="p-5 sm:p-6 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-3">
@@ -490,7 +500,24 @@ export function DeveloperDashboard({
 
               {/* Rendered Markdown Body */}
               <div className="pt-1">
-                <MarkdownRenderer content={profile.readmeMarkdown} />
+                {profile.readmeMarkdown && profile.readmeMarkdown.trim() ? (
+                  <MarkdownRenderer content={profile.readmeMarkdown} />
+                ) : (
+                  <div className="py-8 px-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 text-center flex flex-col items-center justify-center">
+                    <FileText className="w-7 h-7 text-slate-300 mb-2" />
+                    <p className="text-xs font-semibold text-slate-700">No README.md added yet</p>
+                    <p className="text-[11px] text-slate-400 max-w-sm mt-0.5 mb-3">
+                      Link your GitHub account to auto-import your public profile README, or write a custom developer blueprint.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsBioModalOpen(true)}
+                      className="px-3.5 py-1.5 rounded-full bg-slate-900 hover:bg-black text-white text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      Write README.md
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

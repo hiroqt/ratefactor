@@ -119,7 +119,7 @@ export function ShowcaseBanner({
               No developer portfolios indexed yet
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1.5 leading-relaxed">
-              Be the first to showcase your codebases, receive peer critiques across our 4-factor rubric, and compete for the Daily and Weekly Showcase!
+              Be the first to showcase your codebases, receive peer critiques across our 3-factor rubric, and compete for the Daily and Weekly Showcase!
             </p>
           </div>
         ) : (
@@ -240,13 +240,13 @@ export function ShowcaseBanner({
                   </div>
                 )}
 
-                {/* 4-Factor Rubric Progress Bars */}
+                {/* 3-Factor Rubric Progress Bars */}
                 {currentShowcase.ratingBreakdown && (
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
                     <div className="text-[11px] font-mono text-slate-500 font-semibold mb-2">
-                      4-Factor Rubric Scores
+                      3-Factor Rubric Scores
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs font-mono">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
                       <div>
                         <div className="flex justify-between text-[11px] text-slate-500 mb-0.5">
                           <span>Code</span>
@@ -254,7 +254,7 @@ export function ShowcaseBanner({
                             {currentShowcase.ratingBreakdown.codeQuality?.toFixed(1) || "5.0"}★
                           </span>
                         </div>
-                        <div className="h-1 rounded bg-slate-200 overflow-hidden">
+                        <div className="h-1.5 rounded bg-slate-200 overflow-hidden">
                           <div 
                             className="h-full bg-slate-900 rounded" 
                             style={{ width: `${((currentShowcase.ratingBreakdown.codeQuality || 5) / 5) * 100}%` }}
@@ -269,7 +269,7 @@ export function ShowcaseBanner({
                             {currentShowcase.ratingBreakdown.performance?.toFixed(1) || "5.0"}★
                           </span>
                         </div>
-                        <div className="h-1 rounded bg-slate-200 overflow-hidden">
+                        <div className="h-1.5 rounded bg-slate-200 overflow-hidden">
                           <div 
                             className="h-full bg-emerald-600 rounded" 
                             style={{ width: `${((currentShowcase.ratingBreakdown.performance || 5) / 5) * 100}%` }}
@@ -284,25 +284,10 @@ export function ShowcaseBanner({
                             {currentShowcase.ratingBreakdown.design?.toFixed(1) || "4.8"}★
                           </span>
                         </div>
-                        <div className="h-1 rounded bg-slate-200 overflow-hidden">
+                        <div className="h-1.5 rounded bg-slate-200 overflow-hidden">
                           <div 
                             className="h-full bg-amber-500 rounded" 
                             style={{ width: `${((currentShowcase.ratingBreakdown.design || 4.8) / 5) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between text-[11px] text-slate-500 mb-0.5">
-                          <span>Docs</span>
-                          <span className="font-bold text-indigo-700">
-                            {currentShowcase.ratingBreakdown.documentation?.toFixed(1) || "4.9"}★
-                          </span>
-                        </div>
-                        <div className="h-1 rounded bg-slate-200 overflow-hidden">
-                          <div 
-                            className="h-full bg-indigo-600 rounded" 
-                            style={{ width: `${((currentShowcase.ratingBreakdown.documentation || 4.9) / 5) * 100}%` }}
                           />
                         </div>
                       </div>

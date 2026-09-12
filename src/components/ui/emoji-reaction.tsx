@@ -26,7 +26,7 @@ const DEFAULT_EMOJIS = [
   "thumbs-up",
 ];
 
-const SURFACE = "bg-[#F4F4F9] dark:bg-[#262626]";
+const SURFACE = "bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-xl";
 
 const BURST_COUNT = 5;
 const HOLD_INTERVAL = 550;
@@ -38,30 +38,30 @@ const CLIMB_SPREAD = 78;
 const EASE = [0.4, 0.3, 0.5, 1] as const;
 const SWAY = [0, 0.3, 0.65, 1];
 
-const GAP = 16;
-const EDGE = 8;
+const GAP = 14;
+const EDGE = 12;
 
 const SIZES = {
   sm: {
     trigger: "size-8",
     icon: "size-4",
-    emoji: 26,
-    pill: "gap-0.5 p-1",
-    burst: 26,
+    emoji: 24,
+    pill: "gap-1 p-1 sm:p-1.5",
+    burst: 24,
   },
   md: {
     trigger: "size-10",
     icon: "size-5",
-    emoji: 34,
-    pill: "gap-1 p-1.5",
-    burst: 34,
+    emoji: 30,
+    pill: "gap-1.5 p-1.5 sm:p-2",
+    burst: 30,
   },
   lg: {
     trigger: "size-12",
     icon: "size-6",
-    emoji: 42,
-    pill: "gap-1.5 p-2",
-    burst: 42,
+    emoji: 38,
+    pill: "gap-2 p-2",
+    burst: 38,
   },
 } as const;
 
@@ -87,7 +87,7 @@ type Particle = {
 
 function SmileIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 24" fill="none" aria-hidden className={className}>
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
       <path
         d="M21 12a9 9 0 1 1-9-9"
         stroke="currentColor"
@@ -97,7 +97,7 @@ function SmileIcon({ className }: { className?: string }) {
       <circle cx="8.9" cy="10" r="1.35" fill="currentColor" />
       <circle cx="15.1" cy="10" r="1.35" fill="currentColor" />
       <path
-        d="M8 13.9a4.7 4.7 0 8"
+        d="M8 13.9a4.7 4.7 0 0 0 8 0"
         stroke="currentColor"
         strokeWidth="1.7"
         strokeLinecap="round"
@@ -128,6 +128,8 @@ function getPlacement(
   height: number,
   align: Align,
 ): Placement {
+  const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1024;
+
   const anchored =
     align === "left"
       ? trigger.left
@@ -136,15 +138,22 @@ function getPlacement(
         : trigger.left + trigger.width / 2 - width / 2;
 
   const overhangLeft = EDGE - anchored;
-  const overhangRight = anchored + width - (window.innerWidth - EDGE);
+  const overhangRight = anchored + width - (windowWidth - EDGE);
   const shift =
     overhangLeft > 0 ? overhangLeft : overhangRight > 0 ? -overhangRight : 0;
 
+  const finalBarLeft = anchored + shift;
+  const triggerCenterX = trigger.left + trigger.width / 2;
+  const rawTailX = triggerCenterX - finalBarLeft;
+  const tailX = Math.max(16, Math.min(width - 16, rawTailX));
+
+  const fitsOnTop = trigger.top - height - GAP >= EDGE;
+  const side = fitsOnTop ? "top" : "bottom";
+
   return {
-    side: trigger.top - height - GAP < EDGE ? "bottom" : "top",
+    side,
     shift,
-    // keeps the tail over the trigger whatever the alignment and shift are
-    tailX: trigger.left + trigger.width / 2 - (anchored + shift),
+    tailX,
   };
 }
 
@@ -455,21 +464,21 @@ export function EmojiReaction({
       <div
         ref={rootRef}
         data-slot="emoji-reaction"
-        className={cn("relative flex w-fit items-center", className)}
+        className={cn("relative flex w-fit items-center", open && "z-40", className)}
         {...props}
       >
         <AnimatePresence>
           {open && (
             <motion.div
               className={cn(
-                "absolute z-30",
+                "absolute z-50 pointer-events-auto",
                 anchor,
-                top ? "bottom-full mb-4" : "top-full mt-4",
+                top ? "bottom-full mb-3.5" : "top-full mt-3.5",
               )}
               initial={{
                 opacity: 0,
-                y: top ? 10 : -10,
-                scale: 0.85,
+                y: top ? 8 : -8,
+                scale: 0.9,
                 x: centering,
               }}
               animate={{ opacity: 1, y: 0, scale: 1, x: centering }}
@@ -488,7 +497,7 @@ export function EmojiReaction({
                 aria-orientation="horizontal"
                 onKeyDown={onMenuKeyDown}
                 className={cn(
-                  "relative flex items-center rounded-full",
+                  "relative flex items-center rounded-full max-w-[calc(100vw-24px)] select-none",
                   SURFACE,
                   s.pill,
                 )}
@@ -521,7 +530,7 @@ export function EmojiReaction({
                       event.detail === 0 &&
                       react(name, event.currentTarget.getBoundingClientRect())
                     }
-                    className="relative z-10 rounded-full p-1 outline-none focus-visible:ring-2 focus-visible:ring-slate-950 dark:focus-visible:ring-slate-300"
+                    className="relative z-10 rounded-full p-1 sm:p-1.5 outline-none focus-visible:ring-2 focus-visible:ring-slate-950 dark:focus-visible:ring-slate-300 touch-manipulation hover:bg-slate-100/80 dark:hover:bg-slate-800/80 transition-colors"
                     initial={reduced ? false : { scale: 0.4, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{
@@ -530,7 +539,7 @@ export function EmojiReaction({
                       damping: 25,
                       delay: reduced ? 0 : 0.04 + i * 0.035,
                     }}
-                    whileHover={reduced ? undefined : { scale: 1.28, y: -4 }}
+                    whileHover={reduced ? undefined : { scale: 1.25, y: -3 }}
                     whileTap={{ scale: 0.92 }}
                   >
                     <Emoji
@@ -546,7 +555,7 @@ export function EmojiReaction({
 
               <span
                 className={cn(
-                  "absolute size-3 -translate-x-1/2 rounded-full",
+                  "absolute size-2.5 -translate-x-1/2 rounded-full pointer-events-none shadow-xs",
                   SURFACE,
                   top ? "-bottom-1" : "-top-1",
                 )}
@@ -554,11 +563,11 @@ export function EmojiReaction({
               />
               <span
                 className={cn(
-                  "absolute size-1.5 -translate-x-1/2 rounded-full",
+                  "absolute size-1.5 -translate-x-1/2 rounded-full pointer-events-none shadow-2xs",
                   SURFACE,
-                  top ? "-bottom-4" : "-top-4",
+                  top ? "-bottom-3" : "-top-3",
                 )}
-                style={{ left: placement.tailX + 6 }}
+                style={{ left: placement.tailX }}
               />
             </motion.div>
           )}

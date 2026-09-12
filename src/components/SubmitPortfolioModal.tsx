@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useModalSmoothScroll } from "@/hooks/useModalSmoothScroll";
 import { 
   X, 
   Terminal, 
@@ -113,45 +114,12 @@ export function SubmitPortfolioModal({
     };
   }, [isOpen, onClose]);
 
-  // Isolate scroll so ONLY the modal content scrolls when cursor is inside modal (matching Notification pattern)
-  useEffect(() => {
-    if (!isOpen) return;
-    const modalEl = modalRef.current;
-    const scrollEl = scrollRef.current;
-    if (!modalEl || !scrollEl) return;
-
-    const handleWheel = (e: WheelEvent) => {
-      e.stopPropagation();
-
-      const deltaY = e.deltaY;
-      const isDirectlyOnScroll = e.target && scrollEl.contains(e.target as Node);
-
-      if (!isDirectlyOnScroll) {
-        e.preventDefault();
-        scrollEl.scrollTop += deltaY;
-        return;
-      }
-
-      const atTop = scrollEl.scrollTop <= 0;
-      const atBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight <= 1;
-
-      if ((deltaY < 0 && atTop) || (deltaY > 0 && atBottom)) {
-        e.preventDefault();
-      }
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      e.stopPropagation();
-    };
-
-    modalEl.addEventListener("wheel", handleWheel, { passive: false });
-    modalEl.addEventListener("touchmove", handleTouchMove, { passive: true });
-
-    return () => {
-      modalEl.removeEventListener("wheel", handleWheel);
-      modalEl.removeEventListener("touchmove", handleTouchMove);
-    };
-  }, [isOpen, activeTab]);
+  useModalSmoothScroll({
+    isOpen,
+    modalRef,
+    scrollRef,
+    deps: [activeTab, uploadedFile, thumbnail, error],
+  });
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -271,10 +239,10 @@ export function SubmitPortfolioModal({
       demoUrl: demoUrl.trim() || portfolioUrl.trim(),
       thumbnail,
       author: {
-        name: currentUser?.name || profile?.name || "Arnel Rivera",
-        username: currentUser?.username || profile?.username || "arneldev",
-        avatar: currentUser?.avatar || profile?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
-        role: currentUser?.role || profile?.role || "Principal Architect",
+        name: currentUser?.name || profile?.name || "Developer",
+        username: currentUser?.username || profile?.username || "developer",
+        avatar: currentUser?.avatar || profile?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+        role: currentUser?.role || profile?.role || "Software Engineer",
         isVerified: true,
       },
       techStack,
@@ -285,7 +253,6 @@ export function SubmitPortfolioModal({
         design: 5.0,
         codeQuality: 5.0,
         performance: 5.0,
-        documentation: 5.0,
       },
       likesCount: 1,
       isLiked: true,
@@ -323,7 +290,6 @@ export function SubmitPortfolioModal({
       design: 5.0,
       codeQuality: 5.0,
       performance: 5.0,
-      documentation: 5.0,
     },
     likesCount: 1,
     isLiked: true,

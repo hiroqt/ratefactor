@@ -25,7 +25,7 @@ export interface RatingBreakdown {
   design: number;
   codeQuality: number;
   performance: number;
-  documentation: number;
+  documentation?: number;
 }
 
 export interface Portfolio {

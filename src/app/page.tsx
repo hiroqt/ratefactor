@@ -216,6 +216,7 @@ export default function Home() {
                   }
                   setIsSubmitModalOpen(true);
                 }}
+                onRequireAuth={requireAuth}
               />
             </div>
           </div>
@@ -299,6 +300,7 @@ export default function Home() {
           }
           setIsSubmitModalOpen(true);
         }}
+        onRequireAuth={requireAuth}
       />
 
       {/* RBAC Multi-Factor Authentication & OTP Modal */}

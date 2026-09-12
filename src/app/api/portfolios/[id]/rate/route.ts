@@ -52,9 +52,9 @@ export async function POST(
       );
     }
 
-    const { design, codeQuality, performance, documentation } = parseResult.data;
+    const { design, codeQuality, performance } = parseResult.data;
     const averageScore = Number(
-      ((design + codeQuality + performance + documentation) / 4).toFixed(2)
+      ((design + codeQuality + performance) / 3).toFixed(2)
     );
 
     const key = `${actorId}:${portfolioId}`;
@@ -62,7 +62,7 @@ export async function POST(
       userId: actorId,
       portfolioId,
       score: averageScore,
-      breakdown: { design, codeQuality, performance, documentation },
+      breakdown: { design, codeQuality, performance },
       updatedAt: new Date().toISOString(),
     });
 
@@ -70,7 +70,7 @@ export async function POST(
       message: "Rating successfully recorded.",
       portfolioId,
       score: averageScore,
-      breakdown: { design, codeQuality, performance, documentation },
+      breakdown: { design, codeQuality, performance },
     });
   } catch (error: any) {
     return NextResponse.json(

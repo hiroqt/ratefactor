@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useModalSmoothScroll } from "@/hooks/useModalSmoothScroll";
 import { 
   X, 
   ExternalLink, 
@@ -16,7 +17,6 @@ import {
   Cpu,
   Layers,
   Zap,
-  BookOpen,
   Sparkles,
   AlertCircle
 } from "lucide-react";
@@ -64,7 +64,6 @@ export function PortfolioDetailModal({
     codeQuality: 5,
     performance: 5,
     design: 4.8,
-    documentation: 4.9,
   });
 
   useEffect(() => {
@@ -101,45 +100,12 @@ export function PortfolioDetailModal({
     };
   }, [onClose]);
 
-  // Isolate scroll so ONLY the modal content scrolls when cursor is inside modal (matching Notification pattern)
-  useEffect(() => {
-    if (!portfolio) return;
-    const modalEl = modalRef.current;
-    const scrollEl = scrollRef.current;
-    if (!modalEl || !scrollEl) return;
-
-    const handleWheel = (e: WheelEvent) => {
-      e.stopPropagation();
-
-      const deltaY = e.deltaY;
-      const isDirectlyOnScroll = e.target && scrollEl.contains(e.target as Node);
-
-      if (!isDirectlyOnScroll) {
-        e.preventDefault();
-        scrollEl.scrollTop += deltaY;
-        return;
-      }
-
-      const atTop = scrollEl.scrollTop <= 0;
-      const atBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight <= 1;
-
-      if ((deltaY < 0 && atTop) || (deltaY > 0 && atBottom)) {
-        e.preventDefault();
-      }
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      e.stopPropagation();
-    };
-
-    modalEl.addEventListener("wheel", handleWheel, { passive: false });
-    modalEl.addEventListener("touchmove", handleTouchMove, { passive: true });
-
-    return () => {
-      modalEl.removeEventListener("wheel", handleWheel);
-      modalEl.removeEventListener("touchmove", handleTouchMove);
-    };
-  }, [portfolio, activeTab]);
+  useModalSmoothScroll({
+    isOpen: !!portfolio,
+    modalRef,
+    scrollRef,
+    deps: [activeTab, portfolio?.id],
+  });
 
   if (!portfolio) return null;
 
@@ -208,7 +174,7 @@ export function PortfolioDetailModal({
     const next = { ...criteria, [key]: value };
     setCriteria(next);
     const avg = Number(
-      ((next.codeQuality + next.performance + next.design + next.documentation) / 4).toFixed(2)
+      ((next.codeQuality + next.performance + next.design) / 3).toFixed(2)
     );
     setUserRating(avg);
     onRatePortfolio(portfolio.id, avg, next);
@@ -275,7 +241,7 @@ export function PortfolioDetailModal({
         </div>
 
         {/* Modal Scrollable Body */}
-        <div ref={scrollRef} data-lenis-prevent="true" className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5">
+        <div ref={scrollRef} data-lenis-prevent="true" className="flex-1 overflow-y-auto overscroll-contain scroll-smooth p-4 sm:p-6 space-y-5">
           
           {/* Top Showcase Spotlight Banner if present */}
           {portfolio.isShowcase && (
@@ -335,28 +301,29 @@ export function PortfolioDetailModal({
           </div>
 
           {/* Author Card */}
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+            <div className="flex items-center gap-3 min-w-0">
               <img
                 src={portfolio.author.avatar}
                 alt={portfolio.author.name}
-                className="w-10 h-10 rounded-full object-cover ring-1 ring-slate-200"
+                className="w-10 h-10 rounded-full object-cover ring-1 ring-slate-200 shrink-0"
               />
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-semibold text-slate-900">{portfolio.author.name}</span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-sm font-semibold text-slate-900 truncate">{portfolio.author.name}</span>
                   {portfolio.author.isVerified && (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   )}
-                  <span className="text-xs font-mono text-slate-500">@{portfolio.author.username}</span>
+                  <span className="text-xs font-mono text-slate-500 truncate">@{portfolio.author.username}</span>
                 </div>
-                <div className="text-xs text-slate-500">{portfolio.author.role}</div>
+                <div className="text-xs text-slate-500 truncate">{portfolio.author.role}</div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0 ml-auto sm:ml-0">
               <EmojiReaction
                 size="md"
+                align="right"
                 asChild
                 onReact={handleReact}
               >
@@ -500,7 +467,7 @@ export function PortfolioDetailModal({
                   Evaluate This Architecture (Tap Stars to Rate)
                 </h4>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {/* Code Quality */}
                   <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
@@ -594,36 +561,6 @@ export function PortfolioDetailModal({
                     </div>
                   </div>
 
-                  {/* Documentation */}
-                  <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-900 flex items-center gap-1.5">
-                        <BookOpen className="w-4 h-4 text-indigo-600" /> Documentation &amp; Tests
-                      </span>
-                      <span className="text-xs font-mono font-bold text-indigo-700 tabular-nums">
-                        {criteria.documentation.toFixed(1)} / 5.0
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => handleCriteriaRate("documentation", star)}
-                          className="p-1 hover:scale-110 transition-transform cursor-pointer"
-                        >
-                          <Star
-                            className={cn(
-                              "w-4 h-4",
-                              criteria.documentation >= star
-                                ? "fill-amber-500 text-amber-500"
-                                : "fill-slate-100 text-slate-300"
-                            )}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>

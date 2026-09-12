@@ -170,7 +170,6 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
               codeQuality: prevScore,
               performance: prevScore,
               design: prevScore,
-              documentation: prevScore,
             };
 
             const calcNewCriterion = (
@@ -178,7 +177,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
               newVal: number,
               prevVal: number
             ) => {
-              const tot = communityAvg * p.ratingCount;
+              const tot = (communityAvg || 5) * p.ratingCount;
               const updatedTot = hasUserRated ? tot - prevVal + newVal : tot + newVal;
               return Number((updatedTot / Math.max(1, newCount)).toFixed(2));
             };
@@ -198,11 +197,6 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
                 p.ratingBreakdown.performance,
                 breakdown.performance,
                 prevUserBreakdown.performance
-              ),
-              documentation: calcNewCriterion(
-                p.ratingBreakdown.documentation,
-                breakdown.documentation,
-                prevUserBreakdown.documentation
               ),
             };
 

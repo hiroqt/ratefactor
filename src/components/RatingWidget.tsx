@@ -101,29 +101,23 @@ export function RatingWidget({
       </div>
 
       {breakdown && (
-        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200 text-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-slate-600">Code Architecture</span>
-            <span className="font-mono font-medium text-slate-900 tabular-nums">
-              {breakdown.codeQuality.toFixed(1)}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-200 text-xs">
+          <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1 p-1.5 rounded-lg bg-slate-50 border border-slate-100">
+            <span className="text-slate-600 text-[11px]">Code Architecture</span>
+            <span className="font-mono font-bold text-slate-900 tabular-nums text-xs">
+              {breakdown.codeQuality.toFixed(1)}★
             </span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-600">Performance</span>
-            <span className="font-mono font-medium text-slate-900 tabular-nums">
-              {breakdown.performance.toFixed(1)}
+          <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1 p-1.5 rounded-lg bg-slate-50 border border-slate-100">
+            <span className="text-slate-600 text-[11px]">Performance</span>
+            <span className="font-mono font-bold text-emerald-700 tabular-nums text-xs">
+              {breakdown.performance.toFixed(1)}★
             </span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-600">Visual UX</span>
-            <span className="font-mono font-medium text-slate-900 tabular-nums">
-              {breakdown.design.toFixed(1)}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-600">Documentation</span>
-            <span className="font-mono font-medium text-slate-900 tabular-nums">
-              {breakdown.documentation.toFixed(1)}
+          <div className="flex items-center justify-between sm:flex-col sm:items-start gap-1 p-1.5 rounded-lg bg-slate-50 border border-slate-100">
+            <span className="text-slate-600 text-[11px]">Visual Craft / UX</span>
+            <span className="font-mono font-bold text-amber-700 tabular-nums text-xs">
+              {breakdown.design.toFixed(1)}★
             </span>
           </div>
         </div>

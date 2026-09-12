@@ -7,7 +7,6 @@ import {
   Bell, 
   Search, 
   X, 
-  ChevronDown, 
   ArrowRight,
   Command,
   Menu
@@ -43,19 +42,6 @@ export interface NavbarProps {
   onSignOut?: () => void;
 }
 
-const CATEGORIES: PortfolioCategory[] = [
-  "All",
-  "Developer",
-  "Arts",
-  "Client",
-  "Systems",
-  "Frontend",
-  "Fullstack",
-  "Design Engineer",
-  "Mobile",
-  "AI / ML",
-];
-
 export function Navbar({
   unreadCount = 0,
   onOpenNotifications,
@@ -80,7 +66,6 @@ export function Navbar({
   onSignOut,
 }: NavbarProps) {
   const [showSearchModal, setShowSearchModal] = useState(false);
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [localNotificationOpen, setLocalNotificationOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { data: session } = useSession();
@@ -121,7 +106,6 @@ export function Navbar({
     }
   };
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const notificationContainerRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -134,7 +118,6 @@ export function Navbar({
       }
       if (e.key === "Escape") {
         setShowSearchModal(false);
-        setIsCategoryOpen(false);
         setIsMobileMenuOpen(false);
         closeNotificationOpen();
       }
@@ -149,20 +132,6 @@ export function Navbar({
       setTimeout(() => searchInputRef.current?.focus(), 60);
     }
   }, [showSearchModal]);
-
-  // Click outside category dropdown
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        categoryDropdownRef.current &&
-        !categoryDropdownRef.current.contains(e.target as Node)
-      ) {
-        setIsCategoryOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   // Click outside and escape handler for notification dropdown
   useEffect(() => {
@@ -211,20 +180,6 @@ export function Navbar({
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
-
-  const handleCategoryPick = (cat: PortfolioCategory) => {
-    setIsCategoryOpen(false);
-    setActiveNavTab("discover");
-    if (onSelectCategory) {
-      onSelectCategory(cat);
-    }
-    if (pathname !== "/") {
-      router.push("/");
-    } else {
-      const grid = document.getElementById("discovery-grid");
-      grid?.scrollIntoView({ behavior: "smooth" });
-    }
-  };
 
   const handleNavClick = (tab: string) => {
     setActiveNavTab(tab);
@@ -314,83 +269,20 @@ export function Navbar({
           </div>
 
           {/* LEFT: Desktop Navigation Links (hidden on mobile < md) */}
-          <div className="hidden md:flex items-center gap-2 sm:gap-6 lg:gap-8 xl:gap-10">
-            {/* Discover Category Dropdown (equivalent to 'Products ⌵') */}
-            <div className="relative" ref={categoryDropdownRef}>
-              <button
-                type="button"
-                onClick={() => setIsCategoryOpen(!isCategoryOpen)}
-                className={cn(
-                  "flex items-center gap-1 text-xs sm:text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors py-1 px-1.5 sm:px-2 rounded-md cursor-pointer",
-                  (isCategoryOpen || activeNavTab === "discover") && "text-slate-950 font-semibold"
-                )}
-                aria-expanded={isCategoryOpen}
-              >
-                <span>Discover</span>
-                <ChevronDown
-                  className={cn(
-                    "w-3.5 h-3.5 transition-transform duration-150 text-slate-500",
-                    isCategoryOpen && "rotate-180 text-slate-900"
-                  )}
-                />
-              </button>
-
-              {/* Dropdown Menu */}
-              <AnimatePresence>
-                {isCategoryOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 6, scale: 0.97 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 4, scale: 0.97 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute left-0 mt-2 w-48 rounded-xl bg-white border border-slate-200 shadow-xl py-2 z-50"
-                  >
-                    <div className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold">
-                      Filter by Domain
-                    </div>
-                    {CATEGORIES.map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => handleCategoryPick(cat)}
-                        className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors flex items-center justify-between"
-                      >
-                        <span>{cat}</span>
-                        {cat === "All" && (
-                          <span className="text-[10px] font-mono text-slate-400">All apps</span>
-                        )}
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Showcases Link (equivalent to 'Customers') */}
+          <div className="hidden md:flex items-center gap-1.5 lg:gap-3">
+            {/* Showcases Link */}
             <button
               type="button"
               onClick={() => handleNavClick("showcase")}
               className={cn(
-                "hidden sm:inline-flex items-center gap-1 text-xs sm:text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors py-1 px-2 rounded-md cursor-pointer",
-                activeNavTab === "showcase" && "text-slate-950 font-semibold"
+                "whitespace-nowrap text-xs sm:text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors py-1.5 px-3 rounded-lg hover:bg-slate-100 cursor-pointer",
+                activeNavTab === "showcase" && "text-slate-950 font-semibold bg-slate-100"
               )}
             >
               Showcases
             </button>
 
-            {/* Dashboard Link */}
-            <button
-              type="button"
-              onClick={() => handleNavClick("dashboard")}
-              className={cn(
-                "hidden sm:inline-flex items-center gap-1 text-xs sm:text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors py-1 px-2 rounded-md cursor-pointer",
-                activeNavTab === "dashboard" && "text-slate-950 font-semibold"
-              )}
-            >
-              Dashboard
-            </button>
-
-            {/* Leaderboard Link (equivalent to 'Careers') */}
+            {/* Leaderboard Link */}
             <button
               type="button"
               onClick={() => {
@@ -401,14 +293,26 @@ export function Navbar({
                 const el = document.getElementById("showcase-bento");
                 el?.scrollIntoView({ behavior: "smooth" });
               }}
-              className="hidden md:inline-flex text-xs sm:text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors py-1 px-2 rounded-md cursor-pointer"
+              className="whitespace-nowrap text-xs sm:text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors py-1.5 px-3 rounded-lg hover:bg-slate-100 cursor-pointer"
             >
               Leaderboard
+            </button>
+
+            {/* Dashboard Link */}
+            <button
+              type="button"
+              onClick={() => handleNavClick("dashboard")}
+              className={cn(
+                "whitespace-nowrap text-xs sm:text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors py-1.5 px-3 rounded-lg hover:bg-slate-100 cursor-pointer",
+                activeNavTab === "dashboard" && "text-slate-950 font-semibold bg-slate-100"
+              )}
+            >
+              Dashboard
             </button>
           </div>
 
           {/* CENTER: Desktop Brand Logo (visible on md+) */}
-          <div className="hidden md:flex items-center justify-center mx-4 sm:mx-8 lg:mx-12">
+          <div className="hidden md:flex items-center justify-center mx-2 lg:mx-6 shrink-0">
             <button
               type="button"
               onClick={() => {
@@ -419,7 +323,7 @@ export function Navbar({
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }
               }}
-              className="flex items-center gap-2 group text-left focus:outline-none cursor-pointer"
+              className="flex items-center gap-2 group text-left focus:outline-none cursor-pointer whitespace-nowrap"
             >
               <svg
                 className="w-5 h-5 text-slate-900 group-hover:scale-110 transition-transform shrink-0"
@@ -428,7 +332,7 @@ export function Navbar({
               >
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
               </svg>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <span className="font-extrabold text-base sm:text-lg tracking-tight text-slate-900 font-sans">
                   RateFactor
                 </span>
@@ -440,12 +344,12 @@ export function Navbar({
           </div>
 
           {/* RIGHT: Actions */}
-          <div className="flex items-center gap-1.5 sm:gap-3 md:gap-5 lg:gap-6">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 lg:gap-3.5 shrink-0">
             {/* Search Trigger */}
             <button
               type="button"
               onClick={() => setShowSearchModal(true)}
-              className="p-1.5 sm:p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
               title="Search portfolios (Cmd+K)"
               aria-label="Search"
             >
@@ -453,7 +357,7 @@ export function Navbar({
             </button>
 
             {/* Notification Bell with live unread badge and Dropdown Menu */}
-            <div className="relative" ref={notificationContainerRef}>
+            <div className="relative shrink-0" ref={notificationContainerRef}>
               <button
                 type="button"
                 onClick={toggleNotificationOpen}
@@ -493,7 +397,7 @@ export function Navbar({
 
             {/* Signed-in Developer Profile or Guest Sign-In */}
             {effectiveUser ? (
-              <div className="hidden md:flex items-center gap-2">
+              <div className="hidden md:flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -503,10 +407,10 @@ export function Navbar({
                       window.scrollTo({ top: 0, behavior: "smooth" });
                     }
                   }}
-                  className="flex items-center gap-2 py-1 px-2 rounded-full hover:bg-slate-100 transition-colors border border-slate-200/60 hover:border-slate-300 cursor-pointer group"
+                  className="flex items-center gap-2 py-1 px-2.5 rounded-full hover:bg-slate-100 transition-colors border border-slate-200/60 hover:border-slate-300 cursor-pointer group whitespace-nowrap"
                   title="Open Dedicated Profile Dashboard"
                 >
-                  <div className="relative">
+                  <div className="relative shrink-0">
                     <div className="w-7 h-7 rounded-full overflow-hidden ring-1 ring-slate-300 flex-shrink-0">
                       <img
                         src={effectiveUser.avatar || profile?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80"}
@@ -516,24 +420,14 @@ export function Navbar({
                     </div>
                     <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-white bg-emerald-500" />
                   </div>
-                  <div className="hidden lg:flex flex-col text-left pr-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-slate-900 leading-tight">
-                        {effectiveUser.name || "Developer"}
-                      </span>
-                      <span className="text-[9px] font-mono uppercase bg-slate-900 text-white px-1.5 py-0.2 rounded font-semibold">
-                        {effectiveUser.role || "developer"}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-mono leading-tight truncate max-w-[85px]">
-                      @{effectiveUser.username || "dev"}
-                    </span>
-                  </div>
+                  <span className="hidden lg:inline-block text-xs font-semibold text-slate-900 truncate max-w-[120px] whitespace-nowrap">
+                    {effectiveUser.name || effectiveUser.username || "Developer"}
+                  </span>
                 </button>
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="text-[11px] font-mono text-slate-400 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-100 transition cursor-pointer"
+                  className="text-xs font-mono text-slate-400 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-100 transition cursor-pointer whitespace-nowrap"
                 >
                   Sign Out
                 </button>
@@ -542,7 +436,7 @@ export function Navbar({
               <button
                 type="button"
                 onClick={onOpenAuthModal}
-                className="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-900 hover:bg-black text-white text-xs font-medium shadow-xs transition cursor-pointer"
+                className="hidden md:flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-900 hover:bg-black text-white text-xs font-medium shadow-xs transition whitespace-nowrap shrink-0 cursor-pointer"
               >
                 <span>Sign In</span>
               </button>
@@ -554,7 +448,7 @@ export function Navbar({
               whileTap={{ scale: 0.98 }}
               type="button"
               onClick={onOpenSubmitModal}
-              className="hidden md:flex items-center gap-1.5 px-3.5 sm:px-5 py-1.5 sm:py-2 rounded-full bg-[#22c55e] hover:bg-[#16a34a] text-white font-medium text-xs sm:text-sm shadow-xs hover:shadow transition-all active:scale-[0.98] cursor-pointer"
+              className="hidden md:flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-[#22c55e] hover:bg-[#16a34a] text-white font-medium text-xs sm:text-sm shadow-xs hover:shadow transition-all whitespace-nowrap shrink-0 cursor-pointer"
             >
               <span>Submit Portfolio</span>
               <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -617,17 +511,12 @@ export function Navbar({
                       />
                       <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white bg-emerald-500" />
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-slate-900 truncate">
-                          {effectiveUser.name || "Developer"}
-                        </span>
-                        <span className="text-[9px] font-mono uppercase bg-slate-200 text-slate-700 px-1 py-0.2 rounded font-semibold">
-                          {effectiveUser.role || "developer"}
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-mono text-slate-500 truncate block">
-                        @{effectiveUser.username || "dev"}
+                    <div className="min-w-0 flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-900 truncate whitespace-nowrap">
+                        {effectiveUser.name || effectiveUser.username || "Developer"}
+                      </span>
+                      <span className="text-[9px] font-mono uppercase bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-semibold whitespace-nowrap">
+                        {effectiveUser.role || "developer"}
                       </span>
                     </div>
                   </div>
@@ -637,7 +526,7 @@ export function Navbar({
                       setIsMobileMenuOpen(false);
                       handleSignOut();
                     }}
-                    className="text-[11px] font-mono text-slate-600 hover:text-slate-900 px-2 py-1 rounded bg-slate-200/60 ml-2 cursor-pointer"
+                    className="text-xs font-mono text-slate-600 hover:text-slate-900 px-2.5 py-1 rounded bg-slate-200/70 ml-2 cursor-pointer shrink-0 whitespace-nowrap"
                   >
                     Sign Out
                   </button>
@@ -649,7 +538,7 @@ export function Navbar({
                     setIsMobileMenuOpen(false);
                     onOpenAuthModal?.();
                   }}
-                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white font-medium text-xs shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white font-medium text-xs shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
                 >
                   <span>Sign In with GitHub / Email</span>
                 </button>
@@ -665,21 +554,6 @@ export function Navbar({
                   type="button"
                   onClick={() => {
                     setIsMobileMenuOpen(false);
-                    handleNavClick("discover");
-                  }}
-                  className={cn(
-                    "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left cursor-pointer",
-                    activeNavTab === "discover" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-50"
-                  )}
-                >
-                  <span className="font-semibold">Discover Blueprints</span>
-                  <span className="text-[10px] font-mono opacity-80">Top Rated</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
                     handleNavClick("showcase");
                   }}
                   className={cn(
@@ -687,8 +561,8 @@ export function Navbar({
                     activeNavTab === "showcase" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-50"
                   )}
                 >
-                  <span className="font-semibold">Daily &amp; Weekly Showcases</span>
-                  <span className="text-[10px] font-mono opacity-80">Spotlight</span>
+                  <span className="font-semibold whitespace-nowrap">Showcases</span>
+                  <span className="text-[10px] font-mono opacity-80 whitespace-nowrap">Daily &amp; Weekly</span>
                 </button>
 
                 <button
@@ -702,8 +576,8 @@ export function Navbar({
                   }}
                   className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left cursor-pointer"
                 >
-                  <span className="font-semibold">Community Leaderboard</span>
-                  <span className="text-[10px] font-mono text-slate-500">Ranked</span>
+                  <span className="font-semibold whitespace-nowrap">Leaderboard</span>
+                  <span className="text-[10px] font-mono text-slate-500 whitespace-nowrap">Top Rated</span>
                 </button>
 
                 <button
@@ -717,31 +591,9 @@ export function Navbar({
                     activeNavTab === "dashboard" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-50"
                   )}
                 >
-                  <span className="font-semibold">Developer Dashboard</span>
-                  <span className="text-[10px] font-mono opacity-80">Console</span>
+                  <span className="font-semibold whitespace-nowrap">Dashboard</span>
+                  <span className="text-[10px] font-mono opacity-80 whitespace-nowrap">Developer Console</span>
                 </button>
-              </div>
-
-              {/* Filter by Category */}
-              <div className="pt-2 border-t border-slate-100">
-                <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold px-2 mb-2">
-                  Filter by Domain
-                </div>
-                <div className="flex flex-wrap gap-1.5 px-1">
-                  {CATEGORIES.map((cat) => (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => {
-                        setIsMobileMenuOpen(false);
-                        handleCategoryPick(cat);
-                      }}
-                      className="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-mono transition-colors cursor-pointer"
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               {/* Submit CTA */}
@@ -752,9 +604,9 @@ export function Navbar({
                     setIsMobileMenuOpen(false);
                     onOpenSubmitModal();
                   }}
-                  className="w-full py-2.5 rounded-xl bg-[#22c55e] hover:bg-[#16a34a] text-white font-medium text-xs shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-[#22c55e] hover:bg-[#16a34a] text-white font-medium text-xs shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
                 >
-                  <span>Submit Architecture Portfolio</span>
+                  <span>Submit Portfolio</span>
                   <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
                 </button>
               </div>

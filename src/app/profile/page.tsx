@@ -166,6 +166,7 @@ export default function ProfilePage() {
                 }
                 setIsSubmitModalOpen(true);
               }}
+              onRequireAuth={requireAuth}
             />
           </div>
         </div>
