@@ -13,6 +13,7 @@ import {
 import { Portfolio } from "@/types/portfolio";
 import { cn, formatNumber, formatRating } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
+import { EmojiReaction } from "@/components/ui/emoji-reaction";
 
 export interface PortfolioCardProps {
   portfolio: Portfolio;
@@ -47,6 +48,17 @@ export function PortfolioCard({
     trackEvent("portfolio_like", { portfolioId: portfolio.id, liked: nextState });
     if (onLikeToggle) {
       onLikeToggle(portfolio.id, nextState);
+    }
+  };
+
+  const handleReact = (emojiName: string) => {
+    if (!isLiked) {
+      setIsLiked(true);
+      setLikesCount((prev) => prev + 1);
+    }
+    trackEvent("portfolio_reaction", { portfolioId: portfolio.id, reaction: emojiName });
+    if (onLikeToggle) {
+      onLikeToggle(portfolio.id, true);
     }
   };
 
@@ -144,20 +156,29 @@ export function PortfolioCard({
             <span className="font-semibold tabular-nums">{formatRating(portfolio.rating)}</span>
           </div>
 
-          {/* Like */}
-          <button
-            type="button"
-            onClick={handleLike}
-            className={cn(
-              "flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors cursor-pointer font-mono",
-              isLiked
-                ? "bg-slate-900 border-slate-900 text-white"
-                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-            )}
-          >
-            <Heart className={cn("w-3 h-3", isLiked && "fill-rose-400 text-rose-400")} />
-            <span className="tabular-nums">{likesCount}</span>
-          </button>
+          {/* Like / Reactions */}
+          <div onClick={(e) => e.stopPropagation()} className="relative inline-flex items-center">
+            <EmojiReaction
+              size="sm"
+              asChild
+              onReact={handleReact}
+            >
+              <button
+                type="button"
+                onClick={handleLike}
+                className={cn(
+                  "flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors cursor-pointer font-mono",
+                  isLiked
+                    ? "bg-slate-900 border-slate-900 text-white"
+                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                )}
+                aria-label="React or like portfolio"
+              >
+                <Heart className={cn("w-3 h-3", isLiked && "fill-rose-400 text-rose-400")} />
+                <span className="tabular-nums">{likesCount}</span>
+              </button>
+            </EmojiReaction>
+          </div>
 
           {/* Comments */}
           <div className="flex items-center gap-1 text-xs text-slate-600 font-mono bg-slate-50 px-2 py-1 rounded-md border border-slate-200">
@@ -268,19 +289,28 @@ export function PortfolioCard({
               </div>
 
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleLike}
-                  className={cn(
-                    "flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors cursor-pointer font-mono",
-                    isLiked
-                      ? "bg-slate-900 border-slate-900 text-white"
-                      : "bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50"
-                  )}
-                >
-                  <Heart className={cn("w-3 h-3", isLiked && "fill-rose-400 text-rose-400")} />
-                  <span className="tabular-nums">{likesCount}</span>
-                </button>
+                <div onClick={(e) => e.stopPropagation()} className="relative inline-flex items-center">
+                  <EmojiReaction
+                    size="sm"
+                    asChild
+                    onReact={handleReact}
+                  >
+                    <button
+                      type="button"
+                      onClick={handleLike}
+                      className={cn(
+                        "flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors cursor-pointer font-mono",
+                        isLiked
+                          ? "bg-slate-900 border-slate-900 text-white"
+                          : "bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50"
+                      )}
+                      aria-label="React or like portfolio"
+                    >
+                      <Heart className={cn("w-3 h-3", isLiked && "fill-rose-400 text-rose-400")} />
+                      <span className="tabular-nums">{likesCount}</span>
+                    </button>
+                  </EmojiReaction>
+                </div>
 
                 <span className="p-1.5 rounded-md bg-slate-900 text-white font-medium hover:bg-black transition-colors">
                   <ArrowUpRight className="w-3.5 h-3.5" />
@@ -385,21 +415,29 @@ export function PortfolioCard({
           </div>
 
           <div className="flex items-center gap-1.5">
-            {/* Likes */}
-            <button
-              type="button"
-              onClick={handleLike}
-              className={cn(
-                "flex items-center gap-1 text-xs px-2 py-0.5 rounded-md border transition-colors cursor-pointer font-mono",
-                isLiked
-                  ? "bg-slate-900 border-slate-900 text-white"
-                  : "bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50"
-              )}
-              aria-label="Like portfolio"
-            >
-              <Heart className={cn("w-3 h-3", isLiked && "fill-rose-400 text-rose-400")} />
-              <span className="text-[11px] tabular-nums">{formatNumber(likesCount)}</span>
-            </button>
+            {/* Likes / Reactions */}
+            <div onClick={(e) => e.stopPropagation()} className="relative inline-flex items-center">
+              <EmojiReaction
+                size="sm"
+                asChild
+                onReact={handleReact}
+              >
+                <button
+                  type="button"
+                  onClick={handleLike}
+                  className={cn(
+                    "flex items-center gap-1 text-xs px-2 py-0.5 rounded-md border transition-colors cursor-pointer font-mono",
+                    isLiked
+                      ? "bg-slate-900 border-slate-900 text-white"
+                      : "bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50"
+                  )}
+                  aria-label="React or like portfolio"
+                >
+                  <Heart className={cn("w-3 h-3", isLiked && "fill-rose-400 text-rose-400")} />
+                  <span className="text-[11px] tabular-nums">{formatNumber(likesCount)}</span>
+                </button>
+              </EmojiReaction>
+            </div>
 
             {/* Comments */}
             <div className="flex items-center gap-1 text-xs text-slate-600 font-mono bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">

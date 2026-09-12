@@ -125,6 +125,24 @@ export default function Home() {
     }
   };
 
+  // Real developer count: unique developers from existing portfolios + active authenticated user
+  const totalDevelopers = React.useMemo(() => {
+    const authorSet = new Set<string>();
+    portfolios.forEach((p) => {
+      const authorIdentifier = p.author?.username || p.author?.name;
+      if (authorIdentifier) {
+        authorSet.add(authorIdentifier.toLowerCase().trim());
+      }
+    });
+    if (currentUser) {
+      const currentIdentifier = currentUser.username || currentUser.name || currentUser.id;
+      if (currentIdentifier) {
+        authorSet.add(currentIdentifier.toLowerCase().trim());
+      }
+    }
+    return authorSet.size;
+  }, [portfolios, currentUser]);
+
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       {/* Top Navbar */}
@@ -220,7 +238,7 @@ export default function Home() {
                   el?.scrollIntoView({ behavior: "smooth" });
                 }}
                 profile={developerProfile}
-                totalDevelopers={1420 + portfolios.length}
+                totalDevelopers={totalDevelopers}
               />
             )}
 

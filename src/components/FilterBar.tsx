@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { PortfolioCategory, SortOption } from "@/types/portfolio";
 import { cn } from "@/lib/utils";
+import { AnimatedCounter } from "@/components/ui/animated-counter";
 
 interface FilterBarProps {
   activeCategory: PortfolioCategory;
@@ -82,7 +83,7 @@ export function FilterBar({
         {/* View Switcher + Total Counter */}
         <div className="flex items-center gap-3 self-end lg:self-auto">
           <span className="text-xs font-mono text-slate-500 tabular-nums">
-            Showing <strong className="text-slate-900 font-semibold">{totalCount}</strong> architectures
+            Showing <strong className="text-slate-900 font-semibold inline-flex items-center"><AnimatedCounter value={totalCount} duration={0.8} /></strong> architectures
           </span>
 
           <div className="flex items-center p-0.5 rounded-lg bg-slate-100 border border-slate-200">

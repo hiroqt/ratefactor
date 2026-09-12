@@ -26,6 +26,7 @@ import { RatingWidget } from "./RatingWidget";
 import { cn, formatNumber, timeAgo, formatRating } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
 import { validateCommentContent, MIN_COMMENT_LENGTH } from "@/lib/guardrails";
+import { EmojiReaction } from "@/components/ui/emoji-reaction";
 
 interface PortfolioDetailModalProps {
   portfolio: Portfolio | null;
@@ -155,6 +156,22 @@ export function PortfolioDetailModal({
     trackEvent("portfolio_like", {
       portfolioId: portfolio.id,
       liked: nextState,
+    });
+  };
+
+  const handleReact = (emojiName: string) => {
+    if (!currentUser) {
+      onRequireAuth?.("Sign in with GitHub or Email to react to developer portfolios.");
+      return;
+    }
+    if (!isLiked) {
+      setIsLiked(true);
+      setLikesCount((prev) => prev + 1);
+      onLikeToggle(portfolio.id, true);
+    }
+    trackEvent("portfolio_reaction", {
+      portfolioId: portfolio.id,
+      reaction: emojiName,
     });
   };
 
@@ -338,19 +355,26 @@ export function PortfolioDetailModal({
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleLike}
-                className={cn(
-                  "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-xs font-medium transition-all cursor-pointer",
-                  isLiked
-                    ? "bg-rose-50 border-rose-200 text-rose-600 shadow-sm"
-                    : "bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                )}
+              <EmojiReaction
+                size="md"
+                asChild
+                onReact={handleReact}
               >
-                <Heart className={cn("w-4 h-4", isLiked && "fill-rose-500 text-rose-500")} />
-                <span className="font-mono tabular-nums">{formatNumber(likesCount)}</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={handleLike}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-xs font-medium transition-all cursor-pointer",
+                    isLiked
+                      ? "bg-rose-50 border-rose-200 text-rose-600 shadow-sm"
+                      : "bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  )}
+                  aria-label="React or like portfolio"
+                >
+                  <Heart className={cn("w-4 h-4", isLiked && "fill-rose-500 text-rose-500")} />
+                  <span className="font-mono tabular-nums">{formatNumber(likesCount)}</span>
+                </button>
+              </EmojiReaction>
             </div>
           </div>
 

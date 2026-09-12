@@ -1,7 +1,9 @@
 /**
  * Telemetry and Analytics module conforming to ARD_PRD_Ratefactor.md Section 8.
- * Supports PostHog and custom event sinks without blocking UI or throwing errors.
+ * Integrates PostHog and Sentry telemetry without blocking UI or throwing errors.
  */
+
+import { captureClientEvent } from "./posthog";
 
 type EventName =
   | "page_view"
@@ -14,21 +16,20 @@ type EventName =
   | "showcase_impression"
   | "showcase_click"
   | "showcase_cron_triggered"
-  | "filter_applied";
+  | "filter_applied"
+  | "uptime_heartbeat"
+  | "downtime_incident"
+  | "uptime_client_online"
+  | "downtime_client_offline"
+  | "sentry_test_error_triggered";
 
 interface EventPayload {
-  [key: string]: string | number | boolean | null | undefined;
+  [key: string]: string | number | boolean | null | undefined | Record<string, any>;
 }
 
-export function trackEvent(event: EventName, properties?: EventPayload): void {
+export function trackEvent(event: EventName | string, properties?: EventPayload): void {
   try {
-    // If running in browser and PostHog is loaded
-    if (typeof window !== "undefined") {
-      const w = window as unknown as { posthog?: { capture: (e: string, p?: EventPayload) => void } };
-      if (w.posthog && typeof w.posthog.capture === "function") {
-        w.posthog.capture(event, properties);
-      }
-    }
+    captureClientEvent(event, properties);
 
     // Non-obtrusive development logging
     if (process.env.NODE_ENV === "development") {

@@ -7,6 +7,7 @@ import { Portfolio } from "@/types/portfolio";
 import { DeveloperProfile } from "@/types/profile";
 import { cn, formatNumber } from "@/lib/utils";
 import { AdykrniShader } from "./AdykrniShader.webgl";
+import { AnimatedCounter } from "@/components/ui/animated-counter";
 
 interface HeroSectionProps {
   showcasePortfolio?: Portfolio | null;
@@ -26,6 +27,7 @@ export function HeroSection({
   totalDevelopers,
 }: HeroSectionProps) {
   const [activeKeywordIndex, setActiveKeywordIndex] = useState(0);
+  const [animatedCount, setAnimatedCount] = useState(0);
   // Grounded in RateFactor ARD & PRD specifications (Sections 1, 4.1, 4.3, 6)
   const keywords = [
     "PORTFOLIO",
@@ -43,11 +45,19 @@ export function HeroSection({
     return () => clearInterval(timer);
   }, [keywords.length]);
 
+  const devCount = totalDevelopers ?? 0;
+
+  // On opening/mount, start counting smoothly from 0 to real developer count
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAnimatedCount(devCount);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [devCount]);
+
   const handleToggleKeyword = () => {
     setActiveKeywordIndex((prev) => (prev + 1) % keywords.length);
   };
-
-  const devCount = totalDevelopers ?? 1420;
 
   return (
     <section className="relative w-full min-h-[85vh] lg:min-h-[90vh] flex flex-col justify-between overflow-hidden select-none bg-[#fafafa] text-slate-950">
@@ -149,8 +159,8 @@ export function HeroSection({
                   <div className="flex items-center gap-1.5 text-xs text-slate-600">
                     <Users className="w-3.5 h-3.5 text-slate-400" />
                     <span className="font-medium text-slate-600">Total Developers:</span>
-                    <span className="font-bold text-slate-950 font-mono tracking-tight text-xs">
-                      {formatNumber(devCount)}+
+                    <span className="font-bold text-slate-950 font-mono tracking-tight text-xs inline-flex items-center">
+                      <AnimatedCounter value={animatedCount} duration={1.2} />
                     </span>
                   </div>
                 </div>
