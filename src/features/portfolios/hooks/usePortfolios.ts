@@ -10,7 +10,6 @@ import {
   NotificationItem,
   CritiqueTag,
 } from "@/types/portfolio";
-import { INITIAL_PORTFOLIOS } from "@/data/mockPortfolios";
 import {
   selectShowcaseCandidate,
   DEFAULT_SHOWCASE_WEIGHTS,
@@ -36,45 +35,66 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
     if (memoryPortfoliosCache && memoryPortfoliosCache.length > 0) {
       return memoryPortfoliosCache;
     }
-    return INITIAL_PORTFOLIOS;
+    return [];
   });
 
-  // Hydration-safe initial load from localStorage
+  // Hydration-safe initial load from localStorage and dynamic fetch from server API
   useEffect(() => {
     try {
       const saved = localStorage.getItem("ratefactor_portfolios");
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Clean legacy placeholder items if any
-          const validSaved = parsed.filter(
+          // Clean legacy placeholder and mock catalog items (e.g. app-*, hyperion, etc.)
+          const realSaved = parsed.filter(
             (p: any) =>
               p &&
               p.id &&
+              !p.id.startsWith("app-") &&
               p.id !== "hyperion-lsm" &&
               p.id !== "kubelens-tui" &&
               p.id !== "zenith-state"
           );
-
-          // Merge with INITIAL_PORTFOLIOS so catalog updates are included while user changes are preserved
-          const map = new Map<string, Portfolio>();
-          INITIAL_PORTFOLIOS.forEach((p) => map.set(p.id, p));
-          validSaved.forEach((p: Portfolio) => {
-            if (p && p.id) {
-              map.set(p.id, p);
-            }
-          });
-          const merged = Array.from(map.values());
-          memoryPortfoliosCache = merged;
-          setPortfolios(merged);
+          localStorage.setItem("ratefactor_portfolios", JSON.stringify(realSaved));
+          if (realSaved.length > 0) {
+            setPortfolios(realSaved);
+            memoryPortfoliosCache = realSaved;
+          } else {
+            setPortfolios([]);
+            memoryPortfoliosCache = [];
+          }
         }
       }
     } catch (e) {}
+
+    // Fetch dynamic real portfolios from backend API
+    fetch("/api/portfolios?limit=50")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.portfolios && Array.isArray(data.portfolios)) {
+          // Only keep genuine real user portfolios
+          const realPortfolios = data.portfolios.filter(
+            (p: Portfolio) =>
+              p &&
+              p.id &&
+              !p.id.startsWith("app-") &&
+              p.id !== "hyperion-lsm" &&
+              p.id !== "kubelens-tui" &&
+              p.id !== "zenith-state"
+          );
+          setPortfolios(realPortfolios);
+          memoryPortfoliosCache = realPortfolios;
+          try {
+            localStorage.setItem("ratefactor_portfolios", JSON.stringify(realPortfolios));
+          } catch {}
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Synchronize memory cache whenever state changes
   useEffect(() => {
-    if (portfolios && portfolios.length > 0) {
+    if (portfolios) {
       memoryPortfoliosCache = portfolios;
     }
   }, [portfolios]);
@@ -96,7 +116,10 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         try {
           const updated = JSON.parse(e.newValue);
           if (Array.isArray(updated)) {
-            setPortfolios(updated);
+            const realUpdated = updated.filter(
+              (p: any) => p && p.id && !p.id.startsWith("app-")
+            );
+            setPortfolios(realUpdated);
           }
         } catch {}
       }
@@ -115,18 +138,13 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
     } catch (e) {}
   }, [portfolios]);
 
-  // Daily & Weekly showcases
+  // Daily & Weekly showcases (only real elected showcases)
   const dailyShowcase = useMemo(() => {
-    return portfolios.find((p) => p.showcaseType === "daily") || portfolios[0] || null;
+    return portfolios.find((p) => p.showcaseType === "daily") || null;
   }, [portfolios]);
 
   const weeklyShowcase = useMemo(() => {
-    return (
-      portfolios.find((p) => p.showcaseType === "weekly") ||
-      portfolios[1] ||
-      portfolios[0] ||
-      null
-    );
+    return portfolios.find((p) => p.showcaseType === "weekly") || null;
   }, [portfolios]);
 
   // User's own portfolios (real-time recalculation based on author match)

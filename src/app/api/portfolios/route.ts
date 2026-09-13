@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { portfolioSubmissionSchema } from "@/lib/validations/portfolio";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
-import { INITIAL_PORTFOLIOS } from "@/data/mockPortfolios";
 import { getSessionUser } from "@/lib/auth/server-session";
-
-// In-memory runtime cache for newly added portfolios when Supabase DB is in mock/dev state
-let dynamicPortfolios = [...INITIAL_PORTFOLIOS];
+import { pool } from "@/lib/auth/better-auth";
+import { Portfolio } from "@/types/portfolio";
+import { portfolioComments } from "@/lib/comments-store";
+import { getDynamicPortfolios, setDynamicPortfolios } from "@/lib/dynamic-portfolios";
 
 export async function GET(req: NextRequest) {
   try {
@@ -16,6 +16,118 @@ export async function GET(req: NextRequest) {
     const query = (searchParams.get("q") || "").toLowerCase().trim();
     const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit")) || 20));
     const offset = Math.max(0, Number(searchParams.get("offset")) || 0);
+
+    let dynamicPortfolios = [...getDynamicPortfolios()];
+
+    // Attempt to query PostgreSQL database if connection is available
+    try {
+      const dbRes = await pool.query(`
+        SELECT 
+          p.id,
+          p.title,
+          p.tagline,
+          p.description,
+          p.portfolio_url as "portfolioUrl",
+          p.github_url as "githubUrl",
+          p.demo_url as "demoUrl",
+          p.thumbnail_url as "thumbnail",
+          p.image_size_bytes as "imageSizeBytes",
+          p.category,
+          p.tech_stack as "techStack",
+          p.rating,
+          p.rating_count as "ratingCount",
+          p.rating_design as "ratingDesign",
+          p.rating_code_quality as "ratingCodeQuality",
+          p.rating_performance as "ratingPerformance",
+          p.rating_documentation as "ratingDocumentation",
+          p.likes_count as "likesCount",
+          p.comments_count as "commentsCount",
+          p.is_showcase as "isShowcase",
+          p.showcase_type as "showcaseType",
+          p.showcase_reason as "showcaseReason",
+          p.request_critique as "requestCritique",
+          p.created_at as "createdAt",
+          pr.id as "authorProfileId",
+          pr.full_name as "authorName",
+          pr.username as "authorUsername",
+          pr.avatar_url as "authorAvatar",
+          pr.role as "authorRole",
+          pr.is_verified as "authorIsVerified",
+          pr.available_for_hire as "authorAvailableForHire"
+        FROM public.portfolios p
+        LEFT JOIN public.profiles pr ON p.author_id = pr.id
+        WHERE p.status = 'published'
+        ORDER BY p.created_at DESC
+      `);
+
+      if (dbRes.rows && dbRes.rows.length > 0) {
+        const dbPortfolios: Portfolio[] = dbRes.rows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          tagline: row.tagline,
+          description: row.description || "",
+          portfolioUrl: row.portfolioUrl,
+          githubUrl: row.githubUrl,
+          demoUrl: row.demoUrl || row.portfolioUrl,
+          thumbnail: row.thumbnail,
+          imageSizeBytes: row.imageSizeBytes || 1024 * 500,
+          category: row.category,
+          techStack: Array.isArray(row.techStack) ? row.techStack : [],
+          rating: Number(row.rating) || 5.0,
+          ratingCount: Number(row.ratingCount) || 1,
+          ratingBreakdown: {
+            design: Number(row.ratingDesign) || 5.0,
+            codeQuality: Number(row.ratingCodeQuality) || 5.0,
+            performance: Number(row.ratingPerformance) || 5.0,
+            documentation: Number(row.ratingDocumentation) || 5.0,
+          },
+          likesCount: Number(row.likesCount) || 0,
+          commentsCount: Number(row.commentsCount) || 0,
+          comments: portfolioComments.get(row.id) || [],
+          isShowcase: Boolean(row.isShowcase),
+          showcaseType: row.showcaseType || null,
+          showcaseReason: row.showcaseReason || null,
+          requestCritique: Boolean(row.requestCritique),
+          createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : new Date().toISOString(),
+          author: {
+            name: row.authorName || "Developer",
+            username: row.authorUsername || "dev",
+            avatar: row.authorAvatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
+            role: row.authorRole || "developer",
+            isVerified: Boolean(row.authorIsVerified),
+            availableForHire: row.authorAvailableForHire ?? true,
+          },
+        }));
+
+        // Merge DB rows into dynamicPortfolios without duplicates
+        const map = new Map<string, Portfolio>();
+        dbPortfolios.forEach((p) => map.set(p.id, p));
+        dynamicPortfolios.forEach((p) => {
+          if (!map.has(p.id)) {
+            map.set(p.id, p);
+          }
+        });
+        dynamicPortfolios = Array.from(map.values());
+        setDynamicPortfolios(dynamicPortfolios);
+      }
+    } catch {
+      // Graceful fallback to dynamicPortfolios in-memory store
+    }
+
+    // Query real developer count from database
+    let totalDevelopers = 0;
+    try {
+      const devRes = await pool.query(`SELECT COUNT(DISTINCT id) as count FROM public.profiles`);
+      if (devRes.rows && devRes.rows.length > 0) {
+        totalDevelopers = Number(devRes.rows[0].count) || 0;
+      }
+    } catch {
+      const authorSet = new Set<string>();
+      dynamicPortfolios.forEach((p) => {
+        if (p.author?.username) authorSet.add(p.author.username.toLowerCase());
+      });
+      totalDevelopers = authorSet.size;
+    }
 
     let filtered = [...dynamicPortfolios];
 
@@ -91,6 +203,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         portfolios: paginated,
+        totalDevelopers,
+        developersCount: totalDevelopers,
         pagination: {
           total,
           offset,
@@ -164,21 +278,21 @@ export async function POST(req: NextRequest) {
     const slug = data.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     const id = `${slug}-${Date.now().toString(36)}`;
 
-    const newPortfolio = {
+    const newPortfolio: Portfolio = {
       id,
       title: data.title,
       tagline: data.tagline,
-      description: data.description,
+      description: data.description || data.tagline || "",
       portfolioUrl: data.portfolioUrl,
       githubUrl: data.githubUrl,
       demoUrl: data.demoUrl || data.portfolioUrl,
       thumbnail: data.thumbnailUrl,
       imageSizeBytes: data.imageSizeBytes,
       author: {
-        name: body.authorName || authUser.name || "Principal Architect",
-        username: body.authorUsername || authUser.username || "arneldev",
+        name: body.authorName || authUser.name || "Developer",
+        username: body.authorUsername || authUser.username || "dev",
         avatar: body.authorAvatar || authUser.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
-        role: "Fullstack Architect",
+        role: (authUser.role as any) || "developer",
         isVerified: true,
         availableForHire: true,
       },
@@ -201,7 +315,68 @@ export async function POST(req: NextRequest) {
       isShowcase: false,
     };
 
-    dynamicPortfolios.unshift(newPortfolio as any);
+    // Attempt PostgreSQL database persistence
+    try {
+      let authorProfileId: string | null = null;
+      const profileCheck = await pool.query(
+        `SELECT id FROM public.profiles WHERE id = $1 OR LOWER(username) = LOWER($2) LIMIT 1`,
+        [authUser.id, authUser.username || ""]
+      );
+
+      if (profileCheck.rows && profileCheck.rows.length > 0) {
+        authorProfileId = profileCheck.rows[0].id;
+      } else {
+        const insertProfile = await pool.query(
+          `INSERT INTO public.profiles (id, username, full_name, avatar_url, role)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username
+           RETURNING id`,
+          [
+            authUser.id,
+            authUser.username || `dev_${Date.now().toString(36)}`,
+            authUser.name || "Developer",
+            authUser.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
+            authUser.role || "developer",
+          ]
+        );
+        if (insertProfile.rows && insertProfile.rows.length > 0) {
+          authorProfileId = insertProfile.rows[0].id;
+        }
+      }
+
+      if (authorProfileId) {
+        await pool.query(
+          `INSERT INTO public.portfolios (
+            id, author_id, title, tagline, description, portfolio_url, github_url, demo_url,
+            thumbnail_url, image_size_bytes, category, tech_stack, rating, rating_count,
+            rating_design, rating_code_quality, rating_performance, rating_documentation,
+            likes_count, comments_count, is_showcase, status, request_critique
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 5.0, 1, 5.0, 5.0, 5.0, 5.0, 1, 0, false, 'published', $13)
+          ON CONFLICT (id) DO NOTHING`,
+          [
+            id,
+            authorProfileId,
+            data.title,
+            data.tagline,
+            data.description || null,
+            data.portfolioUrl,
+            data.githubUrl,
+            data.demoUrl || data.portfolioUrl,
+            data.thumbnailUrl,
+            data.imageSizeBytes || 1024 * 500,
+            data.category,
+            data.techStack,
+            Boolean(data.requestCritique),
+          ]
+        );
+      }
+    } catch (dbErr) {
+      console.warn("[POST /api/portfolios] Database persist notice:", dbErr);
+    }
+
+    const currentPortfolios = getDynamicPortfolios();
+    currentPortfolios.unshift(newPortfolio);
+    setDynamicPortfolios(currentPortfolios);
 
     return NextResponse.json(
       {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { getSessionUser } from "@/lib/auth/server-session";
 import { getCanonicalEmailHash } from "@/lib/auth/email";
+import { pool } from "@/lib/auth/better-auth";
 
 // In-memory like tracker keyed by canonical mailbox hash to prevent multi-account like manipulation
 const userLikes = new Map<string, Set<string>>(); // mailboxHash -> Set of portfolioIds
@@ -51,6 +52,42 @@ export async function POST(
       likedSet.add(portfolioId);
     } else {
       likedSet.delete(portfolioId);
+    }
+
+    // Attempt PostgreSQL database persistence
+    try {
+      let authorProfileId: string | null = null;
+      const profileCheck = await pool.query(
+        `SELECT id FROM public.profiles WHERE id = $1 OR LOWER(username) = LOWER($2) LIMIT 1`,
+        [authUser.id, authUser.username || ""]
+      );
+      if (profileCheck.rows && profileCheck.rows.length > 0) {
+        authorProfileId = profileCheck.rows[0].id;
+      }
+
+      if (authorProfileId) {
+        if (newLikedState) {
+          await pool.query(
+            `INSERT INTO public.likes (portfolio_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+            [portfolioId, authorProfileId]
+          );
+          await pool.query(
+            `UPDATE public.portfolios SET likes_count = likes_count + 1 WHERE id = $1`,
+            [portfolioId]
+          );
+        } else {
+          await pool.query(
+            `DELETE FROM public.likes WHERE portfolio_id = $1 AND user_id = $2`,
+            [portfolioId, authorProfileId]
+          );
+          await pool.query(
+            `UPDATE public.portfolios SET likes_count = GREATEST(0, likes_count - 1) WHERE id = $1`,
+            [portfolioId]
+          );
+        }
+      }
+    } catch (dbErr) {
+      console.warn("[POST like] Database persist notice:", dbErr);
     }
 
     return NextResponse.json({

@@ -4,6 +4,7 @@ import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { validateCommentContent } from "@/lib/guardrails";
 import { getSessionUser } from "@/lib/auth/server-session";
 import { portfolioComments } from "@/lib/comments-store";
+import { pool } from "@/lib/auth/better-auth";
 
 export async function GET(
   req: NextRequest,
@@ -11,9 +12,52 @@ export async function GET(
 ) {
   try {
     const { id: portfolioId } = await params;
-    const comments = portfolioComments.get(portfolioId) || [];
 
-    // Only return approved comments to public guests
+    // 1. Attempt PostgreSQL database query
+    try {
+      const dbRes = await pool.query(
+        `SELECT 
+           c.id,
+           c.portfolio_id as "portfolioId",
+           c.content,
+           c.critique_tag as "critiqueTag",
+           c.created_at as "createdAt",
+           c.is_reported as "isReported",
+           c.status,
+           pr.full_name as "authorName",
+           pr.username as "authorUsername",
+           pr.avatar_url as "authorAvatar"
+         FROM public.comments c
+         LEFT JOIN public.profiles pr ON c.user_id = pr.id
+         WHERE c.portfolio_id = $1 AND c.status = 'approved' AND c.is_reported = false
+         ORDER BY c.created_at DESC`,
+        [portfolioId]
+      );
+      if (dbRes.rows && dbRes.rows.length > 0) {
+        const dbComments = dbRes.rows.map((r) => ({
+          id: String(r.id),
+          portfolioId: r.portfolioId,
+          authorName: r.authorName || "Developer",
+          authorUsername: r.authorUsername || "dev",
+          authorAvatar: r.authorAvatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
+          content: r.content,
+          critiqueTag: r.critiqueTag || null,
+          createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : new Date().toISOString(),
+          likes: 0,
+          isUserOwner: false,
+          status: r.status,
+          isReported: Boolean(r.isReported),
+        }));
+        return NextResponse.json({
+          portfolioId,
+          comments: dbComments,
+          total: dbComments.length,
+        });
+      }
+    } catch {}
+
+    // 2. In-memory comments fallback
+    const comments = portfolioComments.get(portfolioId) || [];
     const approved = comments.filter((c) => !c.isReported && c.status !== "hidden");
 
     return NextResponse.json({
@@ -91,9 +135,9 @@ export async function POST(
     const newComment = {
       id: `comm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       portfolioId,
-      authorName: body.authorName || authUser.name || "Architect",
-      authorUsername: body.authorUsername || authUser.username || "arneldev",
-      authorAvatar: body.authorAvatar || authUser.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
+      authorName: authUser.name || body.authorName || "Developer",
+      authorUsername: authUser.username || body.authorUsername || "dev",
+      authorAvatar: authUser.avatar || body.authorAvatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
       content,
       critiqueTag: critiqueTag || null,
       createdAt: new Date().toISOString(),
@@ -102,6 +146,32 @@ export async function POST(
       status: "approved",
       isReported: false,
     };
+
+    // Attempt PostgreSQL database persistence
+    try {
+      let authorProfileId: string | null = null;
+      const profileCheck = await pool.query(
+        `SELECT id FROM public.profiles WHERE id = $1 OR LOWER(username) = LOWER($2) LIMIT 1`,
+        [authUser.id, authUser.username || ""]
+      );
+      if (profileCheck.rows && profileCheck.rows.length > 0) {
+        authorProfileId = profileCheck.rows[0].id;
+      }
+
+      if (authorProfileId) {
+        await pool.query(
+          `INSERT INTO public.comments (id, portfolio_id, user_id, content, critique_tag, status)
+           VALUES (gen_random_uuid(), $1, $2, $3, $4, 'approved')`,
+          [portfolioId, authorProfileId, content, critiqueTag || null]
+        );
+        await pool.query(
+          `UPDATE public.portfolios SET comments_count = comments_count + 1 WHERE id = $1`,
+          [portfolioId]
+        );
+      }
+    } catch (dbErr) {
+      console.warn("[POST comments] Database persist notice:", dbErr);
+    }
 
     let list = portfolioComments.get(portfolioId);
     if (!list) {

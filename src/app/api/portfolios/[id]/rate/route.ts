@@ -3,6 +3,7 @@ import { ratingSubmissionSchema } from "@/lib/validations/portfolio";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { getSessionUser } from "@/lib/auth/server-session";
 import { getCanonicalEmailHash } from "@/lib/auth/email";
+import { pool } from "@/lib/auth/better-auth";
 
 // In-memory rating storage keyed by canonical mailbox hash to prevent multi-account Sybil manipulation
 const userRatings = new Map<string, any>(); // key: `${mailboxHash}:${portfolioId}`
@@ -73,6 +74,49 @@ export async function POST(
     let portfolioRatingCount = 0;
     for (const r of userRatings.values()) {
       if (r.portfolioId === portfolioId) portfolioRatingCount++;
+    }
+
+    // Attempt PostgreSQL database persistence
+    try {
+      let authorProfileId: string | null = null;
+      const profileCheck = await pool.query(
+        `SELECT id FROM public.profiles WHERE id = $1 OR LOWER(username) = LOWER($2) LIMIT 1`,
+        [authUser.id, authUser.username || ""]
+      );
+      if (profileCheck.rows && profileCheck.rows.length > 0) {
+        authorProfileId = profileCheck.rows[0].id;
+      }
+
+      if (authorProfileId) {
+        await pool.query(
+          `INSERT INTO public.ratings (portfolio_id, user_id, score, design, code_quality, performance, documentation)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT (portfolio_id, user_id)
+           DO UPDATE SET
+             score = EXCLUDED.score,
+             design = EXCLUDED.design,
+             code_quality = EXCLUDED.code_quality,
+             performance = EXCLUDED.performance,
+             documentation = EXCLUDED.documentation,
+             updated_at = NOW()`,
+          [portfolioId, authorProfileId, averageScore, design, codeQuality, performance, documentation]
+        );
+
+        // Update aggregated portfolio ratings
+        await pool.query(
+          `UPDATE public.portfolios SET
+             rating = COALESCE((SELECT ROUND(AVG(score), 2) FROM public.ratings WHERE portfolio_id = $1), 5.0),
+             rating_count = (SELECT COUNT(*) FROM public.ratings WHERE portfolio_id = $1),
+             rating_design = COALESCE((SELECT ROUND(AVG(design), 2) FROM public.ratings WHERE portfolio_id = $1), 5.0),
+             rating_code_quality = COALESCE((SELECT ROUND(AVG(code_quality), 2) FROM public.ratings WHERE portfolio_id = $1), 5.0),
+             rating_performance = COALESCE((SELECT ROUND(AVG(performance), 2) FROM public.ratings WHERE portfolio_id = $1), 5.0),
+             rating_documentation = COALESCE((SELECT ROUND(AVG(documentation), 2) FROM public.ratings WHERE portfolio_id = $1), 5.0)
+           WHERE id = $1`,
+          [portfolioId]
+        );
+      }
+    } catch (dbErr) {
+      console.warn("[POST rate] Database persist notice:", dbErr);
     }
 
     return NextResponse.json({

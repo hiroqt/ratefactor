@@ -3,11 +3,11 @@ import { profileUpdateSchema } from "@/lib/validations/profile";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { getSessionUser } from "@/lib/auth/server-session";
 import { INITIAL_DEVELOPER_PROFILE } from "@/data/mockProfile";
-import { INITIAL_PORTFOLIOS } from "@/data/mockPortfolios";
 import { deriveDeveloperAccolades } from "@/lib/accolades";
 import { DeveloperProfile } from "@/types/profile";
 import { Portfolio } from "@/types/portfolio";
 import { pool } from "@/lib/auth/better-auth";
+import { getDynamicPortfolios } from "@/lib/dynamic-portfolios";
 
 type TechDomain = "Frontend" | "Backend" | "Database" | "Cloud" | "AI";
 
@@ -128,7 +128,7 @@ export async function GET(req: NextRequest) {
     try {
       if (requestedUsername) {
         const res = await pool.query(
-          `SELECT id, name, username, bio, skills, available_for_hire, custom_hire_message, company, location, website, github, twitter, linkedin FROM profiles WHERE LOWER(username) = LOWER($1) LIMIT 1`,
+          `SELECT id, full_name as name, username, avatar_url, bio, skills, available_for_hire, custom_hire_message, company, location, website, github, twitter, linkedin FROM profiles WHERE LOWER(username) = LOWER($1) LIMIT 1`,
           [requestedUsername]
         );
         if (res.rows && res.rows.length > 0) {
@@ -138,6 +138,7 @@ export async function GET(req: NextRequest) {
             id: row.id || profile.id,
             name: row.name || profile.name,
             username: row.username || profile.username,
+            avatar: row.avatar_url || profile.avatar,
             bio: row.bio ?? profile.bio,
             skills: Array.isArray(row.skills) ? row.skills : profile.skills,
             availableForHire: row.available_for_hire ?? profile.availableForHire,
@@ -152,7 +153,7 @@ export async function GET(req: NextRequest) {
         }
       } else if (authUser?.id) {
         const res = await pool.query(
-          `SELECT id, name, username, bio, skills, available_for_hire, custom_hire_message, company, location, website, github, twitter, linkedin FROM profiles WHERE id = $1 LIMIT 1`,
+          `SELECT id, full_name as name, username, avatar_url, bio, skills, available_for_hire, custom_hire_message, company, location, website, github, twitter, linkedin FROM profiles WHERE id = $1 LIMIT 1`,
           [authUser.id]
         );
         if (res.rows && res.rows.length > 0) {
@@ -160,6 +161,8 @@ export async function GET(req: NextRequest) {
           profile = {
             ...profile,
             name: row.name || profile.name,
+            username: row.username || profile.username,
+            avatar: row.avatar_url || profile.avatar,
             bio: row.bio ?? profile.bio,
             skills: Array.isArray(row.skills) ? row.skills : profile.skills,
             availableForHire: row.available_for_hire ?? profile.availableForHire,
@@ -177,19 +180,63 @@ export async function GET(req: NextRequest) {
       // Graceful fallback to in-memory store in dev/offline mode
     }
 
-    // Filter candidate portfolios for accolades and tech stack distribution
+    // Query real dynamic portfolios belonging to this user for accolades and tech stack distribution
     const targetUser = (profile.username || "").toLowerCase().trim();
-    const userPortfolios = INITIAL_PORTFOLIOS.filter((p: Portfolio) => {
-      const pAuthor = (p.author?.username || "").toLowerCase().trim();
-      return (
-        !targetUser ||
-        pAuthor === targetUser ||
-        pAuthor === "hiroqt" ||
-        pAuthor === "arnel" ||
-        pAuthor === "arneldev" ||
-        targetUser === "developer"
-      );
-    });
+    let userPortfolios: Portfolio[] = [];
+
+    try {
+      if (profile.id && profile.id !== "user-default") {
+        const pfRes = await pool.query(
+          `SELECT 
+             p.id, p.title, p.tagline, p.description, p.portfolio_url as "portfolioUrl",
+             p.github_url as "githubUrl", p.demo_url as "demoUrl", p.thumbnail_url as "thumbnail",
+             p.image_size_bytes as "imageSizeBytes", p.category, p.tech_stack as "techStack",
+             p.rating, p.rating_count as "ratingCount", p.rating_design as "ratingDesign",
+             p.rating_code_quality as "ratingCodeQuality", p.rating_performance as "ratingPerformance",
+             p.rating_documentation as "ratingDocumentation", p.likes_count as "likesCount",
+             p.comments_count as "commentsCount", p.is_showcase as "isShowcase",
+             p.showcase_type as "showcaseType", p.showcase_reason as "showcaseReason",
+             p.request_critique as "requestCritique", p.created_at as "createdAt"
+           FROM public.portfolios p
+           JOIN public.profiles pr ON p.author_id = pr.id
+           WHERE pr.id = $1 OR LOWER(pr.username) = LOWER($2)
+           ORDER BY p.created_at DESC`,
+          [profile.id, targetUser]
+        );
+        if (pfRes.rows && pfRes.rows.length > 0) {
+          userPortfolios = pfRes.rows.map((row) => ({
+            ...row,
+            rating: Number(row.rating) || 5.0,
+            ratingCount: Number(row.ratingCount) || 1,
+            ratingBreakdown: {
+              design: Number(row.ratingDesign) || 5.0,
+              codeQuality: Number(row.ratingCodeQuality) || 5.0,
+              performance: Number(row.ratingPerformance) || 5.0,
+              documentation: Number(row.ratingDocumentation) || 5.0,
+            },
+            likesCount: Number(row.likesCount) || 0,
+            commentsCount: Number(row.commentsCount) || 0,
+            comments: [],
+            author: {
+              name: profile.name,
+              username: profile.username,
+              avatar: profile.avatar,
+              role: profile.role,
+              isVerified: profile.isVerified ?? false,
+              availableForHire: profile.availableForHire ?? true,
+            },
+          }));
+        }
+      }
+    } catch {}
+
+    // In-memory dynamicPortfolios fallback
+    if (userPortfolios.length === 0 && targetUser) {
+      userPortfolios = getDynamicPortfolios().filter((p) => {
+        const pAuthor = (p.author?.username || "").toLowerCase().trim();
+        return pAuthor === targetUser;
+      });
+    }
 
     const accolades = deriveDeveloperAccolades(userPortfolios);
     const techStackDistribution = buildTechStackDistribution(profile.skills || [], userPortfolios);
@@ -330,7 +377,7 @@ export async function PATCH(req: NextRequest) {
       let paramIdx = 1;
 
       if (data.name !== undefined) {
-        setClauses.push(`name = $${paramIdx++}`);
+        setClauses.push(`full_name = $${paramIdx++}`);
         values.push(data.name);
       }
       if (data.bio !== undefined) {
@@ -384,17 +431,60 @@ export async function PATCH(req: NextRequest) {
     }
 
     const targetUser = (updated.username || "").toLowerCase().trim();
-    const userPortfolios = INITIAL_PORTFOLIOS.filter((p: Portfolio) => {
-      const pAuthor = (p.author?.username || "").toLowerCase().trim();
-      return (
-        !targetUser ||
-        pAuthor === targetUser ||
-        pAuthor === "hiroqt" ||
-        pAuthor === "arnel" ||
-        pAuthor === "arneldev" ||
-        targetUser === "developer"
-      );
-    });
+    let userPortfolios: Portfolio[] = [];
+    try {
+      if (updated.id && updated.id !== "user-default") {
+        const pfRes = await pool.query(
+          `SELECT 
+             p.id, p.title, p.tagline, p.description, p.portfolio_url as "portfolioUrl",
+             p.github_url as "githubUrl", p.demo_url as "demoUrl", p.thumbnail_url as "thumbnail",
+             p.image_size_bytes as "imageSizeBytes", p.category, p.tech_stack as "techStack",
+             p.rating, p.rating_count as "ratingCount", p.rating_design as "ratingDesign",
+             p.rating_code_quality as "ratingCodeQuality", p.rating_performance as "ratingPerformance",
+             p.rating_documentation as "ratingDocumentation", p.likes_count as "likesCount",
+             p.comments_count as "commentsCount", p.is_showcase as "isShowcase",
+             p.showcase_type as "showcaseType", p.showcase_reason as "showcaseReason",
+             p.request_critique as "requestCritique", p.created_at as "createdAt"
+           FROM public.portfolios p
+           JOIN public.profiles pr ON p.author_id = pr.id
+           WHERE pr.id = $1 OR LOWER(pr.username) = LOWER($2)
+           ORDER BY p.created_at DESC`,
+          [updated.id, targetUser]
+        );
+        if (pfRes.rows && pfRes.rows.length > 0) {
+          userPortfolios = pfRes.rows.map((row) => ({
+            ...row,
+            rating: Number(row.rating) || 5.0,
+            ratingCount: Number(row.ratingCount) || 1,
+            ratingBreakdown: {
+              design: Number(row.ratingDesign) || 5.0,
+              codeQuality: Number(row.ratingCodeQuality) || 5.0,
+              performance: Number(row.ratingPerformance) || 5.0,
+              documentation: Number(row.ratingDocumentation) || 5.0,
+            },
+            likesCount: Number(row.likesCount) || 0,
+            commentsCount: Number(row.commentsCount) || 0,
+            comments: [],
+            author: {
+              name: updated.name,
+              username: updated.username,
+              avatar: updated.avatar,
+              role: updated.role,
+              isVerified: updated.isVerified ?? false,
+              availableForHire: updated.availableForHire ?? true,
+            },
+          }));
+        }
+      }
+    } catch {}
+
+    if (userPortfolios.length === 0 && targetUser) {
+      userPortfolios = getDynamicPortfolios().filter((p) => {
+        const pAuthor = (p.author?.username || "").toLowerCase().trim();
+        return pAuthor === targetUser;
+      });
+    }
+
     const accolades = deriveDeveloperAccolades(userPortfolios);
 
     const fullProfile = {

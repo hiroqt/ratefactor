@@ -88,8 +88,8 @@ export function ShowcaseBanner({
   }, [searchQuery, allPortfolios, portfolios, baseProfile]);
 
   const currentShowcase = activeSpotlightTab === "daily" 
-    ? dailyShowcase || weeklyShowcase 
-    : weeklyShowcase || dailyShowcase;
+    ? dailyShowcase || weeklyShowcase || portfolios[0] || null
+    : weeklyShowcase || dailyShowcase || portfolios[0] || null;
 
   const leaderboardItems = useMemo(() => {
     if (!portfolios || portfolios.length === 0) return [];
@@ -557,7 +557,12 @@ export function ShowcaseBanner({
 
               {/* Leaderboard Rows */}
               <div className="divide-y divide-slate-100 dark:divide-white/5 pt-1">
-                {leaderboardItems.map((item, idx) => {
+                {leaderboardItems.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-slate-500 dark:text-slate-400 font-mono">
+                    No ranked developer architectures yet.
+                  </div>
+                ) : (
+                  leaderboardItems.map((item, idx) => {
                   const rank = idx + 1;
                   const isGold = rank === 1;
 
@@ -617,7 +622,7 @@ export function ShowcaseBanner({
                       </div>
                     </div>
                   );
-                })}
+                }))}
               </div>
             </div>
 
@@ -640,7 +645,12 @@ export function ShowcaseBanner({
 
             {/* Quad Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-4">
-              {latestSubmissions.map((sub) => (
+              {latestSubmissions.length === 0 ? (
+                <div className="col-span-full py-8 text-center text-xs text-slate-500 dark:text-slate-400 font-mono">
+                  No developer submissions recorded yet.
+                </div>
+              ) : (
+                latestSubmissions.map((sub) => (
                 <div
                   key={sub.id}
                   onClick={() => handleInspect(sub, "fresh_card")}
@@ -673,7 +683,7 @@ export function ShowcaseBanner({
                     <span className="text-slate-500 dark:text-slate-400 font-mono shrink-0">{timeAgo(sub.createdAt)}</span>
                   </div>
                 </div>
-              ))}
+              )))}
             </div>
           </article>
         </div>
