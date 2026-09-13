@@ -126,7 +126,31 @@ export async function GET(req: NextRequest) {
 
     // Attempt to query PostgreSQL database if connection is live
     try {
-      if (authUser?.id) {
+      if (requestedUsername) {
+        const res = await pool.query(
+          `SELECT id, name, username, bio, skills, available_for_hire, custom_hire_message, company, location, website, github, twitter, linkedin FROM profiles WHERE LOWER(username) = LOWER($1) LIMIT 1`,
+          [requestedUsername]
+        );
+        if (res.rows && res.rows.length > 0) {
+          const row = res.rows[0];
+          profile = {
+            ...profile,
+            id: row.id || profile.id,
+            name: row.name || profile.name,
+            username: row.username || profile.username,
+            bio: row.bio ?? profile.bio,
+            skills: Array.isArray(row.skills) ? row.skills : profile.skills,
+            availableForHire: row.available_for_hire ?? profile.availableForHire,
+            customHireMessage: row.custom_hire_message ?? profile.customHireMessage,
+            company: row.company ?? profile.company,
+            location: row.location ?? profile.location,
+            website: row.website ?? profile.website,
+            github: row.github ?? profile.github,
+            twitter: row.twitter ?? profile.twitter,
+            linkedin: row.linkedin ?? profile.linkedin,
+          };
+        }
+      } else if (authUser?.id) {
         const res = await pool.query(
           `SELECT id, name, username, bio, skills, available_for_hire, custom_hire_message, company, location, website, github, twitter, linkedin FROM profiles WHERE id = $1 LIMIT 1`,
           [authUser.id]
@@ -160,6 +184,7 @@ export async function GET(req: NextRequest) {
       return (
         !targetUser ||
         pAuthor === targetUser ||
+        pAuthor === "hiroqt" ||
         pAuthor === "arnel" ||
         pAuthor === "arneldev" ||
         targetUser === "developer"
@@ -293,38 +318,67 @@ export async function PATCH(req: NextRequest) {
     };
 
     userProfiles.set(targetKey, updated);
+    if (updated.username) {
+      userProfiles.set(updated.username.toLowerCase().replace(/^@/, ""), updated);
+    }
     userProfiles.set("default", updated);
 
     // Optional PostgreSQL database persistence
     try {
-      await pool.query(
-        `UPDATE profiles SET 
-           name = COALESCE($1, name),
-           bio = COALESCE($2, bio),
-           available_for_hire = COALESCE($3, available_for_hire),
-           custom_hire_message = COALESCE($4, custom_hire_message),
-           company = COALESCE($5, company),
-           location = COALESCE($6, location),
-           website = COALESCE($7, website),
-           github = COALESCE($8, github),
-           twitter = COALESCE($9, twitter),
-           linkedin = COALESCE($10, linkedin),
-           updated_at = NOW()
-         WHERE id = $11`,
-        [
-          data.name ?? null,
-          data.bio ?? null,
-          data.availableForHire ?? null,
-          data.customHireMessage ?? null,
-          data.company ?? null,
-          data.location ?? null,
-          data.website ?? null,
-          data.github ?? null,
-          data.twitter ?? null,
-          data.linkedin ?? null,
-          authUser.id,
-        ]
-      );
+      const setClauses: string[] = ["updated_at = NOW()"];
+      const values: any[] = [];
+      let paramIdx = 1;
+
+      if (data.name !== undefined) {
+        setClauses.push(`name = $${paramIdx++}`);
+        values.push(data.name);
+      }
+      if (data.bio !== undefined) {
+        setClauses.push(`bio = $${paramIdx++}`);
+        values.push(data.bio);
+      }
+      if (data.skills !== undefined) {
+        setClauses.push(`skills = $${paramIdx++}`);
+        values.push(data.skills);
+      }
+      if (data.availableForHire !== undefined) {
+        setClauses.push(`available_for_hire = $${paramIdx++}`);
+        values.push(data.availableForHire);
+      }
+      if (data.customHireMessage !== undefined) {
+        setClauses.push(`custom_hire_message = $${paramIdx++}`);
+        values.push(data.customHireMessage);
+      }
+      if (data.company !== undefined) {
+        setClauses.push(`company = $${paramIdx++}`);
+        values.push(data.company);
+      }
+      if (data.location !== undefined) {
+        setClauses.push(`location = $${paramIdx++}`);
+        values.push(data.location);
+      }
+      if (data.website !== undefined) {
+        setClauses.push(`website = $${paramIdx++}`);
+        values.push(data.website);
+      }
+      if (data.github !== undefined) {
+        setClauses.push(`github = $${paramIdx++}`);
+        values.push(data.github);
+      }
+      if (data.twitter !== undefined) {
+        setClauses.push(`twitter = $${paramIdx++}`);
+        values.push(data.twitter);
+      }
+      if (data.linkedin !== undefined) {
+        setClauses.push(`linkedin = $${paramIdx++}`);
+        values.push(data.linkedin);
+      }
+
+      if (setClauses.length > 1) {
+        values.push(authUser.id);
+        const query = `UPDATE profiles SET ${setClauses.join(", ")} WHERE id = $${paramIdx}`;
+        await pool.query(query, values);
+      }
     } catch {
       // Graceful fallback if database connection is offline
     }
@@ -335,6 +389,7 @@ export async function PATCH(req: NextRequest) {
       return (
         !targetUser ||
         pAuthor === targetUser ||
+        pAuthor === "hiroqt" ||
         pAuthor === "arnel" ||
         pAuthor === "arneldev" ||
         targetUser === "developer"

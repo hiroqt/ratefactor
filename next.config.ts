@@ -5,6 +5,12 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   compress: true,
   poweredByHeader: false,
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "@radix-ui/react-slot",
+    ],
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
@@ -46,6 +52,5 @@ export default withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG || "yhels",
   project: process.env.SENTRY_PROJECT || "javascript-nextjs-e0",
   silent: true,
-  disableLogger: true,
 });
 

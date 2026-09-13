@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { marked } from "marked";
-import { Code, Eye, Copy, Check } from "lucide-react";
+import { Code, Eye, Copy, Check } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 
 interface MarkdownRendererProps {
@@ -27,8 +27,12 @@ function sanitizeHtmlOutput(html: string): string {
     .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
     .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, "")
     .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, "")
-    .replace(/\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "") // strip event handlers (onclick, onerror, etc)
-    .replace(/href\s*=\s*["']?javascript:[^"'>]+/gi, 'href="#"');
+    .replace(/<meta\b[^>]*\/?>/gi, "")
+    .replace(/<base\b[^>]*\/?>/gi, "")
+    .replace(/<link\b[^>]*\/?>/gi, "")
+    .replace(/<\/?form\b[^>]*>/gi, "")
+    .replace(/\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "") // strip event handlers (onclick, onerror, onload, etc)
+    .replace(/(?:href|src|action|xlink:href|formaction)\s*=\s*["']?\s*(?:javascript|vbscript):[^"'>]+/gi, 'href="#"');
 }
 
 export function MarkdownRenderer({

@@ -10,7 +10,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion, useReducedMotion, useSpring, useTransform } from "motion/react";
+import { motion, useReducedMotion, useSpring, useTransform } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 // the duration picker's spring, damped so nothing overshoots

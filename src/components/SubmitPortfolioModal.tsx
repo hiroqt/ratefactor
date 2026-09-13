@@ -10,11 +10,10 @@ import {
   AlertCircle, 
   Link as LinkIcon, 
   Github, 
-  Globe,
-  Eye,
-  Plus,
-  Sparkles
-} from "lucide-react";
+  Globe, 
+  Eye, 
+  Plus 
+} from "@/components/ui/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { Portfolio, PortfolioCategory } from "@/types/portfolio";
 import { DeveloperProfile } from "@/types/profile";
@@ -279,8 +278,8 @@ export function SubmitPortfolioModal({
     githubUrl: githubUrl || "https://github.com/user/repo",
     thumbnail,
     author: {
-      name: currentUser?.name || profile?.name || "Arnel Rivera",
-      username: currentUser?.username || profile?.username || "arneldev",
+      name: currentUser?.name || profile?.name || "Developer",
+      username: currentUser?.username || profile?.username || "developer",
       avatar: currentUser?.avatar || profile?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
       role: currentUser?.role || profile?.role || "Principal Architect",
       isVerified: true,
@@ -311,7 +310,7 @@ export function SubmitPortfolioModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-md"
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-md modal-backdrop"
         onClick={onClose}
       />
 
@@ -325,31 +324,31 @@ export function SubmitPortfolioModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 15 }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-2xl bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden z-10 max-h-[90vh] flex flex-col"
+        className="relative w-full max-w-2xl bg-white dark:bg-[#121215] rounded-2xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden z-10 max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="absolute top-0 inset-x-12 h-[1px] bg-gradient-to-r from-transparent via-slate-200 to-transparent pointer-events-none" />
+        <div className="absolute top-0 inset-x-12 h-[1px] bg-gradient-to-r from-transparent via-slate-200 dark:via-white/20 to-transparent pointer-events-none" />
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 bg-slate-50/80 shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 dark:border-white/10 bg-slate-50/80 dark:bg-zinc-900/80 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="p-1.5 rounded-lg bg-slate-100 text-slate-900 border border-slate-200 shrink-0">
+            <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white border border-slate-200 dark:border-zinc-700 shrink-0">
               <Terminal className="w-4 h-4" />
             </div>
-            <h3 id="submit-modal-title" className="font-bold text-slate-900 text-sm truncate">
+            <h3 id="submit-modal-title" className="font-bold text-slate-900 dark:text-white text-sm truncate">
               <span className="hidden sm:inline">Submit Portfolio for Peer Review</span>
               <span className="sm:hidden">Submit Portfolio</span>
             </h3>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center rounded-lg bg-slate-100 p-0.5 border border-slate-200">
+            <div className="flex items-center rounded-lg bg-slate-100 dark:bg-zinc-800 p-0.5 border border-slate-200 dark:border-zinc-700">
               <button
                 type="button"
                 onClick={() => setActiveTab("form")}
                 className={cn(
-                  "px-2.5 sm:px-3 py-1 rounded-md text-xs font-medium transition-all",
-                  activeTab === "form" ? "bg-white text-slate-900 shadow-xs font-semibold" : "text-slate-500 hover:text-slate-800"
+                  "px-2.5 sm:px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer",
+                  activeTab === "form" ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs font-semibold" : "text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200"
                 )}
               >
                 Editor
@@ -358,8 +357,8 @@ export function SubmitPortfolioModal({
                 type="button"
                 onClick={() => setActiveTab("preview")}
                 className={cn(
-                  "px-2.5 sm:px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1",
-                  activeTab === "preview" ? "bg-white text-slate-900 shadow-xs font-semibold" : "text-slate-500 hover:text-slate-800"
+                  "px-2.5 sm:px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 cursor-pointer",
+                  activeTab === "preview" ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs font-semibold" : "text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200"
                 )}
               >
                 <Eye className="w-3 h-3" />
@@ -369,7 +368,7 @@ export function SubmitPortfolioModal({
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors ml-0.5 cursor-pointer"
+              className="p-1.5 rounded-full text-slate-400 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors ml-0.5 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -379,7 +378,7 @@ export function SubmitPortfolioModal({
         {/* Content */}
         <div ref={scrollRef} data-lenis-prevent="true" className="p-4 sm:p-6 flex-1 overflow-y-auto overscroll-contain">
           {error && (
-            <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+            <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>{error}</span>
             </div>
@@ -387,8 +386,8 @@ export function SubmitPortfolioModal({
 
           {activeTab === "preview" ? (
             <div className="space-y-4">
-              <div className="text-xs text-slate-500 font-mono flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <div className="text-xs text-slate-500 dark:text-zinc-400 font-mono flex items-center gap-1.5">
+                <Eye className="w-3.5 h-3.5 text-amber-500" />
                 Live registry rendering preview:
               </div>
               <div className="max-w-md mx-auto">
@@ -402,7 +401,7 @@ export function SubmitPortfolioModal({
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-900 mb-1">
+                <label className="block text-xs font-medium text-slate-900 dark:text-white mb-1">
                   Project Title *
                 </label>
                 <input
@@ -410,13 +409,13 @@ export function SubmitPortfolioModal({
                   placeholder="e.g. Hyperion LSM Engine"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/10 transition-colors shadow-xs"
+                  className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-slate-900 dark:focus:border-zinc-400 focus:ring-1 focus:ring-slate-900/10 dark:focus:ring-white/10 transition-colors shadow-xs"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-900 mb-1">
+                <label className="block text-xs font-medium text-slate-900 dark:text-white mb-1">
                   Tagline / Technical Summary *
                 </label>
                 <input
@@ -424,56 +423,56 @@ export function SubmitPortfolioModal({
                   placeholder="e.g. Embedded Log-Structured Merge tree in Rust with SIMD-accelerated SSTables"
                   value={tagline}
                   onChange={(e) => setTagline(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/10 transition-colors shadow-xs"
+                  className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-slate-900 dark:focus:border-zinc-400 focus:ring-1 focus:ring-slate-900/10 dark:focus:ring-white/10 transition-colors shadow-xs"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-900 mb-1 flex items-center gap-1">
-                    <Globe className="w-3 h-3 text-sky-600" /> Live Demo URL *
+                  <label className="block text-xs font-medium text-slate-900 dark:text-white mb-1 flex items-center gap-1">
+                    <Globe className="w-3 h-3 text-sky-600 dark:text-sky-400" /> Live Demo URL *
                   </label>
                   <input
                     type="url"
                     placeholder="https://example.com"
                     value={portfolioUrl}
                     onChange={(e) => setPortfolioUrl(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/10 transition-colors shadow-xs"
+                    className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-slate-900 dark:focus:border-zinc-400 focus:ring-1 focus:ring-slate-900/10 dark:focus:ring-white/10 transition-colors shadow-xs"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-900 mb-1 flex items-center gap-1">
-                    <Github className="w-3 h-3 text-emerald-600" /> GitHub Repository *
+                  <label className="block text-xs font-medium text-slate-900 dark:text-white mb-1 flex items-center gap-1">
+                    <Github className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> GitHub Repository *
                   </label>
                   <input
                     type="url"
                     placeholder="https://github.com/user/repo"
                     value={githubUrl}
                     onChange={(e) => setGithubUrl(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/10 transition-colors shadow-xs"
+                    className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-slate-900 dark:focus:border-zinc-400 focus:ring-1 focus:ring-slate-900/10 dark:focus:ring-white/10 transition-colors shadow-xs"
                     required
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-900 mb-1">
+                <label className="block text-xs font-medium text-slate-900 dark:text-white mb-1">
                   Primary Domain *
                 </label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as any)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-slate-900 transition-colors shadow-xs"
+                  className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-zinc-400 transition-colors shadow-xs"
                 >
-                  <optgroup label="Portfolio Type">
+                  <optgroup label="Portfolio Type" className="dark:bg-zinc-900 dark:text-white">
                     <option value="Developer">Developer Portfolio</option>
                     <option value="Arts">Arts Portfolio</option>
                     <option value="Client">Client Portfolio</option>
                   </optgroup>
-                  <optgroup label="Technical Domain">
+                  <optgroup label="Technical Domain" className="dark:bg-zinc-900 dark:text-white">
                     <option value="Frontend">Frontend Architecture</option>
                     <option value="Systems">Systems &amp; Low-Level</option>
                     <option value="Fullstack">Fullstack / Cloud</option>
@@ -487,16 +486,16 @@ export function SubmitPortfolioModal({
               {/* Single Image Upload (Max 2 MB, 1 Image Only) */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-medium text-slate-900">
+                  <label className="block text-xs font-medium text-slate-900 dark:text-white">
                     Cover Banner Image *
                   </label>
-                  <span className="text-[11px] text-slate-500 font-mono">
+                  <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-mono">
                     Max 2 MB (PNG, JPG, WebP)
                   </span>
                 </div>
 
                 {/* File Upload Dropzone */}
-                <div className="relative border-2 border-dashed border-slate-200 hover:border-slate-300 rounded-xl p-3 text-center transition bg-slate-50/50">
+                <div className="relative border-2 border-dashed border-slate-200 dark:border-zinc-700 hover:border-slate-300 dark:hover:border-zinc-500 rounded-xl p-3 text-center transition bg-slate-50/50 dark:bg-zinc-900/50">
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
@@ -504,30 +503,30 @@ export function SubmitPortfolioModal({
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                   />
                   <div className="flex flex-col items-center justify-center gap-1 py-1">
-                    <Upload className="w-5 h-5 text-slate-400" />
-                    <p className="text-xs font-medium text-slate-700">
+                    <Upload className="w-5 h-5 text-slate-400 dark:text-zinc-500" />
+                    <p className="text-xs font-medium text-slate-700 dark:text-zinc-300">
                       Click or drag & drop custom cover image
                     </p>
-                    <p className="text-[10px] text-slate-500 font-mono">
+                    <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-mono">
                       PNG, JPG or WebP strictly up to 2.00 MB
                     </p>
                   </div>
                 </div>
 
                 {fileUploadError && (
-                  <p className="mt-1.5 text-xs text-rose-600 font-medium flex items-center gap-1">
+                  <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5" />
                     {fileUploadError}
                   </p>
                 )}
 
                 {uploadedFile && (
-                  <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs">
+                  <div className="mt-2 p-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2 truncate">
-                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span className="font-mono text-emerald-800 truncate">{uploadedFile.name}</span>
+                      <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span className="font-mono text-emerald-800 dark:text-emerald-300 truncate">{uploadedFile.name}</span>
                     </div>
-                    <span className="text-[10px] font-mono text-emerald-600 shrink-0">
+                    <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 shrink-0">
                       {(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB / 2.00 MB
                     </span>
                   </div>
@@ -535,7 +534,7 @@ export function SubmitPortfolioModal({
 
                 {/* Or choose from Presets */}
                 <div className="mt-3">
-                  <span className="text-[11px] font-mono text-slate-400 block mb-1">
+                  <span className="text-[11px] font-mono text-slate-400 dark:text-zinc-500 block mb-1">
                     Or select a verified preset banner:
                   </span>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -549,8 +548,8 @@ export function SubmitPortfolioModal({
                         className={cn(
                           "relative aspect-[16/10] rounded-xl overflow-hidden border cursor-pointer group transition-all",
                           thumbnail === thumb.url && !uploadedFile
-                            ? "border-slate-900 ring-2 ring-slate-900/20 shadow-md"
-                            : "border-slate-200 hover:border-slate-300"
+                            ? "border-slate-900 dark:border-white ring-2 ring-slate-900/20 dark:ring-white/20 shadow-md"
+                            : "border-slate-200 dark:border-zinc-700 hover:border-slate-300 dark:hover:border-zinc-500"
                         )}
                       >
                         <img
@@ -564,7 +563,7 @@ export function SubmitPortfolioModal({
                           </span>
                         </div>
                         {thumbnail === thumb.url && !uploadedFile && (
-                          <div className="absolute top-1.5 right-1.5 p-0.5 rounded-full bg-slate-900 text-white">
+                          <div className="absolute top-1.5 right-1.5 p-0.5 rounded-full bg-slate-900 dark:bg-white text-white dark:text-zinc-900">
                             <Check className="w-2.5 h-2.5 stroke-[3]" />
                           </div>
                         )}
@@ -576,20 +575,20 @@ export function SubmitPortfolioModal({
 
               {/* Tech Stack Chips */}
               <div>
-                <label className="block text-xs font-medium text-slate-900 mb-1.5">
+                <label className="block text-xs font-medium text-slate-900 dark:text-white mb-1.5">
                   Technology Stack Tags *
                 </label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {techStack.map((tech) => (
                     <span
                       key={tech}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 text-xs font-mono"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-zinc-200 text-xs font-mono"
                     >
                       <span>{tech}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveTech(tech)}
-                        className="hover:text-rose-600"
+                        className="hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -598,14 +597,14 @@ export function SubmitPortfolioModal({
                 </div>
 
                 <div className="flex items-center gap-1.5 flex-wrap text-xs">
-                  <span className="text-[11px] font-mono text-slate-400">Suggestions:</span>
+                  <span className="text-[11px] font-mono text-slate-400 dark:text-zinc-500">Suggestions:</span>
                   {SUGGESTED_TECHS.map((tech) => (
                     <button
                       key={tech}
                       type="button"
                       onClick={() => handleAddTech(tech)}
                       disabled={techStack.includes(tech)}
-                      className="px-2 py-0.5 rounded-md bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 text-[11px] font-mono disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                      className="px-2 py-0.5 rounded-md bg-slate-50 dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white text-[11px] font-mono disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
                     >
                       +{tech}
                     </button>
@@ -616,16 +615,16 @@ export function SubmitPortfolioModal({
               {/* Description — Optional, min 200 chars if provided */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-medium text-slate-900">
-                    Description <span className="text-slate-400 font-normal">(optional)</span>
+                  <label className="block text-xs font-medium text-slate-900 dark:text-white">
+                    Description <span className="text-slate-400 dark:text-zinc-500 font-normal">(optional)</span>
                   </label>
                   {descriptionChars > 0 && (
                     <span
                       className={cn(
                         "text-[11px] font-mono px-2 py-0.5 rounded font-medium",
                         descriptionChars >= MIN_DESCRIPTION_CHARACTERS
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-amber-100 text-amber-800"
+                          ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300"
+                          : "bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300"
                       )}
                     >
                       {descriptionChars} / {MIN_DESCRIPTION_CHARACTERS} chars
@@ -637,10 +636,10 @@ export function SubmitPortfolioModal({
                   placeholder="Optional — add context about your portfolio, process, or approach (if provided, must be at least 200 characters)..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl p-3.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/10 transition-colors resize-none shadow-xs"
+                  className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl p-3.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-slate-900 dark:focus:border-zinc-400 focus:ring-1 focus:ring-slate-900/10 dark:focus:ring-white/10 transition-colors resize-none shadow-xs"
                 />
                 {descriptionChars > 0 && descriptionChars < MIN_DESCRIPTION_CHARACTERS && (
-                  <p className="text-[11px] text-amber-600 font-mono mt-1 flex items-center gap-1">
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 font-mono mt-1 flex items-center gap-1">
                     <AlertCircle className="w-3 h-3 flex-shrink-0" />
                     <span>
                       Description needs at least {MIN_DESCRIPTION_CHARACTERS - descriptionChars} more character{MIN_DESCRIPTION_CHARACTERS - descriptionChars !== 1 ? "s" : ""}, or clear it entirely.
@@ -648,7 +647,7 @@ export function SubmitPortfolioModal({
                   </p>
                 )}
                 {descriptionChars >= MIN_DESCRIPTION_CHARACTERS && (
-                  <p className="text-[11px] text-emerald-600 font-mono mt-1 flex items-center gap-1">
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono mt-1 flex items-center gap-1">
                     <Check className="w-3 h-3 flex-shrink-0" />
                     <span>Description length looks good ({descriptionChars} characters).</span>
                   </p>
@@ -656,12 +655,12 @@ export function SubmitPortfolioModal({
               </div>
 
               {/* Request Roast / In-Depth Critique Toggle */}
-              <div className="p-3.5 rounded-xl bg-orange-50/70 border border-orange-200/80 flex items-start justify-between gap-3">
+              <div className="p-3.5 rounded-xl bg-orange-50/70 dark:bg-orange-950/30 border border-orange-200/80 dark:border-orange-800/50 flex items-start justify-between gap-3">
                 <div className="space-y-0.5">
-                  <label htmlFor="request-critique-toggle" className="text-xs font-semibold text-slate-900 flex items-center gap-1.5 cursor-pointer">
+                  <label htmlFor="request-critique-toggle" className="text-xs font-semibold text-slate-900 dark:text-orange-200 flex items-center gap-1.5 cursor-pointer">
                     <span>🔥 Request Roast / In-Depth Critique</span>
                   </label>
-                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                  <p className="text-[11px] text-slate-600 dark:text-orange-300/80 leading-relaxed">
                     Signal to reviewers that you actively welcome rigorous, no-holds-barred constructive critique, UX tear-downs, and code architecture feedback.
                   </p>
                 </div>
@@ -679,14 +678,14 @@ export function SubmitPortfolioModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-full sm:w-auto px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-xs font-medium transition-colors text-center cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2 rounded-lg border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-zinc-800 text-xs font-medium transition-colors text-center cursor-pointer"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer text-center"
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-slate-900 dark:bg-white hover:bg-black dark:hover:bg-zinc-200 text-white dark:text-zinc-900 text-xs font-semibold shadow-xs transition-colors cursor-pointer text-center"
                 >
                   Submit for Peer Review
                 </button>

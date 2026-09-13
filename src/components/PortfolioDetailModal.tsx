@@ -14,34 +14,23 @@ import {
   Flag, 
   Flame, 
   CheckCircle2, 
-  Cpu,
-  Layers,
-  Zap,
-  BookOpen,
-  Sparkles,
-  AlertCircle
-} from "lucide-react";
+  Cpu, 
+  Layers, 
+  Zap, 
+  BookOpen, 
+  Award, 
+  AlertCircle 
+} from "@/components/ui/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { Portfolio, CommentItem, RatingBreakdown, CritiqueTag, CRITIQUE_TAG_CONFIG } from "@/types/portfolio";
 import { RatingWidget } from "./RatingWidget";
-import { cn, formatNumber, timeAgo, formatRating } from "@/lib/utils";
+import { cn, formatNumber, timeAgo, formatRating, normalizeAvatarUrl } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
 import { validateCommentContent, MIN_COMMENT_LENGTH } from "@/lib/guardrails";
 import { EmojiReaction } from "@/components/ui/emoji-reaction";
+import { EMOJI_MAP, getEmojiDisplay } from "@/lib/emoji-utils";
 
-export const EMOJI_MAP: Record<string, string> = {
-  "star-struck": "🤩",
-  "smiling-face-with-hearts": "🥰",
-  "neutral-face": "😐",
-  "thumbs-up": "👍",
-  "fire": "🔥",
-  "rocket": "🚀",
-};
-
-export function getEmojiDisplay(name?: string) {
-  if (!name) return "🤩";
-  return EMOJI_MAP[name] || name;
-}
+export { EMOJI_MAP, getEmojiDisplay };
 
 interface PortfolioDetailModalProps {
   portfolio: Portfolio | null;
@@ -217,12 +206,12 @@ export function PortfolioDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 overflow-hidden">
-      {/* Frosted Backdrop */}
+      {/* Deep Occluding Backdrop */}
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-md transition-opacity" 
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-md modal-backdrop transition-opacity" 
         onClick={onClose}
       />
 
@@ -237,20 +226,20 @@ export function PortfolioDetailModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 15 }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden z-10"
+        className="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-white dark:bg-[#121215] rounded-2xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden z-10"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Specular Edge */}
-        <div className="absolute top-0 inset-x-12 h-[1px] bg-gradient-to-r from-transparent via-slate-200 to-transparent pointer-events-none" />
+        <div className="absolute top-0 inset-x-12 h-[1px] bg-gradient-to-r from-transparent via-slate-200 dark:via-white/20 to-transparent pointer-events-none" />
 
         {/* Header Bar */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 bg-slate-50/80 shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 dark:border-white/10 bg-slate-50/80 dark:bg-zinc-900/80 shrink-0">
           <div className="flex items-center gap-2.5">
-            <span className="text-xs font-mono text-slate-500 uppercase tracking-wider">
+            <span className="text-xs font-mono text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
               Architecture Analysis
             </span>
-            <span className="text-slate-300">•</span>
-            <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200 font-medium">
+            <span className="text-slate-300 dark:text-zinc-600">•</span>
+            <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 font-medium">
               {portfolio.category}
             </span>
           </div>
@@ -258,7 +247,7 @@ export function PortfolioDetailModal({
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-200 transition-colors cursor-pointer"
+              className="p-1.5 rounded-full text-slate-400 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               aria-label="Close modal"
             >
               <X className="w-5 h-5" />
@@ -271,15 +260,15 @@ export function PortfolioDetailModal({
           
           {/* Top Showcase Spotlight Banner if present */}
           {portfolio.isShowcase && (
-            <div className="p-3.5 sm:p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
-              <div className="p-1.5 rounded-lg bg-amber-100 text-amber-700 flex-shrink-0">
+            <div className="p-3.5 sm:p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 flex items-start gap-3">
+              <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 flex-shrink-0">
                 <Flame className="w-4 h-4" />
               </div>
               <div className="text-xs">
-                <strong className="text-amber-900 font-semibold text-sm block">
+                <strong className="text-amber-900 dark:text-amber-200 font-semibold text-sm block">
                   {portfolio.showcaseType === "daily" ? "Daily Showcase Spotlight" : "Weekly Showcase Champion"}
                 </strong>
-                <p className="text-amber-800 mt-0.5 leading-relaxed">
+                <p className="text-amber-800 dark:text-amber-300/90 mt-0.5 leading-relaxed">
                   {portfolio.showcaseReason}
                 </p>
               </div>
@@ -288,16 +277,16 @@ export function PortfolioDetailModal({
 
           {/* Roast / In-Depth Critique Beacon Banner */}
           {portfolio.requestCritique && (
-            <div className="p-3.5 sm:p-4 rounded-xl bg-orange-50 border border-orange-200 flex items-start gap-3">
-              <div className="p-1.5 rounded-lg bg-orange-100 text-orange-700 flex-shrink-0">
+            <div className="p-3.5 sm:p-4 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800/60 flex items-start gap-3">
+              <div className="p-1.5 rounded-lg bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 flex-shrink-0">
                 <Flame className="w-4 h-4" />
               </div>
               <div className="text-xs">
-                <strong className="text-orange-900 font-semibold text-sm block flex items-center gap-1.5">
+                <strong className="text-orange-900 dark:text-orange-200 font-semibold text-sm block flex items-center gap-1.5">
                   <span>🔥 Roast / In-Depth Critique Requested</span>
                   <span className="inline-block w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
                 </strong>
-                <p className="text-orange-800 mt-0.5 leading-relaxed">
+                <p className="text-orange-800 dark:text-orange-300/90 mt-0.5 leading-relaxed">
                   The author specifically invites rigorous, constructive feedback, UX tear-downs, and architectural reviews.
                 </p>
               </div>
@@ -307,10 +296,10 @@ export function PortfolioDetailModal({
           {/* Project Title & Author Row */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
             <div>
-              <h2 id="portfolio-modal-title" className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-900">
+              <h2 id="portfolio-modal-title" className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white">
                 {portfolio.title}
               </h2>
-              <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
+              <p className="text-base sm:text-[19px] text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed font-normal">
                 {portfolio.tagline}
               </p>
             </div>
@@ -322,11 +311,11 @@ export function PortfolioDetailModal({
                   href={portfolio.githubUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium border border-slate-200 transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 text-xs font-medium border border-slate-200 dark:border-zinc-700 transition-all cursor-pointer"
                 >
                   <Github className="w-4 h-4" />
                   <span>GitHub</span>
-                  <ExternalLink className="w-3 h-3 text-muted" />
+                  <ExternalLink className="w-3 h-3 text-slate-400 dark:text-zinc-500" />
                 </a>
               )}
 
@@ -335,7 +324,7 @@ export function PortfolioDetailModal({
                   href={portfolio.portfolioUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold shadow-xs transition-all"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-slate-900 dark:bg-white hover:bg-black dark:hover:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-semibold shadow-xs transition-all"
                 >
                   <span>Launch Live</span>
                   <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -345,22 +334,26 @@ export function PortfolioDetailModal({
           </div>
 
           {/* Author Card */}
-          <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+          <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-900/60 border border-slate-200 dark:border-white/10">
             <div className="flex items-center gap-3 min-w-0">
               <img
-                src={portfolio.author.avatar}
+                src={normalizeAvatarUrl(portfolio.author.avatar, portfolio.author.username)}
                 alt={portfolio.author.name}
-                className="w-10 h-10 rounded-full object-cover ring-1 ring-slate-200 shrink-0"
+                className="w-10 h-10 rounded-full object-cover ring-1 ring-slate-200 dark:ring-zinc-700 shrink-0"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src =
+                    "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80";
+                }}
               />
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-sm font-semibold text-slate-900 truncate">{portfolio.author.name}</span>
+                  <span className="text-sm font-semibold text-slate-900 dark:text-white truncate">{portfolio.author.name}</span>
                   {portfolio.author.isVerified && (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   )}
-                  <span className="text-xs font-mono text-slate-500 truncate">@{portfolio.author.username}</span>
+                  <span className="text-xs font-mono text-slate-500 dark:text-zinc-400 truncate">@{portfolio.author.username}</span>
                 </div>
-                <div className="text-xs text-slate-500 truncate">{portfolio.author.role}</div>
+                <div className="text-xs text-slate-500 dark:text-zinc-400 truncate">{portfolio.author.role}</div>
               </div>
             </div>
 
@@ -377,8 +370,8 @@ export function PortfolioDetailModal({
                       className={cn(
                         "flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-mono transition-all cursor-pointer",
                         portfolio.userReaction === emoji
-                          ? "bg-slate-900 border-slate-900 text-white shadow-xs"
-                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                          ? "bg-slate-900 dark:bg-white border-slate-900 dark:border-white text-white dark:text-zinc-900 shadow-xs"
+                          : "bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-700"
                       )}
                       title={`Reacted ${getEmojiDisplay(emoji)} (${count})`}
                     >
@@ -399,8 +392,8 @@ export function PortfolioDetailModal({
                   className={cn(
                     "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-xs font-medium transition-all cursor-pointer",
                     isLiked
-                      ? "bg-amber-50 border-amber-300 text-amber-900 shadow-xs font-semibold"
-                      : "bg-slate-50 border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                      ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 shadow-xs font-semibold"
+                      : "bg-slate-50 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-700"
                   )}
                   aria-label="React to architecture"
                 >
@@ -408,7 +401,7 @@ export function PortfolioDetailModal({
                   {likesCount > 0 ? (
                     <span className="font-mono tabular-nums font-semibold">{formatNumber(likesCount)}</span>
                   ) : (
-                    <span className="font-medium text-slate-600">React</span>
+                    <span className="font-medium text-slate-600 dark:text-zinc-400">React</span>
                   )}
                 </button>
               </EmojiReaction>
@@ -416,7 +409,7 @@ export function PortfolioDetailModal({
           </div>
 
           {/* Project Media Preview */}
-          <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm">
+          <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-zinc-900 shadow-sm">
             <img
               src={portfolio.thumbnail}
               alt={portfolio.title}
@@ -425,14 +418,14 @@ export function PortfolioDetailModal({
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex items-center gap-1.5 border-b border-slate-100 pb-2 overflow-x-auto no-scrollbar scrollbar-none">
+          <div className="flex items-center gap-1.5 border-b border-slate-100 dark:border-white/10 pb-2 overflow-x-auto no-scrollbar scrollbar-none">
             <button
               onClick={() => setActiveTab("overview")}
               className={cn(
                 "px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer shrink-0",
                 activeTab === "overview"
-                  ? "bg-slate-900 text-white font-semibold shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  ? "bg-slate-900 dark:bg-white text-white dark:text-zinc-900 font-semibold shadow-xs"
+                  : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800"
               )}
             >
               <span>Overview</span>
@@ -443,8 +436,8 @@ export function PortfolioDetailModal({
               className={cn(
                 "px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer shrink-0",
                 activeTab === "reviews"
-                  ? "bg-slate-900 text-white font-semibold shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  ? "bg-slate-900 dark:bg-white text-white dark:text-zinc-900 font-semibold shadow-xs"
+                  : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800"
               )}
             >
               <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
@@ -457,11 +450,11 @@ export function PortfolioDetailModal({
               className={cn(
                 "px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer shrink-0",
                 activeTab === "discussion"
-                  ? "bg-slate-900 text-white font-semibold shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  ? "bg-slate-900 dark:bg-white text-white dark:text-zinc-900 font-semibold shadow-xs"
+                  : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800"
               )}
             >
-              <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
+              <MessageSquare className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
               <span>Discussion ({portfolio.commentsCount})</span>
             </button>
           </div>
@@ -470,23 +463,23 @@ export function PortfolioDetailModal({
           {activeTab === "overview" && (
             <div className="space-y-4">
               <div>
-                <h4 className="text-xs font-mono uppercase text-slate-500 tracking-wider mb-2">
+                <h4 className="text-xs font-mono uppercase text-slate-500 dark:text-zinc-400 tracking-wider mb-2">
                   Technical Architecture &amp; Execution
                 </h4>
-                <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-line bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <p className="text-base sm:text-[19px] text-slate-800 dark:text-zinc-200 leading-relaxed whitespace-pre-line bg-slate-50 dark:bg-zinc-900/60 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-white/10 font-normal">
                   {portfolio.description}
                 </p>
               </div>
 
               <div>
-                <h4 className="text-xs font-mono uppercase text-slate-500 tracking-wider mb-2">
+                <h4 className="text-xs font-mono uppercase text-slate-500 dark:text-zinc-400 tracking-wider mb-2">
                   Technologies &amp; Frameworks
                 </h4>
                 <div className="flex flex-wrap gap-2">
                   {portfolio.techStack.map((tech) => (
                     <span
                       key={tech}
-                      className="px-3 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 text-xs font-mono font-medium"
+                      className="px-3 py-1 rounded-lg bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-zinc-200 text-xs font-mono font-medium"
                     >
                       {tech}
                     </span>
@@ -500,31 +493,31 @@ export function PortfolioDetailModal({
           {activeTab === "reviews" && (
             <div className="space-y-6">
               {/* Aggregate Score Card */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-900/60 border border-slate-200 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="text-center">
-                    <div className="text-4xl font-mono font-bold text-amber-800 tabular-nums">
+                    <div className="text-4xl font-mono font-bold text-amber-800 dark:text-amber-400 tabular-nums">
                       {portfolio.rating.toFixed(2)}
                     </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">out of 5.0</div>
+                    <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">out of 5.0</div>
                   </div>
-                  <div className="border-l border-slate-200 pl-4 space-y-1">
+                  <div className="border-l border-slate-200 dark:border-zinc-700 pl-4 space-y-1">
                     <RatingWidget
                       currentRating={portfolio.rating}
                       ratingCount={portfolio.ratingCount}
                       breakdown={portfolio.ratingBreakdown}
                       interactive={false}
                     />
-                    <div className="text-[11px] text-slate-500">
+                    <div className="text-[11px] text-slate-500 dark:text-zinc-400">
                       Aggregated across {portfolio.ratingCount} peer critiques
                     </div>
                   </div>
                 </div>
 
                 {userRating && (
-                  <div className="text-right sm:border-l sm:border-slate-200 sm:pl-4">
-                    <div className="text-xs font-mono text-emerald-700">Your Evaluation</div>
-                    <div className="text-xl font-mono font-bold text-slate-900 tabular-nums">
+                  <div className="text-right sm:border-l sm:border-slate-200 dark:sm:border-zinc-700 sm:pl-4">
+                    <div className="text-xs font-mono text-emerald-700 dark:text-emerald-400">Your Evaluation</div>
+                    <div className="text-xl font-mono font-bold text-slate-900 dark:text-white tabular-nums">
                       {userRating.toFixed(2)}★
                     </div>
                   </div>
@@ -533,19 +526,19 @@ export function PortfolioDetailModal({
 
               {/* Multi-Criteria Evaluation */}
               <div className="space-y-3">
-                <h4 className="text-xs font-mono uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                <h4 className="text-xs font-mono uppercase text-slate-500 dark:text-zinc-400 tracking-wider flex items-center gap-1.5">
+                  <Award className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                   Evaluate This Architecture (Tap Stars to Rate)
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {/* Design & UI/UX */}
-                  <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200 space-y-2">
+                  <div className="p-3.5 rounded-2xl bg-slate-50/70 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/10 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-900 flex items-center gap-1.5">
-                        <Layers className="w-4 h-4 text-amber-600" /> Design &amp; UI/UX
+                      <span className="text-xs font-medium text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <Layers className="w-4 h-4 text-amber-600 dark:text-amber-400" /> Design &amp; UI/UX
                       </span>
-                      <span className="text-xs font-mono font-bold text-amber-700 tabular-nums">
+                      <span className="text-xs font-mono font-bold text-amber-700 dark:text-amber-400 tabular-nums">
                         {criteria.design.toFixed(1)} / 5.0
                       </span>
                     </div>
@@ -563,7 +556,7 @@ export function PortfolioDetailModal({
                               "w-4 h-4",
                               criteria.design >= star
                                 ? "fill-amber-500 text-amber-500"
-                                : "fill-slate-100 text-slate-300"
+                                : "fill-slate-100 dark:fill-zinc-800 text-slate-300 dark:text-zinc-700"
                             )}
                           />
                         </button>
@@ -572,12 +565,12 @@ export function PortfolioDetailModal({
                   </div>
 
                   {/* Code Quality */}
-                  <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200 space-y-2">
+                  <div className="p-3.5 rounded-2xl bg-slate-50/70 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/10 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-900 flex items-center gap-1.5">
-                        <Cpu className="w-4 h-4 text-slate-700" /> Code Architecture
+                      <span className="text-xs font-medium text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <Cpu className="w-4 h-4 text-slate-700 dark:text-zinc-300" /> Code Architecture
                       </span>
-                      <span className="text-xs font-mono font-bold text-slate-900 tabular-nums">
+                      <span className="text-xs font-mono font-bold text-slate-900 dark:text-white tabular-nums">
                         {criteria.codeQuality.toFixed(1)} / 5.0
                       </span>
                     </div>
@@ -595,7 +588,7 @@ export function PortfolioDetailModal({
                               "w-4 h-4",
                               criteria.codeQuality >= star
                                 ? "fill-amber-500 text-amber-500"
-                                : "fill-slate-100 text-slate-300"
+                                : "fill-slate-100 dark:fill-zinc-800 text-slate-300 dark:text-zinc-700"
                             )}
                           />
                         </button>
@@ -604,12 +597,12 @@ export function PortfolioDetailModal({
                   </div>
 
                   {/* Performance */}
-                  <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200 space-y-2">
+                  <div className="p-3.5 rounded-2xl bg-slate-50/70 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/10 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-900 flex items-center gap-1.5">
-                        <Zap className="w-4 h-4 text-emerald-600" /> Performance &amp; Latency
+                      <span className="text-xs font-medium text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <Zap className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Performance &amp; Latency
                       </span>
-                      <span className="text-xs font-mono font-bold text-emerald-700 tabular-nums">
+                      <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
                         {criteria.performance.toFixed(1)} / 5.0
                       </span>
                     </div>
@@ -627,7 +620,7 @@ export function PortfolioDetailModal({
                               "w-4 h-4",
                               criteria.performance >= star
                                 ? "fill-amber-500 text-amber-500"
-                                : "fill-slate-100 text-slate-300"
+                                : "fill-slate-100 dark:fill-zinc-800 text-slate-300 dark:text-zinc-700"
                             )}
                           />
                         </button>
@@ -636,12 +629,12 @@ export function PortfolioDetailModal({
                   </div>
 
                   {/* Documentation */}
-                  <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200 space-y-2">
+                  <div className="p-3.5 rounded-2xl bg-slate-50/70 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/10 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-900 flex items-center gap-1.5">
-                        <BookOpen className="w-4 h-4 text-sky-600" /> Documentation
+                      <span className="text-xs font-medium text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <BookOpen className="w-4 h-4 text-sky-600 dark:text-sky-400" /> Documentation
                       </span>
-                      <span className="text-xs font-mono font-bold text-sky-700 tabular-nums">
+                      <span className="text-xs font-mono font-bold text-sky-700 dark:text-sky-400 tabular-nums">
                         {(criteria.documentation ?? 5).toFixed(1)} / 5.0
                       </span>
                     </div>
@@ -659,7 +652,7 @@ export function PortfolioDetailModal({
                               "w-4 h-4",
                               (criteria.documentation ?? 5) >= star
                                 ? "fill-amber-500 text-amber-500"
-                                : "fill-slate-100 text-slate-300"
+                                : "fill-slate-100 dark:fill-zinc-800 text-slate-300 dark:text-zinc-700"
                             )}
                           />
                         </button>
@@ -677,14 +670,14 @@ export function PortfolioDetailModal({
               {/* Comment Input */}
               <form onSubmit={handleCommentSubmit} className="space-y-3">
                 {commentError && (
-                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                  <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 text-xs flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
                     <span>{commentError}</span>
                   </div>
                 )}
 
                 {!currentUser && (
-                  <div className="p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-800 text-xs flex items-center justify-between">
+                  <div className="p-3 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-300 text-xs flex items-center justify-between">
                     <span>You are browsing as a guest. Sign in with GitHub or Email to post peer critiques and rating breakdown.</span>
                     <button
                       type="button"
@@ -698,7 +691,7 @@ export function PortfolioDetailModal({
 
                 {/* Critique Category Tag Selector */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-mono text-slate-500 uppercase tracking-wider block">
+                  <label className="text-[11px] font-mono text-slate-500 dark:text-zinc-400 uppercase tracking-wider block">
                     Feedback Category (Optional):
                   </label>
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -715,8 +708,8 @@ export function PortfolioDetailModal({
                           className={cn(
                             "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono transition-all cursor-pointer border",
                             isSelected
-                              ? cn(cfg.badgeClass, "ring-2 ring-slate-900 ring-offset-1 font-semibold shadow-xs")
-                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                              ? cn(cfg.badgeClass, "ring-2 ring-slate-900 dark:ring-white ring-offset-1 dark:ring-offset-zinc-900 font-semibold shadow-xs")
+                              : "bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-700"
                           )}
                         >
                           <span>{cfg.emoji}</span>
@@ -737,16 +730,16 @@ export function PortfolioDetailModal({
                     }
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white resize-none transition-colors"
+                    className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl p-3.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-slate-400 dark:focus:border-zinc-500 focus:bg-white dark:focus:bg-zinc-800 resize-none transition-colors"
                   />
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-[11px] text-slate-400 font-mono">
+                    <span className="text-[11px] text-slate-400 dark:text-zinc-500 font-mono">
                       Markdown supported • Constructive peer review enforced
                     </span>
                     <button
                       type="submit"
                       disabled={!commentText.trim()}
-                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-slate-900 hover:bg-neutral-800 disabled:opacity-50 disabled:pointer-events-none text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
+                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-slate-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-zinc-200 disabled:opacity-50 disabled:pointer-events-none text-white dark:text-zinc-900 text-xs font-semibold shadow-md transition-all cursor-pointer"
                     >
                       <Send className="w-3.5 h-3.5 stroke-[2.5]" />
                       <span>Post Critique</span>
@@ -758,30 +751,34 @@ export function PortfolioDetailModal({
               {/* Comment Threads */}
               <div className="space-y-3">
                 {portfolio.comments.length === 0 ? (
-                  <div className="text-center py-8 border border-dashed border-slate-200 rounded-2xl text-slate-400 text-xs">
+                  <div className="text-center py-8 border border-dashed border-slate-200 dark:border-zinc-800 rounded-2xl text-slate-400 dark:text-zinc-500 text-xs">
                     No critique posted yet. Initiate the peer review dialogue!
                   </div>
                 ) : (
                   portfolio.comments.map((comment) => (
                     <div
                       key={comment.id}
-                      className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2"
+                      className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-900/60 border border-slate-200 dark:border-white/10 space-y-2"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 flex-wrap">
                           <img
-                            src={comment.authorAvatar}
+                            src={normalizeAvatarUrl(comment.authorAvatar, comment.authorUsername)}
                             alt={comment.authorName}
-                            className="w-6 h-6 rounded-full object-cover ring-1 ring-slate-200"
+                            className="w-6 h-6 rounded-full object-cover ring-1 ring-slate-200 dark:ring-zinc-700"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src =
+                                "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80";
+                            }}
                           />
-                          <span className="text-xs font-semibold text-slate-900">
+                          <span className="text-xs font-semibold text-slate-900 dark:text-white">
                             {comment.authorName}
                           </span>
-                          <span className="text-[11px] font-mono text-slate-400">
+                          <span className="text-[11px] font-mono text-slate-400 dark:text-zinc-500">
                             @{comment.authorUsername}
                           </span>
-                          <span className="text-slate-300 text-xs">•</span>
-                          <span className="text-[11px] text-slate-400">
+                          <span className="text-slate-300 dark:text-zinc-600 text-xs">•</span>
+                          <span className="text-[11px] text-slate-400 dark:text-zinc-500">
                             {timeAgo(comment.createdAt)}
                           </span>
 
@@ -803,7 +800,7 @@ export function PortfolioDetailModal({
                             type="button"
                             onClick={() => handleReportComment(comment.id)}
                             className={cn(
-                              "p-1 rounded-md text-slate-400 hover:text-slate-700 text-xs transition-colors cursor-pointer",
+                              "p-1 rounded-md text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 text-xs transition-colors cursor-pointer",
                               reportedComments[comment.id] && "text-rose-500 pointer-events-none"
                             )}
                             title={reportedComments[comment.id] ? "Reported to moderator" : "Report comment"}
@@ -821,7 +818,7 @@ export function PortfolioDetailModal({
                             <button
                               type="button"
                               onClick={() => onDeleteComment(portfolio.id, comment.id)}
-                              className="p-1 rounded-md text-slate-400 hover:text-rose-600 text-xs transition-colors cursor-pointer"
+                              className="p-1 rounded-md text-slate-400 dark:text-zinc-500 hover:text-rose-600 dark:hover:text-rose-400 text-xs transition-colors cursor-pointer"
                               title="Delete comment"
                               aria-label="Delete your comment"
                             >
@@ -831,12 +828,12 @@ export function PortfolioDetailModal({
                         </div>
                       </div>
 
-                      <p className="text-xs text-slate-700 leading-relaxed pl-8">
+                      <p className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed pl-8">
                         {comment.content}
                       </p>
 
                       {reportedComments[comment.id] && (
-                        <div className="pl-8 text-[11px] font-mono text-rose-600">
+                        <div className="pl-8 text-[11px] font-mono text-rose-600 dark:text-rose-400">
                           ✓ Comment flagged for moderator review.
                         </div>
                       )}
@@ -850,14 +847,14 @@ export function PortfolioDetailModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between text-xs text-slate-500 shrink-0">
+        <div className="px-6 py-3.5 border-t border-slate-100 dark:border-white/10 bg-slate-50/80 dark:bg-zinc-900/80 flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 shrink-0">
           <span className="font-mono text-[11px]">
             Registry ID: {portfolio.id} • Indexed {timeAgo(portfolio.createdAt)}
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 transition-colors font-medium text-xs cursor-pointer"
+            className="px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 transition-colors font-medium text-xs cursor-pointer"
           >
             Close Blueprint
           </button>

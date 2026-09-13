@@ -74,12 +74,38 @@ export async function POST(req: NextRequest | Request) {
 }
 
 export async function GET(req: NextRequest | Request) {
+  const url = new URL(req.url);
+
+  // Fast-path /get-session for guest users without waiting for database connection pool
+  if (url.pathname.endsWith("/get-session") || url.pathname.includes("/get-session")) {
+    const cookieHeader = req.headers.get("cookie") || "";
+    const authHeader = req.headers.get("authorization") || "";
+    const hasSessionCookie =
+      cookieHeader.includes("session_token") ||
+      cookieHeader.includes("better-auth.session") ||
+      cookieHeader.includes("ratefactor_session");
+
+    if (!hasSessionCookie && !authHeader) {
+      return NextResponse.json(null, {
+        status: 200,
+        headers: {
+          "Cache-Control": "private, no-cache, no-store, max-age=0, must-revalidate",
+        },
+      });
+    }
+  }
+
   try {
     return await betterAuthHandlers.GET(req as any);
   } catch (error: any) {
     console.error("[Auth API Route GET Error]:", error);
     return NextResponse.json(
-      { error: error?.message || "Internal Server Error", stack: error?.stack },
+      {
+        type: "https://ratefactor.dev/errors/internal",
+        title: "Internal Server Error",
+        status: 500,
+        detail: "An unexpected authentication error occurred.",
+      },
       { status: 500 }
     );
   }

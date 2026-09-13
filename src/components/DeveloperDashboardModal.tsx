@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { useModalSmoothScroll } from "@/hooks/useModalSmoothScroll";
-import { X } from "lucide-react";
+import { X } from "@/components/ui/icons";
 import { motion } from "framer-motion";
 import { Portfolio } from "@/types/portfolio";
 import { DeveloperProfile } from "@/types/profile";
@@ -82,7 +82,7 @@ export function DeveloperDashboardModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-md"
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-md modal-backdrop"
         onClick={onClose}
       />
 

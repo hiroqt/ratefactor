@@ -4,14 +4,35 @@ import React, { createContext, useContext, useState, useCallback } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Toast, ToastType } from "@/components/ui/Toast";
 
+export interface ToastOptions {
+  message: string;
+  title?: string;
+  type?: ToastType;
+  duration?: number;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
+}
+
 export interface ToastItem {
   id: string;
   message: string;
+  title?: string;
   type: ToastType;
+  duration: number;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 interface ToastContextType {
-  showToast: (message: string, type?: ToastType, duration?: number) => void;
+  showToast: (
+    optionsOrMessage: string | ToastOptions,
+    type?: ToastType,
+    duration?: number
+  ) => void;
   dismissToast: (id: string) => void;
 }
 
@@ -25,30 +46,61 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const showToast = useCallback(
-    (message: string, type: ToastType = "info", duration: number = 4000) => {
+    (
+      optionsOrMessage: string | ToastOptions,
+      type: ToastType = "info",
+      duration: number = 4000
+    ) => {
       const id = "toast-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6);
-      setToasts((prev) => [...prev, { id, message, type }]);
 
-      if (duration > 0) {
-        setTimeout(() => {
-          dismissToast(id);
-        }, duration);
+      let item: ToastItem;
+      if (typeof optionsOrMessage === "string") {
+        item = {
+          id,
+          message: optionsOrMessage,
+          type,
+          duration,
+        };
+      } else {
+        item = {
+          id,
+          message: optionsOrMessage.message,
+          title: optionsOrMessage.title,
+          type: optionsOrMessage.type || type,
+          duration: optionsOrMessage.duration !== undefined ? optionsOrMessage.duration : duration,
+          action: optionsOrMessage.action,
+        };
       }
+
+      setToasts((prev) => {
+        // Limit maximum concurrent visible toasts to 4 to prevent screen clutter
+        const next = [...prev, item];
+        if (next.length > 4) {
+          return next.slice(next.length - 4);
+        }
+        return next;
+      });
     },
-    [dismissToast]
+    []
   );
 
   return (
     <ToastContext.Provider value={{ showToast, dismissToast }}>
       {children}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0">
+      <div
+        className="fixed top-5 right-5 sm:top-6 sm:right-6 z-[999999] flex flex-col gap-2.5 max-w-[420px] w-[calc(100%-2.5rem)] pointer-events-none"
+        aria-live="polite"
+      >
         <AnimatePresence mode="popLayout">
           {toasts.map((t) => (
             <Toast
               key={t.id}
               id={t.id}
               type={t.type}
+              title={t.title}
               message={t.message}
+              duration={t.duration}
+              action={t.action}
               onClose={() => dismissToast(t.id)}
             />
           ))}

@@ -44,6 +44,9 @@ export const profileUpdateSchema = z.object({
     .string()
     .trim()
     .url("Invalid website URL")
+    .refine((val) => !val || /^https?:\/\//i.test(val), {
+      message: "Website URL must begin with http:// or https://",
+    })
     .max(255, "Website URL must not exceed 255 characters")
     .optional()
     .nullable()
@@ -52,6 +55,17 @@ export const profileUpdateSchema = z.object({
     .string()
     .trim()
     .max(100, "GitHub handle or URL must not exceed 100 characters")
+    .refine(
+      (val) => {
+        if (!val) return true;
+        if (/^(javascript|data|vbscript|file|blob):/i.test(val)) return false;
+        if (/^[a-z0-9]+:/i.test(val) && !/^https?:\/\//i.test(val)) return false;
+        return true;
+      },
+      {
+        message: "Dangerous URL scheme not allowed. Use http://, https:// or a handle name.",
+      }
+    )
     .optional()
     .nullable()
     .or(z.literal("")),
@@ -59,6 +73,17 @@ export const profileUpdateSchema = z.object({
     .string()
     .trim()
     .max(100, "Twitter/X handle or URL must not exceed 100 characters")
+    .refine(
+      (val) => {
+        if (!val) return true;
+        if (/^(javascript|data|vbscript|file|blob):/i.test(val)) return false;
+        if (/^[a-z0-9]+:/i.test(val) && !/^https?:\/\//i.test(val)) return false;
+        return true;
+      },
+      {
+        message: "Dangerous URL scheme not allowed. Use http://, https:// or a handle name.",
+      }
+    )
     .optional()
     .nullable()
     .or(z.literal("")),
@@ -66,6 +91,17 @@ export const profileUpdateSchema = z.object({
     .string()
     .trim()
     .max(255, "LinkedIn handle or URL must not exceed 255 characters")
+    .refine(
+      (val) => {
+        if (!val) return true;
+        if (/^(javascript|data|vbscript|file|blob):/i.test(val)) return false;
+        if (/^[a-z0-9]+:/i.test(val) && !/^https?:\/\//i.test(val)) return false;
+        return true;
+      },
+      {
+        message: "Dangerous URL scheme not allowed. Use http://, https:// or a handle name.",
+      }
+    )
     .optional()
     .nullable()
     .or(z.literal("")),

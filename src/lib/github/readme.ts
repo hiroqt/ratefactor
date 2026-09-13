@@ -26,12 +26,18 @@ function decodeBase64Utf8(base64: string): string {
 /**
  * Strips script tags, iframe tags, and hazardous HTML patterns from README.
  */
-function sanitizeReadmeMarkdown(raw: string): string {
+export function sanitizeReadmeMarkdown(raw: string): string {
   return raw
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
     .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
     .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, "")
-    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, "");
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, "")
+    .replace(/<meta\b[^>]*\/?>/gi, "")
+    .replace(/<base\b[^>]*\/?>/gi, "")
+    .replace(/<link\b[^>]*\/?>/gi, "")
+    .replace(/<\/?form\b[^>]*>/gi, "")
+    .replace(/\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/(?:href|src|action|xlink:href)\s*=\s*["']?\s*(?:javascript|vbscript):[^"'>]+/gi, 'href="#"');
 }
 
 /**

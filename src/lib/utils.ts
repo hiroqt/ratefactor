@@ -81,4 +81,67 @@ export function formatJoinedDate(dateStr?: string | Date | null): string {
   return `${month} ${day}, ${year}`;
 }
 
+export const DEFAULT_AVATAR = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80";
+
+/**
+ * Normalizes avatar strings so relative handles, filenames like "cydefxgaming.png",
+ * or "@username" resolve to a valid GitHub CDN URL or standard fallback instead of 404ing locally.
+ */
+export function normalizeAvatarUrl(url?: string | null, fallbackUsername?: string): string {
+  if (!url || typeof url !== "string" || !url.trim()) {
+    if (fallbackUsername && typeof fallbackUsername === "string" && fallbackUsername.trim()) {
+      const cleanUser = fallbackUsername.trim().replace(/^@/, "").replace(/\.png$/i, "");
+      if (cleanUser && cleanUser !== "developer" && cleanUser !== "user-default") {
+        return `https://github.com/${cleanUser}.png`;
+      }
+    }
+    return DEFAULT_AVATAR;
+  }
+
+  const trimmed = url.trim();
+
+  // Full URL, data URL, blob URL, or explicit static asset
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("blob:") ||
+    trimmed.startsWith("/placeholder") ||
+    trimmed.startsWith("/icons/") ||
+    trimmed.startsWith("/images/")
+  ) {
+    return trimmed;
+  }
+
+  // Handle strings like "cydefxgaming.png", "/cydefxgaming.png", "cydefxgaming", "@cydefxgaming"
+  const clean = trimmed.replace(/^\/+/, "").replace(/^@/, "").replace(/\.png$/i, "");
+  if (clean && !clean.includes("/")) {
+    return `https://github.com/${clean}.png`;
+  }
+
+  return DEFAULT_AVATAR;
+}
+
+/**
+ * Optimizes remote images (such as Unsplash) by adjusting width, quality, and format query params.
+ */
+export function getOptimizedImageUrl(url: string, width = 600, quality = 75): string {
+  if (!url || typeof url !== "string") return DEFAULT_AVATAR;
+  const normalized = normalizeAvatarUrl(url);
+  if (normalized.includes("images.unsplash.com")) {
+    try {
+      const parsed = new URL(normalized);
+      parsed.searchParams.set("w", String(width));
+      parsed.searchParams.set("q", String(quality));
+      parsed.searchParams.set("auto", "format,compress");
+      parsed.searchParams.set("fm", "webp");
+      return parsed.toString();
+    } catch {
+      return normalized;
+    }
+  }
+  return normalized;
+}
+
+
 

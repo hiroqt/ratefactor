@@ -35,6 +35,27 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
         ) {
           parsed.readmeMarkdown = "";
         }
+        // Purge stale accidental GitHub sync for "arnel" (Arnel Rivera) if it was inadvertently fetched from email prefix
+        if (
+          parsed.githubSync?.username === "arnel" ||
+          parsed.github === "https://github.com/arnel" ||
+          parsed.name === "Arnel Rivera" ||
+          (parsed.avatar && parsed.avatar.includes("avatars.githubusercontent.com/u/10313"))
+        ) {
+          delete parsed.githubSync;
+          if (parsed.github === "https://github.com/arnel") {
+            parsed.github = "";
+          }
+          if (parsed.name === "Arnel Rivera") {
+            parsed.name = "Arnel Baylon";
+          }
+          if (parsed.avatar && parsed.avatar.includes("avatars.githubusercontent.com/u/10313")) {
+            parsed.avatar = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80";
+          }
+          try {
+            localStorage.setItem("ratefactor_dev_profile", JSON.stringify(parsed));
+          } catch (e) {}
+        }
         memoryProfileCache = parsed;
         setDeveloperProfile(parsed);
       }
@@ -48,6 +69,30 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
       memoryProfileCache = developerProfile;
     }
   }, [developerProfile]);
+
+  // Clear profile and reset cache when user signs out
+  useEffect(() => {
+    if (currentUser === null) {
+      memoryProfileCache = null;
+      lastSyncedHandleRef.current = null;
+      try {
+        localStorage.removeItem("ratefactor_dev_profile");
+      } catch {}
+      setDeveloperProfile({
+        ...INITIAL_DEVELOPER_PROFILE,
+        name: "Guest Developer",
+        username: "developer",
+        bio: "",
+        readmeMarkdown: "",
+        github: "",
+        twitter: "",
+        linkedin: "",
+        website: "",
+        githubSync: undefined,
+        isVerified: false,
+      });
+    }
+  }, [currentUser]);
 
   // Sync developerProfile with active Better Auth user
   useEffect(() => {
@@ -84,36 +129,47 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
         return updated;
       });
 
-      // Auto-sync GitHub bio, public README.md, and contributions (only once per handle)
-      if (
-        targetHandle &&
-        targetHandle !== "developer" &&
-        targetHandle !== "user-default" &&
-        lastSyncedHandleRef.current !== targetHandle
-      ) {
-        lastSyncedHandleRef.current = targetHandle;
-        fetch(`/api/github/contributions?username=${encodeURIComponent(targetHandle)}`)
+      // Auto-sync GitHub bio, public README.md, and contributions ONLY for the verified GitHub username
+      const extractGithubUsername = (urlOrHandle?: string) => {
+        if (!urlOrHandle) return "";
+        return urlOrHandle
+          .replace(/^https?:\/\/github\.com\//i, "")
+          .replace(/\/$/, "")
+          .replace(/^@/, "")
+          .trim();
+      };
+
+      const explicitGithub =
+        extractGithubUsername(developerProfile.github) ||
+        (developerProfile.githubSync?.username && developerProfile.githubSync.username !== "developer"
+          ? developerProfile.githubSync.username.trim().replace(/^@/, "")
+          : "");
+
+      // Case A: User has an explicit GitHub URL or handle entered
+      if (explicitGithub && explicitGithub !== "user-default" && lastSyncedHandleRef.current !== explicitGithub) {
+        lastSyncedHandleRef.current = explicitGithub;
+        fetch(`/api/github/contributions?username=${encodeURIComponent(explicitGithub)}`)
           .then((res) => (res.ok ? res.json() : null))
           .then((data) => {
             if (data?.profile) {
               setDeveloperProfile((prev) => {
                 const updated: DeveloperProfile = {
                   ...prev,
-                  name: data.profile.name || prev.name || targetHandle,
-                  bio: data.profile.bio !== undefined ? data.profile.bio : prev.bio,
-                  readmeMarkdown: data.readmeMarkdown !== undefined ? data.readmeMarkdown : prev.readmeMarkdown,
+                  name: data.profile.name || prev.name || explicitGithub,
+                  bio: data.profile.bio !== undefined && data.profile.bio !== "" ? data.profile.bio : prev.bio,
+                  readmeMarkdown: data.readmeMarkdown !== undefined && data.readmeMarkdown !== "" ? data.readmeMarkdown : prev.readmeMarkdown,
                   avatar: data.profile.avatar || prev.avatar,
                   company: data.profile.company || prev.company || "",
                   location: data.profile.location || prev.location || "",
                   website: data.profile.website || prev.website || "",
                   twitter: data.profile.twitter || prev.twitter || "",
                   linkedin: data.profile.linkedin || prev.linkedin || "",
-                  github: data.profile.profileUrl || `https://github.com/${targetHandle}`,
+                  github: data.profile.profileUrl || `https://github.com/${explicitGithub}`,
                   githubSync: {
                     connected: true,
-                    username: data.username,
+                    username: data.username || explicitGithub,
                     avatarUrl: data.profile.avatar,
-                    profileUrl: data.profile.profileUrl,
+                    profileUrl: data.profile.profileUrl || `https://github.com/${explicitGithub}`,
                     totalContributions: data.totalContributions,
                     currentStreak: data.currentStreak,
                     longestStreak: data.longestStreak,
@@ -124,17 +180,59 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
                 };
                 try {
                   localStorage.setItem("ratefactor_dev_profile", JSON.stringify(updated));
-                } catch (e) {
-                  // ignore
-                }
+                } catch (e) {}
                 return updated;
               });
             }
           })
           .catch(() => {});
+      } else if (
+        !explicitGithub &&
+        (currentUser.avatar?.includes("githubusercontent") || (currentUser as any).provider === "github")
+      ) {
+        // Case B: User signed in via GitHub OAuth without explicit manual handle - query verified GitHub account
+        fetch("/api/github/profile")
+          .then((res) => (res.ok ? res.json() : null))
+          .then((profileData) => {
+            if (profileData?.username && profileData.username !== "developer" && lastSyncedHandleRef.current !== profileData.username) {
+              const verifiedHandle = profileData.username;
+              lastSyncedHandleRef.current = verifiedHandle;
+              fetch(`/api/github/contributions?username=${encodeURIComponent(verifiedHandle)}`)
+                .then((res) => (res.ok ? res.json() : null))
+                .then((data) => {
+                  if (data) {
+                    setDeveloperProfile((prev) => {
+                      const updated: DeveloperProfile = {
+                        ...prev,
+                        github: profileData.profileUrl || `https://github.com/${verifiedHandle}`,
+                        githubSync: {
+                          connected: true,
+                          username: verifiedHandle,
+                          avatarUrl: profileData.avatarUrl || data.profile?.avatar,
+                          profileUrl: profileData.profileUrl || `https://github.com/${verifiedHandle}`,
+                          totalContributions: data.totalContributions,
+                          currentStreak: data.currentStreak,
+                          longestStreak: data.longestStreak,
+                          publicRepos: profileData.publicRepositoryCount || data.profile?.publicRepos,
+                          followers: profileData.followers || data.profile?.followers,
+                          lastSyncedAt: data.syncedAt || "Just now",
+                        },
+                      };
+                      try {
+                        localStorage.setItem("ratefactor_dev_profile", JSON.stringify(updated));
+                      } catch (e) {}
+                      return updated;
+                    });
+                  }
+                })
+                .catch(() => {});
+            }
+          })
+          .catch(() => {});
       }
     }
-  }, [currentUser?.username, currentUser?.name, currentUser?.avatar, currentUser?.role]);
+  }, [currentUser?.username, currentUser?.name, currentUser?.avatar, currentUser?.role, developerProfile.github]);
+
 
   const updateProfile = useCallback((updated: DeveloperProfile) => {
     setDeveloperProfile(updated);

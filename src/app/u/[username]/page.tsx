@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import React, { useState, useMemo, use } from "react";
+import React, { useState, useEffect, useMemo, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
@@ -19,28 +19,27 @@ import {
   MapPin, 
   Copy, 
   Check, 
-  Sparkles, 
   Pin, 
   FileText, 
-  ExternalLink,
-  Code2,
-  Flame,
-  Award,
-  Layers,
-  ArrowRight,
-  ArrowUpRight,
-  MessageSquare,
-  Calendar,
-  Share2,
-  Briefcase,
-  Mail,
-  Cpu,
-  Zap,
-  BookOpen,
-  Trophy,
-  CircleDot,
-  X
-} from "lucide-react";
+  ExternalLink, 
+  Code2, 
+  Flame, 
+  Award, 
+  Layers, 
+  ArrowRight, 
+  ArrowUpRight, 
+  MessageSquare, 
+  Calendar, 
+  Share2, 
+  Briefcase, 
+  Mail, 
+  Cpu, 
+  Zap, 
+  BookOpen, 
+  Trophy, 
+  CircleDot, 
+  X 
+} from "@/components/ui/icons";
 import { Navbar, Footer } from "@/components/layout";
 import { PortfolioDetailModal, SubmitPortfolioModal, usePortfolios } from "@/features/portfolios";
 import { useDeveloperProfile } from "@/features/dashboard";
@@ -51,7 +50,7 @@ import { MarkdownRenderer } from "@/components/dashboard/MarkdownRenderer";
 import { ActivityHeatmap } from "@/components/dashboard/ActivityHeatmap";
 import { createProfileFromAuthor, PublicProfileModal } from "@/components/PublicProfileModal";
 import { getEmojiDisplay } from "@/components/PortfolioDetailModal";
-import { formatRating, formatNumber, timeAgo, formatJoinedDate, cn } from "@/lib/utils";
+import { formatRating, formatNumber, timeAgo, formatJoinedDate, cn, normalizeAvatarUrl } from "@/lib/utils";
 import { Portfolio, PortfolioCategory } from "@/types/portfolio";
 import { DeveloperProfile, ShowcaseAccolade } from "@/types/profile";
 import { deriveDeveloperAccolades } from "@/lib/accolades";
@@ -70,6 +69,29 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
   const [activeTab, setActiveTab] = useState<"overview" | "submissions">("overview");
   const [visitedUser, setVisitedUser] = useState<DeveloperProfile | null>(null);
   const [hireInquiryOpen, setHireInquiryOpen] = useState(false);
+  const [liveProfile, setLiveProfile] = useState<DeveloperProfile | null>(null);
+
+  useEffect(() => {
+    if (!rawUsername) return;
+    let isMounted = true;
+    const fetchLiveProfile = async () => {
+      try {
+        const res = await fetch(`/api/profile?username=${encodeURIComponent(rawUsername)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && data && (data.username || data.profile)) {
+            setLiveProfile(data.profile || data);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load profile:", err);
+      }
+    };
+    fetchLiveProfile();
+    return () => {
+      isMounted = false;
+    };
+  }, [rawUsername]);
 
   // 1. Auth State
   const {
@@ -153,6 +175,16 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
       };
     }
 
+    // Base profile derived from live API fetch if available
+    if (liveProfile && liveProfile.username?.toLowerCase().replace(/^@/, "") === rawUsername.toLowerCase()) {
+      return {
+        ...liveProfile,
+        pinnedPortfolioIds: liveProfile.pinnedPortfolioIds || targetAuthorPortfolios.slice(0, 6).map((p) => p.id),
+        spotlightPortfolioId: liveProfile.spotlightPortfolioId || targetAuthorPortfolios[0]?.id,
+        skills: liveProfile.skills?.length ? liveProfile.skills : ["TypeScript", "Next.js", "React", "Node.js", "PostgreSQL"],
+      };
+    }
+
     // If matched in portfolios
     if (targetAuthorPortfolios.length > 0) {
       const author = targetAuthorPortfolios[0].author;
@@ -180,7 +212,7 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
       skills: ["TypeScript", "Next.js", "React", "Node.js", "PostgreSQL"],
       joinedDate: targetAuthorPortfolios[0]?.createdAt || new Date().toISOString(),
     };
-  }, [rawUsername, myDevProfile, targetAuthorPortfolios, portfolios]);
+  }, [rawUsername, myDevProfile, liveProfile, targetAuthorPortfolios, portfolios]);
 
   // Determine whether current user owns this profile
   const isOwner = Boolean(
@@ -481,7 +513,7 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
                   <div className="relative group">
                     <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden ring-4 ring-slate-100 shadow-sm border border-slate-200 bg-slate-100">
                       <img
-                        src={targetProfile.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"}
+                        src={normalizeAvatarUrl(targetProfile.avatar, targetProfile.username)}
                         alt={targetProfile.name}
                         className="w-full h-full object-cover"
                         onError={(e) => {
@@ -812,16 +844,16 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
                   <section className="space-y-4 w-full min-w-0 max-w-full">
                     <div className="flex items-center justify-between gap-2.5">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <Pin className="w-4 h-4 text-slate-900" />
-                          <h2 className="font-bold text-slate-900 text-sm sm:text-base">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <Pin className="w-4 h-4 text-slate-900 shrink-0" />
+                          <h2 className="font-bold text-slate-900 text-sm sm:text-base tracking-tight">
                             Showcase Shelf (Pinned Architectures)
                           </h2>
-                          <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600 shadow-2xs">
-                            {pinnedPortfolios.length} pinned
+                          <span className="whitespace-nowrap shrink-0 inline-flex items-center gap-1 text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600 shadow-2xs font-medium">
+                            <span className="font-bold text-slate-900">{pinnedPortfolios.length}</span> / 6 pinned
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                           Architectures highlighted on @{targetProfile.username}'s public profile for peer evaluation.
                         </p>
                       </div>
@@ -1218,39 +1250,39 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
       {hireInquiryOpen && targetProfile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm"
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-md modal-backdrop"
             onClick={() => setHireInquiryOpen(false)}
           />
-          <div className="relative w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-5 z-10">
+          <div className="relative w-full max-w-md bg-white dark:bg-[#18181b] rounded-2xl border border-slate-200 dark:border-white/10 shadow-2xl p-6 space-y-5 z-10 text-slate-900 dark:text-white">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700">
+                <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
                   <Briefcase className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
                     Contact {targetProfile.name}
                   </h3>
-                  <p className="text-xs text-slate-500 font-mono">@{targetProfile.username}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">@{targetProfile.username}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setHireInquiryOpen(false)}
-                className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {targetProfile.customHireMessage && (
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 leading-relaxed">
+              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed">
                 &ldquo;{targetProfile.customHireMessage}&rdquo;
               </div>
             )}
 
             <div className="space-y-2.5">
-              <div className="text-xs font-mono text-slate-500 uppercase tracking-wider font-semibold">
+              <div className="text-xs font-mono text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">
                 Reach Out Via
               </div>
               {targetProfile.website && (
@@ -1258,13 +1290,13 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
                   href={targetProfile.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors group"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors group"
                 >
-                  <Globe className="w-4 h-4 text-sky-600" />
-                  <span className="text-xs font-medium text-slate-800 flex-1 truncate">
+                  <Globe className="w-4 h-4 text-sky-600 dark:text-cyan-400" />
+                  <span className="text-xs font-medium text-slate-800 dark:text-slate-200 flex-1 truncate">
                     {targetProfile.website.replace(/^https?:\/\//, "")}
                   </span>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700" />
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-white" />
                 </a>
               )}
               {targetProfile.github && (
@@ -1272,13 +1304,13 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
                   href={targetProfile.github}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors group"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors group"
                 >
-                  <Github className="w-4 h-4 text-slate-900" />
-                  <span className="text-xs font-medium text-slate-800 flex-1 truncate">
+                  <Github className="w-4 h-4 text-slate-900 dark:text-white" />
+                  <span className="text-xs font-medium text-slate-800 dark:text-slate-200 flex-1 truncate">
                     {targetProfile.github.replace(/^https?:\/\/github\.com\//, "@")}
                   </span>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700" />
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-white" />
                 </a>
               )}
               {targetProfile.twitter && (
@@ -1286,13 +1318,13 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
                   href={targetProfile.twitter}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors group"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors group"
                 >
-                  <Twitter className="w-4 h-4 text-sky-500" />
-                  <span className="text-xs font-medium text-slate-800 flex-1 truncate">
+                  <Twitter className="w-4 h-4 text-sky-500 dark:text-cyan-400" />
+                  <span className="text-xs font-medium text-slate-800 dark:text-slate-200 flex-1 truncate">
                     {targetProfile.twitter.replace(/^https?:\/\/twitter\.com\//, "@")}
                   </span>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700" />
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-white" />
                 </a>
               )}
               {targetProfile.linkedin && (

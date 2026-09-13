@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { trackUptimeHeartbeat, checkSystemHealth, trackDowntimeIncident } from "@/lib/uptime";
 import { captureServerEvent } from "@/lib/posthog";
+import { getSessionUser } from "@/lib/auth/server-session";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,25 @@ export async function GET(request: NextRequest) {
   const action = searchParams.get("action");
 
   if (action === "simulate-outage") {
+    const authUser = await getSessionUser(request);
+    const isDev = process.env.NODE_ENV !== "production";
+    const isAuthorized = isDev || (authUser && (authUser.role === "admin" || authUser.role === "moderator"));
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        {
+          type: "https://ratefactor.dev/errors/forbidden",
+          title: "Forbidden",
+          status: 403,
+          detail: "Admin or moderator privileges required to trigger outage simulations.",
+        },
+        {
+          status: 403,
+          headers: { "Content-Type": "application/problem+json" },
+        }
+      );
+    }
+
     trackDowntimeIncident({
       service: "database-cluster",
       status: "down",
@@ -39,6 +59,25 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authUser = await getSessionUser(request);
+    const isDev = process.env.NODE_ENV !== "production";
+    const isAuthorized = isDev || (authUser && (authUser.role === "admin" || authUser.role === "moderator"));
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        {
+          type: "https://ratefactor.dev/errors/forbidden",
+          title: "Forbidden",
+          status: 403,
+          detail: "Admin or moderator privileges required to report downtime incidents or ping uptime probes.",
+        },
+        {
+          status: 403,
+          headers: { "Content-Type": "application/problem+json" },
+        }
+      );
+    }
+
     const body = await request.json();
     const { event, service, reason, severity, status } = body;
 

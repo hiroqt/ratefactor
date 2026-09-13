@@ -32,9 +32,26 @@ export const portfolioSubmissionSchema = z.object({
     }, {
       message: "Description exceeds maximum limit of 15,000 characters.",
     }),
-  portfolioUrl: z.string().url("Please provide a valid live/portfolio URL (http:// or https://)"),
-  githubUrl: z.string().url("Please provide a valid GitHub repository URL (http:// or https://)"),
-  demoUrl: z.string().url("Please provide a valid Demo URL").optional().or(z.literal("")),
+  portfolioUrl: z
+    .string()
+    .url("Please provide a valid live/portfolio URL (http:// or https://)")
+    .refine((val) => /^https?:\/\//i.test(val), {
+      message: "Portfolio URL must start with http:// or https://",
+    }),
+  githubUrl: z
+    .string()
+    .url("Please provide a valid GitHub repository URL (http:// or https://)")
+    .refine((val) => /^https?:\/\//i.test(val), {
+      message: "GitHub repository URL must start with http:// or https://",
+    }),
+  demoUrl: z
+    .string()
+    .url("Please provide a valid Demo URL")
+    .refine((val) => !val || /^https?:\/\//i.test(val), {
+      message: "Demo URL must start with http:// or https://",
+    })
+    .optional()
+    .or(z.literal("")),
   thumbnailUrl: z.string().min(1, "Cover image thumbnail is required"),
   imageSizeBytes: z
     .number()
@@ -92,8 +109,10 @@ export const ratingSubmissionSchema = z.object({
 
 export const otpRequestSchema = z.object({
   email: z.string().email("Invalid email address"),
-  provider: z.enum(["google", "email_password"]),
+  provider: z.enum(["google", "email_password"]).default("email_password"),
+  name: z.string().min(1, "Name cannot be empty").max(100, "Name is too long").optional(),
   password: z.string().min(6, "Password must be at least 6 characters").optional(),
+  purpose: z.enum(["signup", "signin", "2fa"]).optional(),
 });
 
 export const otpVerifySchema = z.object({

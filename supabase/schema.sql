@@ -16,6 +16,10 @@ END $$;
 
 DO $$ BEGIN
   CREATE TYPE public.portfolio_category AS ENUM (
+    'All',
+    'Developer',
+    'Arts',
+    'Client',
     'Systems', 
     'Frontend', 
     'Fullstack', 
@@ -83,10 +87,13 @@ CREATE TABLE IF NOT EXISTS public.portfolios (
   author_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   title TEXT NOT NULL CHECK (char_length(title) >= 3 AND char_length(title) <= 120),
   tagline TEXT NOT NULL CHECK (char_length(tagline) >= 10 AND char_length(tagline) <= 240),
-  -- Description word count enforcement: at least 200 words, capped at 2,500 words to preserve 500MB DB
-  description TEXT NOT NULL CHECK (
-    array_length(regexp_split_to_array(trim(description), '\s+'), 1) >= 200 
-    AND array_length(regexp_split_to_array(trim(description), '\s+'), 1) <= 2500
+  -- Description word count enforcement: optional description, capped at 2,500 words to preserve 500MB DB
+  description TEXT CHECK (
+    description IS NULL 
+    OR (
+      array_length(regexp_split_to_array(trim(description), '\s+'), 1) >= 1 
+      AND array_length(regexp_split_to_array(trim(description), '\s+'), 1) <= 2500
+    )
   ),
   portfolio_url TEXT NOT NULL,
   github_url TEXT NOT NULL,
@@ -579,11 +586,11 @@ CREATE POLICY "Admins manage showcases" ON public.showcases
 
 -- Rate Limits Policies (Managed by service role or system)
 CREATE POLICY "System manage rate limits" ON public.rate_limits
-  FOR ALL USING (true);
+  FOR ALL USING (auth.role() = 'service_role');
 
 -- Auth Challenges Policies (Users verify own challenges)
 CREATE POLICY "Challenge access by email or user" ON public.auth_challenges
-  FOR SELECT USING (auth.uid() = user_id OR auth.uid() IS NULL);
+  FOR SELECT USING (auth.uid() IS NOT NULL AND auth.uid() = user_id);
 
 -- ==========================================================
 -- 14. SUPABASE STORAGE BUCKET CONFIGURATION & POLICIES

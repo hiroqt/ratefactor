@@ -10,18 +10,17 @@ import {
   Globe, 
   Github, 
   Twitter, 
-  Linkedin,
+  Linkedin, 
   FileText, 
-  Sparkles,
-  Check,
-  Plus,
-  Eye,
-  Edit3,
-  Image as ImageIcon
-} from "lucide-react";
+  Check, 
+  Plus, 
+  Eye, 
+  Edit3, 
+  Image as ImageIcon 
+} from "@/components/ui/icons";
 import { motion } from "framer-motion";
 import { DeveloperProfile } from "@/types/profile";
-import { cn } from "@/lib/utils";
+import { cn, normalizeAvatarUrl } from "@/lib/utils";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
 interface EditBioModalProps {
@@ -159,6 +158,21 @@ export function EditBioModal({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    const rawGithub = github.trim();
+    const cleanGithubHandle = rawGithub
+      ? rawGithub.replace(/^https?:\/\/github\.com\//i, "").replace(/\/$/, "").replace(/^@/, "").trim()
+      : "";
+    const cleanGithubUrl = cleanGithubHandle ? `https://github.com/${cleanGithubHandle}` : "";
+
+    const updatedGithubSync = cleanGithubHandle
+      ? {
+          ...(profile.githubSync || {}),
+          connected: true,
+          username: cleanGithubHandle,
+          profileUrl: cleanGithubUrl,
+        }
+      : undefined;
+
     onSaveProfile({
       ...profile,
       name: name.trim() || profile.name,
@@ -170,7 +184,8 @@ export function EditBioModal({
       company: company.trim(),
       location: location.trim(),
       website: website.trim(),
-      github: github.trim(),
+      github: cleanGithubUrl,
+      githubSync: updatedGithubSync,
       twitter: twitter.trim(),
       linkedin: linkedin.trim(),
       skills,
@@ -185,7 +200,7 @@ export function EditBioModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-md modal-backdrop"
         onClick={onClose}
       />
 
@@ -199,28 +214,28 @@ export function EditBioModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 15 }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-2xl bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden z-10 max-h-[90vh] flex flex-col"
+        className="relative w-full max-w-2xl bg-white dark:bg-[#121215] rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden z-10 max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] shrink-0">
           <div className="flex items-center gap-2">
-            <User className="w-4 h-4 text-slate-700" />
-            <h3 id="edit-bio-modal-title" className="font-bold text-slate-900 text-sm">
+            <User className="w-4 h-4 text-slate-700 dark:text-slate-300" />
+            <h3 id="edit-bio-modal-title" className="font-bold text-slate-900 dark:text-white text-sm">
               Edit Developer Profile &amp; Bio
             </h3>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200 text-xs">
+            <div className="flex items-center rounded-xl bg-slate-100 dark:bg-white/5 p-0.5 border border-slate-200 dark:border-white/10 text-xs">
               <button
                 type="button"
                 onClick={() => setActiveTab("general")}
                 className={cn(
-                  "px-3 py-1 rounded-lg font-medium transition-all",
+                  "px-3 py-1 rounded-lg font-medium transition-all cursor-pointer",
                   activeTab === "general"
-                    ? "bg-white text-slate-900 shadow-xs font-semibold"
-                    : "text-slate-500 hover:text-slate-900"
+                    ? "bg-white dark:bg-[#1f1f23] text-slate-900 dark:text-white shadow-xs font-semibold"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 )}
               >
                 Bio &amp; Links
@@ -229,10 +244,10 @@ export function EditBioModal({
                 type="button"
                 onClick={() => setActiveTab("readme")}
                 className={cn(
-                  "px-3 py-1 rounded-lg font-medium transition-all flex items-center gap-1",
+                  "px-3 py-1 rounded-lg font-medium transition-all flex items-center gap-1 cursor-pointer",
                   activeTab === "readme"
-                    ? "bg-white text-slate-900 shadow-xs font-semibold"
-                    : "text-slate-500 hover:text-slate-900"
+                    ? "bg-white dark:bg-[#1f1f23] text-slate-900 dark:text-white shadow-xs font-semibold"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 )}
               >
                 <FileText className="w-3 h-3" />
@@ -242,10 +257,10 @@ export function EditBioModal({
                 type="button"
                 onClick={() => setActiveTab("preview")}
                 className={cn(
-                  "px-3 py-1 rounded-lg font-medium transition-all flex items-center gap-1",
+                  "px-3 py-1 rounded-lg font-medium transition-all flex items-center gap-1 cursor-pointer",
                   activeTab === "preview"
-                    ? "bg-white text-slate-900 shadow-xs font-semibold"
-                    : "text-slate-500 hover:text-slate-900"
+                    ? "bg-white dark:bg-[#1f1f23] text-slate-900 dark:text-white shadow-xs font-semibold"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 )}
               >
                 <Eye className="w-3 h-3" />
@@ -256,7 +271,7 @@ export function EditBioModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors ml-1 cursor-pointer"
+              className="p-1 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/10 transition-colors ml-1 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -269,16 +284,16 @@ export function EditBioModal({
             {activeTab === "general" && (
             <>
               {/* Avatar Selector & Preview */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                <label className="block text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                  <ImageIcon className="w-3.5 h-3.5 text-slate-500" />
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 space-y-3">
+                <label className="block text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <ImageIcon className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                   <span>Profile Avatar (GitHub Style)</span>
                 </label>
 
                 <div className="flex items-center gap-3.5">
-                  <div className="w-14 h-14 rounded-full overflow-hidden ring-2 ring-slate-200 flex-shrink-0 bg-white">
+                  <div className="w-14 h-14 rounded-full overflow-hidden ring-2 ring-slate-200 dark:ring-white/10 flex-shrink-0 bg-white dark:bg-slate-800">
                     <img
-                      src={avatar}
+                      src={normalizeAvatarUrl(avatar, username)}
                       alt={name}
                       className="w-full h-full object-cover"
                       onError={(e) => {
@@ -294,10 +309,10 @@ export function EditBioModal({
                       placeholder="https://... (Image URL)"
                       value={avatar}
                       onChange={(e) => setAvatar(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-900"
+                      className="w-full bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-slate-900 dark:focus:border-cyan-400"
                     />
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] text-slate-500 font-mono">Quick avatars:</span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Quick avatars:</span>
                       {PRESET_AVATARS.map((preset) => (
                         <button
                           key={preset.label}
@@ -306,8 +321,8 @@ export function EditBioModal({
                           className={cn(
                             "w-6 h-6 rounded-full overflow-hidden border transition-all cursor-pointer",
                             avatar === preset.url
-                              ? "ring-2 ring-slate-900 border-white scale-105"
-                              : "border-slate-200 opacity-70 hover:opacity-100"
+                              ? "ring-2 ring-slate-900 dark:ring-white border-white scale-105"
+                              : "border-slate-200 dark:border-white/10 opacity-70 hover:opacity-100"
                           )}
                           title={preset.label}
                         >
@@ -322,7 +337,7 @@ export function EditBioModal({
               {/* Name, Username & Pronouns */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-900 mb-1">
+                  <label className="block text-xs font-semibold text-slate-900 dark:text-white mb-1">
                     Display Name *
                   </label>
                   <input
@@ -330,28 +345,28 @@ export function EditBioModal({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-slate-900"
+                    className="w-full bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-slate-900 dark:focus:border-cyan-400"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-900 mb-1">
+                  <label className="block text-xs font-semibold text-slate-900 dark:text-white mb-1">
                     Handle / Username
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2 text-xs font-mono text-slate-400">@</span>
+                    <span className="absolute left-3 top-2 text-xs font-mono text-slate-400 dark:text-slate-500">@</span>
                     <input
                       type="text"
                       value={username}
                       onChange={(e) => setUsername(e.target.value.replace(/^@/, ""))}
                       required
-                      className="w-full bg-white border border-slate-200 rounded-xl pl-7 pr-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:border-slate-900"
+                      className="w-full bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-xl pl-7 pr-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-slate-900 dark:focus:border-cyan-400"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-900 mb-1">
+                  <label className="block text-xs font-semibold text-slate-900 dark:text-white mb-1">
                     Pronouns
                   </label>
                   <input
@@ -359,14 +374,14 @@ export function EditBioModal({
                     placeholder="he/him, they/them"
                     value={pronouns}
                     onChange={(e) => setPronouns(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-slate-900"
+                    className="w-full bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-slate-900 dark:focus:border-cyan-400"
                   />
                 </div>
               </div>
 
               {/* Headline / Role */}
               <div>
-                <label className="block text-xs font-semibold text-slate-900 mb-1">
+                <label className="block text-xs font-semibold text-slate-900 dark:text-white mb-1">
                   Professional Headline / Role
                 </label>
                 <input
@@ -374,13 +389,13 @@ export function EditBioModal({
                   placeholder="e.g. Principal Frontend Architect"
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-slate-900"
+                  className="w-full bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-slate-900 dark:focus:border-cyan-400"
                 />
               </div>
 
               {/* GitHub-style Bio */}
               <div>
-                <label className="block text-xs font-semibold text-slate-900 mb-1">
+                <label className="block text-xs font-semibold text-slate-900 dark:text-white mb-1">
                   Bio (GitHub-Style)
                 </label>
                 <textarea
@@ -388,10 +403,10 @@ export function EditBioModal({
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   placeholder="Add a bio to tell other developers about your architectural expertise, interests, and what you build..."
-                  className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 resize-none"
+                  className="w-full bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-xl p-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-slate-900 dark:focus:border-cyan-400 resize-none"
                   maxLength={280}
                 />
-                <div className="flex justify-between items-center text-[10px] text-slate-400 mt-1">
+                <div className="flex justify-between items-center text-[10px] text-slate-400 dark:text-slate-500 mt-1">
                   <span>Concise overview shown in profile header and card embeds</span>
                   <span>{bio.length}/280</span>
                 </div>
@@ -400,99 +415,99 @@ export function EditBioModal({
               {/* Company & Location */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-900 mb-1 flex items-center gap-1">
-                    <Building2 className="w-3 h-3 text-slate-500" /> Company / Org
+                  <label className="block text-xs font-semibold text-slate-900 dark:text-white mb-1 flex items-center gap-1">
+                    <Building2 className="w-3 h-3 text-slate-500 dark:text-slate-400" /> Company / Org
                   </label>
                   <input
                     type="text"
                     placeholder="@RateFactor or Independent"
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-slate-900"
+                    className="w-full bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-slate-900 dark:focus:border-cyan-400"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-900 mb-1 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-slate-500" /> Location
+                  <label className="block text-xs font-semibold text-slate-900 dark:text-white mb-1 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-slate-500 dark:text-slate-400" /> Location
                   </label>
                   <input
                     type="text"
                     placeholder="San Francisco, CA or Remote"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-slate-900"
+                    className="w-full bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-slate-900 dark:focus:border-cyan-400"
                   />
                 </div>
               </div>
 
               {/* Website, GitHub, Twitter & LinkedIn */}
               <div className="space-y-2.5">
-                <label className="block text-xs font-semibold text-slate-900">
+                <label className="block text-xs font-semibold text-slate-900 dark:text-white">
                   Social &amp; Developer Links
                 </label>
 
                 <div className="flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-sky-600 flex-shrink-0" />
+                  <Globe className="w-4 h-4 text-sky-600 dark:text-cyan-400 flex-shrink-0" />
                   <input
                     type="url"
-                    placeholder="https://arnel.dev (Personal Website)"
+                    placeholder="https://yourwebsite.com (Personal Website)"
                     value={website}
                     onChange={(e) => setWebsite(e.target.value)}
-                    className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-slate-900"
+                    className="flex-1 bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-slate-900 dark:focus:border-cyan-400"
                   />
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Github className="w-4 h-4 text-slate-900 flex-shrink-0" />
+                  <Github className="w-4 h-4 text-slate-900 dark:text-white flex-shrink-0" />
                   <input
                     type="url"
-                    placeholder="https://github.com/arneldev"
+                    placeholder="https://github.com/username (or @username)"
                     value={github}
                     onChange={(e) => setGithub(e.target.value)}
-                    className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-slate-900"
+                    className="flex-1 bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-slate-900 dark:focus:border-cyan-400"
                   />
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Twitter className="w-4 h-4 text-sky-500 flex-shrink-0" />
+                  <Twitter className="w-4 h-4 text-sky-500 dark:text-cyan-400 flex-shrink-0" />
                   <input
                     type="url"
-                    placeholder="https://twitter.com/arneldev"
+                    placeholder="https://x.com/username"
                     value={twitter}
                     onChange={(e) => setTwitter(e.target.value)}
-                    className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-slate-900"
+                    className="flex-1 bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-slate-900 dark:focus:border-cyan-400"
                   />
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Linkedin className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                  <Linkedin className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                   <input
                     type="url"
-                    placeholder="https://linkedin.com/in/arneldev"
+                    placeholder="https://linkedin.com/in/username"
                     value={linkedin}
                     onChange={(e) => setLinkedin(e.target.value)}
-                    className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-slate-900"
+                    className="flex-1 bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-slate-900 dark:focus:border-cyan-400"
                   />
                 </div>
               </div>
 
               {/* Skills Tags */}
               <div>
-                <label className="block text-xs font-semibold text-slate-900 mb-1.5">
+                <label className="block text-xs font-semibold text-slate-900 dark:text-white mb-1.5">
                   Core Technologies &amp; Architectural Skills
                 </label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {skills.map((skill) => (
                     <span
                       key={skill}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 text-xs font-mono"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-800 dark:text-slate-200 text-xs font-mono"
                     >
                       <span>{skill}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveSkill(skill)}
-                        className="hover:text-rose-600"
+                        className="hover:text-rose-600 dark:hover:text-rose-400"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -512,18 +527,18 @@ export function EditBioModal({
                         handleAddSkill(newSkill);
                       }
                     }}
-                    className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-900"
+                    className="flex-1 bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-slate-900 dark:focus:border-cyan-400"
                   />
                   <button
                     type="button"
                     onClick={() => handleAddSkill(newSkill)}
-                    className="px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 hover:bg-slate-200 text-xs font-medium text-slate-800 cursor-pointer"
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-white/10 text-xs font-medium text-slate-800 dark:text-slate-200 cursor-pointer"
                   >
                     + Add
                   </button>
                 </div>
 
-                <div className="flex items-center gap-1 flex-wrap mt-2 text-[11px] text-slate-500 font-mono">
+                <div className="flex items-center gap-1 flex-wrap mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                   <span>Quick picks:</span>
                   {COMMON_SKILLS.slice(0, 7).map((s) => (
                     <button
@@ -531,7 +546,7 @@ export function EditBioModal({
                       type="button"
                       disabled={skills.includes(s)}
                       onClick={() => handleAddSkill(s)}
-                      className="px-1.5 py-0.5 rounded bg-slate-50 hover:bg-slate-100 border border-slate-200 text-[10px] disabled:opacity-30 cursor-pointer"
+                      className="px-1.5 py-0.5 rounded bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-[10px] text-slate-700 dark:text-slate-300 disabled:opacity-30 cursor-pointer"
                     >
                       +{s}
                     </button>
@@ -545,11 +560,11 @@ export function EditBioModal({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-slate-700" />
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-slate-700 dark:text-slate-300" />
                     {username} / README.md
                   </h4>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     GitHub-style special repository markdown displayed on your developer profile.
                   </p>
                 </div>
@@ -560,11 +575,11 @@ export function EditBioModal({
                 value={readmeMarkdown}
                 onChange={(e) => setReadmeMarkdown(e.target.value)}
                 placeholder="Write your developer README in Markdown..."
-                className="w-full font-mono text-xs bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-slate-900 focus:outline-none focus:border-slate-900 focus:bg-white resize-y"
+                className="w-full font-mono text-xs bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-xl p-3.5 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-slate-900 dark:focus:border-cyan-400 focus:bg-white dark:focus:bg-[#18181b] resize-y"
               />
 
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600">
-                <span className="font-semibold block mb-0.5">Markdown Tips:</span>
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 text-[11px] text-slate-600 dark:text-slate-400">
+                <span className="font-semibold block mb-0.5 text-slate-900 dark:text-white">Markdown Tips:</span>
                 Supports headers (<code>###</code>), bold (<code>**bold**</code>), lists (<code>- item</code>), links (<code>[text](url)</code>), and code blocks. Switch to the <strong>Preview</strong> tab above to see it rendered!
               </div>
             </div>
@@ -573,30 +588,30 @@ export function EditBioModal({
           {activeTab === "preview" && (
             <div className="space-y-4">
               {/* Profile Card Preview */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 space-y-3">
                 <div className="flex items-center gap-3.5">
-                  <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-slate-200 flex-shrink-0 bg-white">
+                  <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-slate-200 dark:ring-white/10 flex-shrink-0 bg-white dark:bg-slate-800">
                     <img src={avatar} alt={name} className="w-full h-full object-cover" />
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <h4 className="text-sm font-bold text-slate-900">{name}</h4>
-                      <span className="text-xs font-mono text-slate-500">@{username}</span>
-                      {pronouns && <span className="text-xs text-slate-400">({pronouns})</span>}
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">{name}</h4>
+                      <span className="text-xs font-mono text-slate-500 dark:text-slate-400">@{username}</span>
+                      {pronouns && <span className="text-xs text-slate-400 dark:text-slate-500">({pronouns})</span>}
                     </div>
-                    <p className="text-xs font-medium text-slate-700 mt-0.5">{role}</p>
-                    {company && <p className="text-xs text-slate-500">{company} • {location}</p>}
+                    <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mt-0.5">{role}</p>
+                    {company && <p className="text-xs text-slate-500 dark:text-slate-400">{company} • {location}</p>}
                   </div>
                 </div>
 
-                <div className="text-xs text-slate-700 bg-white p-3 rounded-xl border border-slate-200 leading-relaxed break-words [overflow-wrap:anywhere]">
-                  {bio || <span className="italic text-slate-400">No bio specified.</span>}
+                <div className="text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-[#18181b] p-3 rounded-xl border border-slate-200 dark:border-white/10 leading-relaxed break-words [overflow-wrap:anywhere]">
+                  {bio || <span className="italic text-slate-400 dark:text-slate-500">No bio specified.</span>}
                 </div>
 
                 {skills.length > 0 && (
                   <div className="flex flex-wrap gap-1 pt-1">
                     {skills.map((s) => (
-                      <span key={s} className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700">
+                      <span key={s} className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300">
                         {s}
                       </span>
                     ))}
@@ -605,9 +620,9 @@ export function EditBioModal({
               </div>
 
               {/* README.md Preview Card */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 space-y-2">
-                <div className="text-xs font-mono font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-slate-700" />
+              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 space-y-2">
+                <div className="text-xs font-mono font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-white/10 pb-2 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-slate-700 dark:text-slate-300" />
                   <span>Rendered README.md</span>
                 </div>
                 <div className="pt-2">
@@ -619,17 +634,17 @@ export function EditBioModal({
           </div>
 
           {/* Footer Actions */}
-          <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-end gap-3 shrink-0">
+          <div className="px-6 py-3.5 border-t border-slate-100 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] flex items-center justify-end gap-3 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-full border border-slate-200 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-full border border-slate-200 dark:border-white/10 text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2 rounded-full bg-slate-900 hover:bg-black text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
+              className="px-6 py-2 rounded-full bg-slate-900 dark:bg-white hover:bg-black dark:hover:bg-slate-200 text-white dark:text-slate-900 text-xs font-semibold shadow-md transition-all cursor-pointer"
             >
               Save Profile Changes
             </button>

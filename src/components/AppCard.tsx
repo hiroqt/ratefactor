@@ -7,12 +7,12 @@ import {
   CheckCircle2, 
   ArrowUpRight, 
   ExternalLink
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { Portfolio } from "@/types/portfolio";
-import { cn, formatNumber, formatRating } from "@/lib/utils";
+import { cn, formatNumber, formatRating, getOptimizedImageUrl } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
 import { EmojiReaction } from "@/components/ui/emoji-reaction";
-import { getEmojiDisplay } from "./PortfolioDetailModal";
+import { getEmojiDisplay } from "@/lib/emoji-utils";
 
 export interface AppCardProps {
   portfolio: Portfolio;
@@ -120,7 +120,7 @@ export function AppCard({
       {/* 1. Clean Media Preview without Eyebrows or Host Overlays */}
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100 border-b border-slate-200">
         <img
-          src={portfolio.thumbnail}
+          src={getOptimizedImageUrl(portfolio.thumbnail, 480, 75)}
           alt={portfolio.title}
           loading="lazy"
           decoding="async"
@@ -167,7 +167,7 @@ export function AppCard({
         {/* Author Line */}
         <div className="flex items-center gap-1.5 pt-2.5 mt-2 border-t border-slate-100">
           <img
-            src={portfolio.author.avatar}
+            src={getOptimizedImageUrl(portfolio.author.avatar, 48, 75)}
             alt={portfolio.author.name}
             onError={onAvatarError}
             className="w-4 h-4 rounded-full object-cover border border-slate-200 shrink-0"

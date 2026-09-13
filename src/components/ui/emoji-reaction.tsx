@@ -2,9 +2,9 @@
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { ComponentProps, KeyboardEvent } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { X } from "@/components/ui/icons";
 import { Slot } from "@radix-ui/react-slot";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { X } from "lucide-react";
 import { Emoji, EmojiProvider, type EmojiData } from "react-apple-emojis";
 import { cn } from "@/lib/utils";
 

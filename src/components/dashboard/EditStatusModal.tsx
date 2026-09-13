@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useModalSmoothScroll } from "@/hooks/useModalSmoothScroll";
-import { X, Smile, Check, Sparkles, Clock, AlertCircle } from "lucide-react";
+import { X, Smile, Check, Clock, AlertCircle } from "@/components/ui/icons";
 import { motion } from "framer-motion";
 import { UserStatus } from "@/types/profile";
 import { STATUS_PRESETS } from "@/data/mockProfile";
+import { normalizeAvatarUrl } from "@/lib/utils";
 
 interface EditStatusModalProps {
   isOpen: boolean;
@@ -110,7 +111,7 @@ export function EditStatusModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-md modal-backdrop"
         onClick={onClose}
       />
 
@@ -124,21 +125,21 @@ export function EditStatusModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-md bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden z-10 max-h-[90vh] flex flex-col"
+        className="relative w-full max-w-md bg-white dark:bg-[#121215] rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden z-10 max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-base">💬</span>
-            <h3 id="status-modal-title" className="font-bold text-slate-900 text-sm">
+            <h3 id="status-modal-title" className="font-bold text-slate-900 dark:text-white text-sm">
               Set GitHub-Style Developer Status
             </h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
+            className="p-1 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -146,13 +147,21 @@ export function EditStatusModal({
 
         <form ref={scrollRef} data-lenis-prevent="true" onSubmit={handleSave} className="p-6 space-y-5 overflow-y-auto overscroll-contain flex-1">
           {/* Live Status Preview Bubble */}
-          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 flex items-center gap-3">
             <div className="relative">
-              <div className="w-11 h-11 rounded-full overflow-hidden ring-2 ring-slate-200 flex-shrink-0">
-                <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
+              <div className="w-11 h-11 rounded-full overflow-hidden ring-2 ring-slate-200 dark:ring-white/10 flex-shrink-0">
+                <img
+                  src={normalizeAvatarUrl(userAvatar, userName)}
+                  alt={userName}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80";
+                  }}
+                />
               </div>
               <span
-                className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
+                className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-[#121215] ${
                   isBusy
                     ? "bg-amber-500"
                     : statusType === "offline"
@@ -163,18 +172,18 @@ export function EditStatusModal({
             </div>
 
             <div className="min-w-0 flex-1">
-              <div className="text-[11px] text-slate-500 font-medium">Public Status Preview</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Public Status Preview</div>
               <div className="flex items-center gap-1.5 mt-0.5">
                 {emoji ? (
                   <span className="text-base leading-none">{emoji}</span>
                 ) : (
-                  <span className="text-slate-400 text-xs">💭</span>
+                  <span className="text-slate-400 dark:text-slate-500 text-xs">💭</span>
                 )}
-                <span className="text-xs font-semibold text-slate-900 truncate">
+                <span className="text-xs font-semibold text-slate-900 dark:text-white truncate">
                   {message || (emoji ? "Status set" : "What's happening?")}
                 </span>
                 {isBusy && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-mono">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-mono">
                     Busy
                   </span>
                 )}
@@ -184,7 +193,7 @@ export function EditStatusModal({
 
           {/* Status Input Row */}
           <div>
-            <label className="block text-xs font-semibold text-slate-900 mb-1.5">
+            <label className="block text-xs font-semibold text-slate-900 dark:text-white mb-1.5">
               Status Message &amp; Emoji
             </label>
             <div className="flex items-center gap-2">
@@ -192,14 +201,14 @@ export function EditStatusModal({
                 <button
                   type="button"
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                  className="w-10 h-10 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-lg transition-all focus:ring-2 focus:ring-slate-900/10 cursor-pointer"
+                  className="w-10 h-10 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 flex items-center justify-center text-lg transition-all focus:ring-2 focus:ring-slate-900/10 cursor-pointer"
                   title="Choose status emoji"
                 >
-                  {emoji || <Smile className="w-4 h-4 text-slate-400" />}
+                  {emoji || <Smile className="w-4 h-4 text-slate-400 dark:text-slate-500" />}
                 </button>
 
                 {showEmojiPicker && (
-                  <div className="absolute top-12 left-0 z-50 p-2.5 bg-white border border-slate-200 rounded-2xl shadow-xl w-60 space-y-2">
+                  <div className="absolute top-12 left-0 z-50 p-2.5 bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl w-60 space-y-2">
                     <div className="grid grid-cols-6 gap-1">
                       {QUICK_EMOJIS.map((e) => (
                         <button
@@ -209,27 +218,27 @@ export function EditStatusModal({
                             setEmoji(e);
                             setShowEmojiPicker(false);
                           }}
-                          className="w-8 h-8 rounded-lg hover:bg-slate-100 text-base flex items-center justify-center transition-colors cursor-pointer"
+                          className="w-8 h-8 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-base flex items-center justify-center transition-colors cursor-pointer"
                         >
                           {e}
                         </button>
                       ))}
                     </div>
-                    <div className="pt-1.5 border-t border-slate-100 flex justify-between">
+                    <div className="pt-1.5 border-t border-slate-100 dark:border-white/10 flex justify-between">
                       <button
                         type="button"
                         onClick={() => {
                           setEmoji("");
                           setShowEmojiPicker(false);
                         }}
-                        className="text-[10px] text-slate-500 hover:text-slate-800 font-medium"
+                        className="text-[10px] text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white font-medium cursor-pointer"
                       >
                         No emoji
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowEmojiPicker(false)}
-                        className="text-[10px] text-slate-500 hover:text-slate-800"
+                        className="text-[10px] text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white cursor-pointer"
                       >
                         Close
                       </button>
@@ -244,10 +253,10 @@ export function EditStatusModal({
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 maxLength={80}
-                className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/10 transition-colors"
+                className="flex-1 bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-slate-900 dark:focus:border-cyan-400 focus:ring-1 focus:ring-slate-900/10 transition-colors"
               />
             </div>
-            <div className="flex justify-between items-center mt-1 text-[10px] text-slate-400">
+            <div className="flex justify-between items-center mt-1 text-[10px] text-slate-400 dark:text-slate-500">
               <span>Supports GitHub-compatible unicode emoji status</span>
               <span>{message.length}/80</span>
             </div>
@@ -263,11 +272,11 @@ export function EditStatusModal({
                 setIsBusy(e.target.checked);
                 if (e.target.checked) setStatusType("busy");
               }}
-              className="mt-0.5 rounded border-slate-300 text-slate-900 focus:ring-slate-900 w-4 h-4 cursor-pointer"
+              className="mt-0.5 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-[#18181b] text-slate-900 dark:text-cyan-400 focus:ring-slate-900 dark:focus:ring-cyan-400 w-4 h-4 cursor-pointer"
             />
-            <label htmlFor="busy-status-toggle" className="text-xs text-slate-700 cursor-pointer">
-              <span className="font-semibold text-slate-900 block">Mark as Busy</span>
-              <span className="text-[11px] text-slate-500">
+            <label htmlFor="busy-status-toggle" className="text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+              <span className="font-semibold text-slate-900 dark:text-white block">Mark as Busy</span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
                 When peers mention you or review architectures, show you are focusing or busy.
               </span>
             </label>
@@ -275,7 +284,7 @@ export function EditStatusModal({
 
           {/* Quick Presets */}
           <div>
-            <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-2 font-semibold">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 font-semibold">
               Quick Suggestions
             </div>
             <div className="grid grid-cols-2 gap-1.5">
@@ -284,7 +293,7 @@ export function EditStatusModal({
                   key={preset.message}
                   type="button"
                   onClick={() => handlePresetClick(preset)}
-                  className="p-2 rounded-xl text-left bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs text-slate-800 transition-colors flex items-center gap-2 group cursor-pointer"
+                  className="p-2 rounded-xl text-left bg-slate-50 dark:bg-white/[0.02] hover:bg-slate-100 dark:hover:bg-white/5 border border-slate-200 dark:border-white/10 text-xs text-slate-800 dark:text-slate-200 transition-colors flex items-center gap-2 group cursor-pointer"
                 >
                   <span className="text-sm group-hover:scale-110 transition-transform">
                     {preset.emoji}
@@ -296,11 +305,11 @@ export function EditStatusModal({
           </div>
 
           {/* Actions */}
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between shrink-0">
+          <div className="pt-2 border-t border-slate-100 dark:border-white/10 flex items-center justify-between shrink-0">
             <button
               type="button"
               onClick={handleClearStatus}
-              className="text-xs text-rose-600 hover:text-rose-700 hover:underline font-medium cursor-pointer"
+              className="text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:underline font-medium cursor-pointer"
             >
               Clear status
             </button>
@@ -309,13 +318,13 @@ export function EditStatusModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3.5 py-1.5 rounded-full border border-slate-200 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
+                className="px-3.5 py-1.5 rounded-full border border-slate-200 dark:border-white/10 text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-5 py-1.5 rounded-full bg-slate-900 hover:bg-neutral-800 text-white text-xs font-semibold shadow-sm transition-all cursor-pointer"
+                className="px-5 py-1.5 rounded-full bg-slate-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 text-xs font-semibold shadow-sm transition-all cursor-pointer"
               >
                 Set status
               </button>

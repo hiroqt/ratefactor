@@ -12,7 +12,7 @@ import {
   ArrowUpDown,
   X,
   ArrowRight
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { motion } from "framer-motion";
 import { Portfolio, PortfolioCategory, SortOption } from "@/types/portfolio";
 import { AppCard } from "./AppCard";
@@ -239,20 +239,20 @@ export function DiscoverApps({
         {/* ========================================================================= */}
         {/* 1. SECTION HEADER WITH SUBMIT PORTFOLIO PILL (MATCHING NAVBAR)             */}
         {/* ========================================================================= */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6 pb-6 border-b border-slate-200">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6 pb-6 border-b border-slate-200 dark:border-white/10">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="p-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700">
+              <span className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400">
                 <Compass className="w-4 h-4" />
               </span>
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-indigo-700">
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
                 Portfolio Directory
               </span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
               Discover Developer Portfolios
             </h2>
-            <p className="text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
+            <p className="text-base sm:text-[19px] text-slate-600 dark:text-slate-300 mt-2 max-w-3xl leading-relaxed font-normal">
               Browse developer portfolios, open-source architectures, and creative codebases categorized across domains with peer ratings and 5-per-line layouts.
             </p>
           </div>
@@ -277,11 +277,11 @@ export function DiscoverApps({
         {/* ========================================================================= */}
         <div className="mb-6">
           <div className="flex items-center justify-between gap-2 mb-3">
-            <span className="text-xs font-mono font-semibold uppercase text-slate-500 flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-xs font-mono font-semibold uppercase text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
               <span>Category Domains</span>
             </span>
-            <span suppressHydrationWarning className="text-xs font-mono text-slate-400">
+            <span suppressHydrationWarning className="text-xs font-mono text-slate-400 dark:text-slate-500">
               {totalApps} {totalApps === 1 ? "portfolio" : "portfolios"} found
             </span>
           </div>
@@ -308,23 +308,23 @@ export function DiscoverApps({
         {/* ========================================================================= */}
         {/* 3. FILTER BAR: Search, Sort, and View Modes                                */}
         {/* ========================================================================= */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200 p-3 sm:p-4 mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-2xs">
+        <div className="bg-slate-50 dark:bg-zinc-900/60 rounded-2xl border border-slate-200 dark:border-white/10 p-3 sm:p-4 mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-2xs">
           {/* Search input */}
           <div className="relative flex-1 min-w-[240px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-zinc-500 pointer-events-none" />
             <input
               id="discover-search-input"
               type="text"
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search portfolios by title, author, tech stack..."
-              className="w-full bg-white text-xs pl-9 pr-8 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder:text-slate-400 text-slate-900 transition-all shadow-xs"
+              className="w-full bg-white dark:bg-zinc-800 text-xs pl-9 pr-8 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder:text-slate-400 dark:placeholder:text-zinc-500 text-slate-900 dark:text-white transition-all shadow-xs"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => handleSearchChange("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 p-0.5 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -334,24 +334,24 @@ export function DiscoverApps({
           {/* Right: Sort & View Mode Switcher */}
           <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
             {/* Sort select */}
-            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-xs">
-              <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+            <div className="flex items-center gap-1.5 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-2.5 py-1.5 shadow-xs">
+              <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500" />
               <select
                 value={sortOption}
                 onChange={(e) => handleSortChange(e.target.value as SortOption)}
-                className="bg-transparent text-xs text-slate-800 font-medium focus:outline-hidden cursor-pointer"
+                className="bg-transparent text-xs text-slate-800 dark:text-zinc-200 font-medium focus:outline-hidden cursor-pointer"
                 aria-label="Sort portfolios"
               >
-                <option value="highest_rated">Highest Rated</option>
-                <option value="most_liked">Most Liked</option>
-                <option value="most_discussed">Most Discussed</option>
-                <option value="latest">Newest First</option>
-                <option value="showcase">Showcase First</option>
+                <option value="highest_rated" className="dark:bg-zinc-800 dark:text-white">Highest Rated</option>
+                <option value="most_liked" className="dark:bg-zinc-800 dark:text-white">Most Liked</option>
+                <option value="most_discussed" className="dark:bg-zinc-800 dark:text-white">Most Discussed</option>
+                <option value="latest" className="dark:bg-zinc-800 dark:text-white">Newest First</option>
+                <option value="showcase" className="dark:bg-zinc-800 dark:text-white">Showcase First</option>
               </select>
             </div>
 
             {/* View Mode Buttons */}
-            <div className="flex items-center bg-white border border-slate-200 rounded-xl p-0.5 shadow-xs">
+            <div className="flex items-center bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl p-0.5 shadow-xs">
               <button
                 type="button"
                 onClick={() => setViewMode("grid3")}
@@ -359,8 +359,8 @@ export function DiscoverApps({
                 className={cn(
                   "p-1.5 rounded-lg text-xs transition-colors cursor-pointer",
                   viewMode === "grid3"
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-500 hover:text-slate-900"
+                    ? "bg-slate-900 dark:bg-white text-white dark:text-zinc-900"
+                    : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
                 )}
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
@@ -372,8 +372,8 @@ export function DiscoverApps({
                 className={cn(
                   "p-1.5 rounded-lg text-xs transition-colors cursor-pointer",
                   viewMode === "grouped"
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-500 hover:text-slate-900"
+                    ? "bg-slate-900 dark:bg-white text-white dark:text-zinc-900"
+                    : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
                 )}
               >
                 <Layers className="w-3.5 h-3.5" />
@@ -385,8 +385,8 @@ export function DiscoverApps({
                 className={cn(
                   "p-1.5 rounded-lg text-xs transition-colors cursor-pointer",
                   viewMode === "list"
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-500 hover:text-slate-900"
+                    ? "bg-slate-900 dark:bg-white text-white dark:text-zinc-900"
+                    : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
                 )}
               >
                 <ListFilter className="w-3.5 h-3.5" />
@@ -438,12 +438,12 @@ export function DiscoverApps({
           <div className="space-y-10">
             {Array.from(groupedApps.entries()).map(([domainCat, apps]) => (
               <div key={domainCat} className="space-y-3.5">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/10">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-base sm:text-lg text-slate-900">
+                    <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white">
                       {domainCat}
                     </h3>
-                    <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                    <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700">
                       {apps.length} {apps.length === 1 ? "portfolio" : "portfolios"}
                     </span>
                   </div>
@@ -455,7 +455,7 @@ export function DiscoverApps({
                       setViewMode("grid3");
                       setCurrentPage(1);
                     }}
-                    className="text-xs font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+                    className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
                   >
                     <span>View all in {domainCat}</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -501,16 +501,16 @@ export function DiscoverApps({
         {/* 5. PAGINATION CONTROLS                                                    */}
         {/* ========================================================================= */}
         {totalApps > 0 && (
-          <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
             {/* Status info & items per page selector */}
-            <div suppressHydrationWarning className="flex items-center gap-3 text-xs text-slate-500 font-mono">
+            <div suppressHydrationWarning className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 font-mono">
               <span suppressHydrationWarning>
-                Showing <strong className="text-slate-900">{startIndex + 1}</strong>–
-                <strong className="text-slate-900">{endIndex}</strong> of{" "}
-                <strong className="text-slate-900">{totalApps}</strong> portfolios
+                Showing <strong className="text-slate-900 dark:text-white">{startIndex + 1}</strong>–
+                <strong className="text-slate-900 dark:text-white">{endIndex}</strong> of{" "}
+                <strong className="text-slate-900 dark:text-white">{totalApps}</strong> portfolios
               </span>
 
-              <div className="h-3 w-px bg-slate-200" />
+              <div className="h-3 w-px bg-slate-200 dark:bg-zinc-700" />
 
               <div className="flex items-center gap-1.5">
                 <span>Per page:</span>
@@ -521,13 +521,13 @@ export function DiscoverApps({
                     setItemsPerPage(next);
                     setCurrentPage(1);
                   }}
-                  className="bg-white border border-slate-200 text-slate-800 rounded-md px-1.5 py-0.5 text-xs font-mono focus:outline-hidden cursor-pointer"
+                  className="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-zinc-200 rounded-md px-1.5 py-0.5 text-xs font-mono focus:outline-hidden cursor-pointer"
                   aria-label="Portfolios per page"
                 >
-                  <option value={9}>9 (3x3 grid)</option>
-                  <option value={18}>18 (6x3 grid)</option>
-                  <option value={27}>27 (9x3 grid)</option>
-                  <option value={36}>36 (12x3 grid)</option>
+                  <option value={9} className="dark:bg-zinc-800 dark:text-white">9 (3x3 grid)</option>
+                  <option value={18} className="dark:bg-zinc-800 dark:text-white">18 (6x3 grid)</option>
+                  <option value={27} className="dark:bg-zinc-800 dark:text-white">27 (9x3 grid)</option>
+                  <option value={36} className="dark:bg-zinc-800 dark:text-white">36 (12x3 grid)</option>
                 </select>
               </div>
             </div>
@@ -542,8 +542,8 @@ export function DiscoverApps({
                 className={cn(
                   "inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all",
                   safeCurrentPage <= 1
-                    ? "bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed"
-                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 cursor-pointer shadow-xs"
+                    ? "bg-slate-50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800 text-slate-300 dark:text-zinc-600 cursor-not-allowed"
+                    : "bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 hover:text-slate-900 dark:hover:text-white cursor-pointer shadow-xs"
                 )}
                 aria-label="Previous page"
               >
@@ -558,7 +558,7 @@ export function DiscoverApps({
                     return (
                       <span
                         key={`ellipsis-${pIdx}`}
-                        className="px-2 py-1 text-xs text-slate-400 font-mono"
+                        className="px-2 py-1 text-xs text-slate-400 dark:text-zinc-500 font-mono"
                       >
                         ...
                       </span>
@@ -576,8 +576,8 @@ export function DiscoverApps({
                       className={cn(
                         "w-8 h-8 rounded-xl text-xs font-mono font-medium transition-all cursor-pointer flex items-center justify-center",
                         isCurrent
-                          ? "bg-slate-900 text-white font-bold shadow-xs"
-                          : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 shadow-2xs"
+                          ? "bg-slate-900 dark:bg-white text-white dark:text-zinc-900 font-bold shadow-xs"
+                          : "bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 hover:text-slate-900 dark:hover:text-white shadow-2xs"
                       )}
                       aria-label={`Page ${pNum}`}
                       aria-current={isCurrent ? "page" : undefined}
@@ -596,8 +596,8 @@ export function DiscoverApps({
                 className={cn(
                   "inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all",
                   safeCurrentPage >= totalPages
-                    ? "bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed"
-                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 cursor-pointer shadow-xs"
+                    ? "bg-slate-50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800 text-slate-300 dark:text-zinc-600 cursor-not-allowed"
+                    : "bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 hover:text-slate-900 dark:hover:text-white cursor-pointer shadow-xs"
                 )}
                 aria-label="Next page"
               >

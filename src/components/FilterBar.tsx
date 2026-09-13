@@ -11,7 +11,7 @@ import {
   Award,
   Filter,
   Columns
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { PortfolioCategory, SortOption } from "@/types/portfolio";
 import { cn } from "@/lib/utils";
 import { AnimatedCounter } from "@/components/ui/animated-counter";

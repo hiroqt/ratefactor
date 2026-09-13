@@ -3,17 +3,17 @@
  * Fully isomorphic & Next.js App Router / Client / Edge compatible.
  */
 
-import posthog from "posthog-js";
-
 const RAW_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY || process.env.POSTHOG_API_KEY || "";
 // A valid PostHog client Project API key starts with "phc_"
 const POSTHOG_KEY = RAW_KEY.startsWith("phc_") ? RAW_KEY : "";
 const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
 
+let posthogInstance: any = null;
+
 /**
  * Initializes PostHog in the browser.
  */
-export function initPostHog(): void {
+export async function initPostHog(): Promise<void> {
   if (typeof window === "undefined") return;
 
   if (!POSTHOG_KEY) {
@@ -23,19 +23,25 @@ export function initPostHog(): void {
     return;
   }
 
-  posthog.init(POSTHOG_KEY, {
-    api_host: POSTHOG_HOST,
-    person_profiles: "identified_only",
-    capture_pageview: false,
-    capture_pageleave: true,
-    autocapture: true,
-    advanced_disable_decide: false,
-    loaded: (ph) => {
-      if (process.env.NODE_ENV === "development") {
-        ph.debug();
-      }
-    },
-  });
+  try {
+    const { default: posthog } = await import("posthog-js");
+    posthogInstance = posthog;
+    posthog.init(POSTHOG_KEY, {
+      api_host: POSTHOG_HOST,
+      person_profiles: "identified_only",
+      capture_pageview: false,
+      capture_pageleave: true,
+      autocapture: true,
+      advanced_disable_decide: false,
+      loaded: (ph) => {
+        if (process.env.NODE_ENV === "development") {
+          ph.debug();
+        }
+      },
+    });
+  } catch (err) {
+    console.warn("[PostHog] Failed to dynamically load posthog-js:", err);
+  }
 }
 
 /**
@@ -47,8 +53,8 @@ export function captureClientEvent(
 ): void {
   try {
     if (typeof window !== "undefined") {
-      if (posthog && typeof posthog.capture === "function" && POSTHOG_KEY) {
-        posthog.capture(eventName, properties);
+      if (posthogInstance && typeof posthogInstance.capture === "function" && POSTHOG_KEY) {
+        posthogInstance.capture(eventName, properties);
       }
       if (process.env.NODE_ENV === "development") {
         console.debug(`[PostHog Client] ${eventName}:`, properties);
@@ -104,4 +110,4 @@ export async function captureServerEvent(
   }
 }
 
-export { posthog };
+export { posthogInstance as posthog };

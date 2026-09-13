@@ -14,7 +14,6 @@ import {
   ArrowUpRight, 
   Edit3, 
   Star, 
-  Sparkles, 
   CheckCircle2, 
   ExternalLink, 
   Eye, 
@@ -41,7 +40,7 @@ import {
   Compass,
   Smile,
   Briefcase
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { Navbar, Footer } from "@/components/layout";
 import { DeveloperDashboard, useDeveloperProfile } from "@/features/dashboard";
 import {
@@ -57,6 +56,7 @@ import { PublicProfileModal } from "@/components/PublicProfileModal";
 import { DeveloperProfile, UserStatus } from "@/types/profile";
 import { Portfolio } from "@/types/portfolio";
 import { HookSidebar, HookSidebarItem } from "@/components/ui/hook-sidebar";
+import { HireSwitch } from "@/components/ui/HireSwitch";
 import { ActivityHeatmap } from "@/components/dashboard/ActivityHeatmap";
 import { ShowcaseShelf } from "@/components/dashboard/ShowcaseShelf";
 import { CustomizePinsModal } from "@/components/dashboard/CustomizePinsModal";
@@ -64,7 +64,7 @@ import { EditStatusModal } from "@/components/dashboard/EditStatusModal";
 import { EditBioModal } from "@/components/dashboard/EditBioModal";
 import { PublicProfilePreview } from "@/components/dashboard/PublicProfilePreview";
 import { MarkdownRenderer } from "@/components/dashboard/MarkdownRenderer";
-import { cn, formatNumber, formatRating, formatJoinedDate } from "@/lib/utils";
+import { cn, formatNumber, formatRating, formatJoinedDate, normalizeAvatarUrl } from "@/lib/utils";
 import { getEmojiDisplay } from "@/components/PortfolioDetailModal";
 
 type ActiveTabId = "dashboard" | "github" | "preview" | "bookmarks" | "edit" | "account";
@@ -104,6 +104,7 @@ function ProfilePageContent() {
   // 1. Unified Authentication State
   const {
     currentUser,
+    isLoading: isAuthLoading,
     isAuthModalOpen,
     setIsAuthModalOpen,
     authIntentMessage,
@@ -115,9 +116,17 @@ function ProfilePageContent() {
       toast.success(`Authenticated as @${u.username || u.name} (${(u.role || "developer").toUpperCase()})`);
     },
     onSignOut: () => {
-      toast.info("Signed out. You are now browsing as a guest.");
+      toast.info("Signed out. Returning to home...");
+      router.push("/");
     },
   });
+
+  // Redirect unauthenticated guests to the main page hero section
+  useEffect(() => {
+    if (!isAuthLoading && !currentUser) {
+      router.push("/");
+    }
+  }, [currentUser, isAuthLoading, router]);
 
   // 2. Developer Profile State
   const {
@@ -385,6 +394,11 @@ function ProfilePageContent() {
     }
   };
 
+  // Prevent flashing unauthenticated profile UI before redirecting to hero section
+  if (!isAuthLoading && !currentUser) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-[#fafbfc] flex flex-col selection:bg-slate-900 selection:text-white">
       {/* Floating Modern Header */}
@@ -502,9 +516,13 @@ function ProfilePageContent() {
                   <div className="relative shrink-0">
                     <div className="w-10 h-10 rounded-xl overflow-hidden ring-1 ring-slate-200">
                       <img
-                        src={developerProfile.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80"}
+                        src={normalizeAvatarUrl(developerProfile.avatar, developerProfile.username)}
                         alt={developerProfile.name}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src =
+                            "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80";
+                        }}
                       />
                     </div>
                     <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white bg-emerald-500" />
@@ -523,7 +541,13 @@ function ProfilePageContent() {
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-mono">
                   <button
                     type="button"
-                    onClick={() => setIsStatusModalOpen(true)}
+                    onClick={() => {
+                      if (!currentUser) {
+                        requireAuth("Sign in to edit your developer status.");
+                        return;
+                      }
+                      setIsStatusModalOpen(true);
+                    }}
                     className="flex items-center gap-1.5 text-slate-700 hover:text-slate-950 p-1 -ml-1 rounded hover:bg-slate-100 transition-colors cursor-pointer group min-w-0 text-left"
                     title="Click to edit status"
                   >
@@ -545,7 +569,13 @@ function ProfilePageContent() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => setIsBioModalOpen(true)}
+                      onClick={() => {
+                        if (!currentUser) {
+                          requireAuth("Sign in to edit your developer bio.");
+                          return;
+                        }
+                        setIsBioModalOpen(true);
+                      }}
                       className="text-[11px] text-emerald-700 hover:text-emerald-800 font-semibold mt-1 inline-flex items-center gap-1 cursor-pointer"
                     >
                       <Edit3 className="w-3 h-3" />
@@ -556,44 +586,20 @@ function ProfilePageContent() {
 
                 {/* Available for Hire Quick Toggle */}
                 <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="relative flex h-2.5 w-2.5">
-                      {(developerProfile.availableForHire ?? true) && (
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      )}
-                      <span
-                        className={cn(
-                          "relative inline-flex rounded-full h-2.5 w-2.5",
-                          (developerProfile.availableForHire ?? true) ? "bg-emerald-500" : "bg-slate-300"
-                        )}
-                      />
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-800">
-                      {(developerProfile.availableForHire ?? true) ? "Available for Hire" : "Not for Hire"}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={developerProfile.availableForHire ?? true}
-                    onClick={() => {
-                      const next = !(developerProfile.availableForHire ?? true);
+                  <HireSwitch
+                    checked={developerProfile.availableForHire ?? true}
+                    onChange={(next) => {
+                      if (!currentUser) {
+                        requireAuth("Sign in to update your hire availability status.");
+                        return;
+                      }
                       updateProfile({ ...developerProfile, availableForHire: next });
                       toast.success(next ? "Status updated: Available for Hire 🟢" : "Status updated: Not looking for work ⚪");
                     }}
-                    className={cn(
-                      "relative inline-flex h-4.5 w-8 items-center rounded-full transition-colors cursor-pointer",
-                      (developerProfile.availableForHire ?? true) ? "bg-emerald-500" : "bg-slate-300"
-                    )}
-                    title="Toggle Available for Hire status"
-                  >
-                    <span
-                      className={cn(
-                        "inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow-xs",
-                        (developerProfile.availableForHire ?? true) ? "translate-x-4" : "translate-x-0.5"
-                      )}
-                    />
-                  </button>
+                    showLabel
+                    size="sm"
+                    className="w-full justify-between"
+                  />
                 </div>
               </div>
 
@@ -697,10 +703,17 @@ function ProfilePageContent() {
                       <div className="text-[11px] font-mono text-slate-500 uppercase tracking-wider">
                         GitHub Sync
                       </div>
-                      <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-600 flex items-center gap-1">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                        <span className="text-sm font-semibold text-slate-900">Synced</span>
-                      </div>
+                      {developerProfile.githubSync?.connected || Boolean(developerProfile.github) ? (
+                        <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-600 flex items-center gap-1">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                          <span className="text-sm font-semibold text-slate-900">Synced</span>
+                        </div>
+                      ) : (
+                        <div className="text-xl sm:text-2xl font-bold font-mono text-slate-400 flex items-center gap-1.5 pt-0.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
+                          <span className="text-xs font-semibold text-slate-500 font-sans">Not Linked</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -821,7 +834,12 @@ function ProfilePageContent() {
 
                   {/* GitHub-Style Activity / Contribution Heatmap */}
                   <div className="pt-2">
-                    <ActivityHeatmap profile={developerProfile} />
+                    <ActivityHeatmap 
+                      profile={developerProfile} 
+                      onUpdateProfile={updateProfile}
+                      onRequireAuth={requireAuth}
+                      readOnly={!currentUser}
+                    />
                   </div>
 
                   {/* Showcase Shelf */}
@@ -830,9 +848,21 @@ function ProfilePageContent() {
                       myPortfolios={myPortfolios}
                       pinnedIds={developerProfile.pinnedPortfolioIds || []}
                       spotlightId={developerProfile.spotlightPortfolioId}
-                      onCustomizePins={() => setIsPinsModalOpen(true)}
+                      onCustomizePins={() => {
+                        if (!currentUser) {
+                          requireAuth("Sign in to customize pinned blueprints.");
+                          return;
+                        }
+                        setIsPinsModalOpen(true);
+                      }}
                       onSelectPortfolio={(p) => setSelectedPortfolio(p)}
-                      onOpenSubmitModal={() => setIsSubmitModalOpen(true)}
+                      onOpenSubmitModal={() => {
+                        if (!currentUser) {
+                          requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
+                          return;
+                        }
+                        setIsSubmitModalOpen(true);
+                      }}
                     />
                   </div>
                 </div>
@@ -857,7 +887,13 @@ function ProfilePageContent() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setIsStatusModalOpen(true)}
+                        onClick={() => {
+                          if (!currentUser) {
+                            requireAuth("Sign in to edit your developer status.");
+                            return;
+                          }
+                          setIsStatusModalOpen(true);
+                        }}
                         className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <Smile className="w-3.5 h-3.5 text-slate-500" />
@@ -865,7 +901,13 @@ function ProfilePageContent() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setIsBioModalOpen(true)}
+                        onClick={() => {
+                          if (!currentUser) {
+                            requireAuth("Sign in to edit your developer bio.");
+                            return;
+                          }
+                          setIsBioModalOpen(true);
+                        }}
                         className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <Edit3 className="w-3.5 h-3.5 text-slate-500" />
@@ -889,6 +931,7 @@ function ProfilePageContent() {
                       setIsSubmitModalOpen(true);
                     }}
                     onRequireAuth={requireAuth}
+                    isOwner={Boolean(currentUser)}
                   />
                 </div>
               )}
@@ -998,204 +1041,210 @@ function ProfilePageContent() {
                     </p>
                   </div>
 
-                  <form onSubmit={handleSaveEditProfile} className="space-y-5">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-700">
-                          Full Name
-                        </label>
-                        <input
-                          type="text"
-                          value={editForm.name}
-                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                          required
-                          className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-700">
-                          Username
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-3.5 top-2.5 text-xs text-slate-400 font-mono">@</span>
-                          <input
-                            type="text"
-                            value={editForm.username}
-                            onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
-                            required
-                            className="w-full pl-8 pr-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900"
-                          />
-                        </div>
-                      </div>
+                  {!currentUser ? (
+                    <div className="py-16 text-center space-y-3 border border-dashed border-slate-200 rounded-2xl">
+                      <Lock className="w-8 h-8 text-slate-300 mx-auto" />
+                      <h4 className="text-sm font-bold text-slate-800">Authentication Required</h4>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                        You must be signed in to configure your developer identity, skills, and README story.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => requireAuth("Sign in with GitHub or Email to configure your developer identity.")}
+                        className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Github className="w-3.5 h-3.5" />
+                        <span>Sign In to Configure</span>
+                      </button>
                     </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-700">
-                          Role / Title
-                        </label>
-                        <input
-                          type="text"
-                          value={editForm.role}
-                          onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                          placeholder="e.g. Senior Fullstack Architect"
-                          className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-700">
-                          Avatar URL
-                        </label>
-                        <input
-                          type="url"
-                          value={editForm.avatar}
-                          onChange={(e) => setEditForm({ ...editForm, avatar: e.target.value })}
-                          className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-slate-700">
-                        Engineering Bio
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={editForm.bio}
-                        onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
-                        placeholder="Describe your technical background, software architecture focus, and philosophy..."
-                        className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-slate-700">
-                        Technologies &amp; Skills (comma separated)
-                      </label>
-                      <input
-                        type="text"
-                        value={editForm.skillsInput}
-                        onChange={(e) => setEditForm({ ...editForm, skillsInput: e.target.value })}
-                        placeholder="TypeScript, Next.js, React, PostgreSQL, TailwindCSS"
-                        className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                          <Github className="w-3.5 h-3.5" />
-                          <span>GitHub URL</span>
-                        </label>
-                        <input
-                          type="url"
-                          value={editForm.github}
-                          onChange={(e) => setEditForm({ ...editForm, github: e.target.value })}
-                          placeholder="https://github.com/..."
-                          className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                          <Linkedin className="w-3.5 h-3.5 text-blue-600" />
-                          <span>LinkedIn URL</span>
-                        </label>
-                        <input
-                          type="url"
-                          value={editForm.linkedin}
-                          onChange={(e) => setEditForm({ ...editForm, linkedin: e.target.value })}
-                          placeholder="https://linkedin.com/in/..."
-                          className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                          <Twitter className="w-3.5 h-3.5 text-sky-500" />
-                          <span>Twitter URL</span>
-                        </label>
-                        <input
-                          type="url"
-                          value={editForm.twitter}
-                          onChange={(e) => setEditForm({ ...editForm, twitter: e.target.value })}
-                          placeholder="https://twitter.com/..."
-                          className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Hire Availability Toggle & Custom Message */}
-                    <div className="space-y-3 pt-2 border-t border-slate-100">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                          <Mail className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Available for Hire</span>
-                        </label>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={editForm.availableForHire}
-                          onClick={() => setEditForm({ ...editForm, availableForHire: !editForm.availableForHire })}
-                          className={cn(
-                            "relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer",
-                            editForm.availableForHire ? "bg-emerald-500" : "bg-slate-300"
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-xs",
-                              editForm.availableForHire ? "translate-x-4.5" : "translate-x-0.5"
-                            )}
-                          />
-                        </button>
-                      </div>
-                      {editForm.availableForHire && (
+                  ) : (
+                    <form onSubmit={handleSaveEditProfile} className="space-y-5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                          <label className="text-xs text-slate-500 font-mono">
-                            Custom Hire Message (optional)
+                          <label className="text-xs font-semibold text-slate-700">
+                            Full Name
                           </label>
                           <input
                             type="text"
-                            value={editForm.customHireMessage}
-                            onChange={(e) => setEditForm({ ...editForm, customHireMessage: e.target.value })}
-                            placeholder="Open for contract engineering and full-time roles..."
-                            maxLength={500}
-                            className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            value={editForm.name}
+                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                            required
+                            className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
                           />
                         </div>
-                      )}
-                    </div>
 
-                    {/* README Story */}
-                    <div className="space-y-2 pt-2 border-t border-slate-100">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                          <FileText className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Developer README.md Markdown Story</span>
-                        </label>
-                        <span className="text-[11px] font-mono text-slate-400">GFM supported</span>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-slate-700">
+                            Username
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3.5 top-2.5 text-xs text-slate-400 font-mono">@</span>
+                            <input
+                              type="text"
+                              value={editForm.username}
+                              onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                              required
+                              className="w-full pl-8 pr-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <textarea
-                        rows={6}
-                        value={editForm.readmeMarkdown}
-                        onChange={(e) => setEditForm({ ...editForm, readmeMarkdown: e.target.value })}
-                        placeholder="### Architectural Philosophy&#10;Describe your software design patterns and open source work..."
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900 leading-relaxed"
-                      />
-                    </div>
 
-                    <div className="pt-3 border-t border-slate-100 flex items-center justify-end">
-                      <button
-                        type="submit"
-                        className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-semibold transition-colors cursor-pointer"
-                      >
-                        Save Identity
-                      </button>
-                    </div>
-                  </form>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-slate-700">
+                            Role / Title
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.role}
+                            onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                            placeholder="e.g. Senior Fullstack Architect"
+                            className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-slate-700">
+                            Avatar URL
+                          </label>
+                          <input
+                            type="url"
+                            value={editForm.avatar}
+                            onChange={(e) => setEditForm({ ...editForm, avatar: e.target.value })}
+                            className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-slate-700">
+                          Engineering Bio
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={editForm.bio}
+                          onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                          placeholder="Describe your technical background, software architecture focus, and philosophy..."
+                          className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-slate-700">
+                          Technologies &amp; Skills (comma separated)
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.skillsInput}
+                          onChange={(e) => setEditForm({ ...editForm, skillsInput: e.target.value })}
+                          placeholder="TypeScript, Next.js, React, PostgreSQL, TailwindCSS"
+                          className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                            <Github className="w-3.5 h-3.5" />
+                            <span>GitHub URL</span>
+                          </label>
+                          <input
+                            type="url"
+                            value={editForm.github}
+                            onChange={(e) => setEditForm({ ...editForm, github: e.target.value })}
+                            placeholder="https://github.com/..."
+                            className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                            <Linkedin className="w-3.5 h-3.5 text-blue-600" />
+                            <span>LinkedIn URL</span>
+                          </label>
+                          <input
+                            type="url"
+                            value={editForm.linkedin}
+                            onChange={(e) => setEditForm({ ...editForm, linkedin: e.target.value })}
+                            placeholder="https://linkedin.com/in/..."
+                            className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                            <Twitter className="w-3.5 h-3.5 text-sky-500" />
+                            <span>Twitter URL</span>
+                          </label>
+                          <input
+                            type="url"
+                            value={editForm.twitter}
+                            onChange={(e) => setEditForm({ ...editForm, twitter: e.target.value })}
+                            placeholder="https://twitter.com/..."
+                            className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Hire Availability Toggle & Custom Message */}
+                      <div className="space-y-3 pt-2 border-t border-slate-100">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                            <Mail className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Available for Hire</span>
+                          </label>
+                          <HireSwitch
+                            checked={editForm.availableForHire}
+                            onChange={(checked) => setEditForm({ ...editForm, availableForHire: checked })}
+                            size="md"
+                          />
+                        </div>
+                        {editForm.availableForHire && (
+                          <div className="space-y-1.5">
+                            <label className="text-xs text-slate-500 font-mono">
+                              Custom Hire Message (optional)
+                            </label>
+                            <input
+                              type="text"
+                              value={editForm.customHireMessage}
+                              onChange={(e) => setEditForm({ ...editForm, customHireMessage: e.target.value })}
+                              placeholder="Open for contract engineering and full-time roles..."
+                              maxLength={500}
+                              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* README Story */}
+                      <div className="space-y-2 pt-2 border-t border-slate-100">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                            <FileText className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Developer README.md Markdown Story</span>
+                          </label>
+                          <span className="text-[11px] font-mono text-slate-400">GFM supported</span>
+                        </div>
+                        <textarea
+                          rows={6}
+                          value={editForm.readmeMarkdown}
+                          onChange={(e) => setEditForm({ ...editForm, readmeMarkdown: e.target.value })}
+                          placeholder="### Architectural Philosophy&#10;Describe your software design patterns and open source work..."
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900 leading-relaxed"
+                        />
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-end">
+                        <button
+                          type="submit"
+                          className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          Save Identity
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               )}
 
@@ -1213,44 +1262,62 @@ function ProfilePageContent() {
                     </p>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                      <div className="text-xs font-semibold text-slate-900">
-                        Session Identity
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                        <div className="p-3 bg-white rounded-xl border border-slate-200/80">
-                          <span className="text-slate-400 font-mono">Email Address</span>
-                          <p className="font-semibold text-slate-900 mt-0.5">
-                            {currentUser?.email || `${developerProfile.username}@developer.io`}
-                          </p>
-                        </div>
-                        <div className="p-3 bg-white rounded-xl border border-slate-200/80">
-                          <span className="text-slate-400 font-mono">Member Since</span>
-                          <p className="font-semibold text-slate-900 mt-0.5">
-                            {formatJoinedDate(developerProfile.joinedDate)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-rose-50/60 border border-rose-200 space-y-3">
-                      <div className="text-xs font-semibold text-rose-900">
-                        Session Termination
-                      </div>
-                      <p className="text-xs text-rose-700">
-                        Terminate session credentials and return to guest state.
+                  {!currentUser ? (
+                    <div className="py-16 text-center space-y-3 border border-dashed border-slate-200 rounded-2xl">
+                      <Lock className="w-8 h-8 text-slate-300 mx-auto" />
+                      <h4 className="text-sm font-bold text-slate-800">No Active Session</h4>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                        You are currently browsing as a guest. Sign in to view session credentials and security settings.
                       </p>
                       <button
                         type="button"
-                        onClick={handleSignOut}
-                        className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                        onClick={() => requireAuth("Sign in with GitHub or Email to manage your account session.")}
+                        className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
-                        <LogOut className="w-3.5 h-3.5" />
-                        <span>Sign Out of RateFactor</span>
+                        <Github className="w-3.5 h-3.5" />
+                        <span>Sign In to RateFactor</span>
                       </button>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                        <div className="text-xs font-semibold text-slate-900">
+                          Session Identity
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                          <div className="p-3 bg-white rounded-xl border border-slate-200/80">
+                            <span className="text-slate-400 font-mono">Email Address</span>
+                            <p className="font-semibold text-slate-900 mt-0.5">
+                              {currentUser.email || `${developerProfile.username}@developer.io`}
+                            </p>
+                          </div>
+                          <div className="p-3 bg-white rounded-xl border border-slate-200/80">
+                            <span className="text-slate-400 font-mono">Member Since</span>
+                            <p className="font-semibold text-slate-900 mt-0.5">
+                              {formatJoinedDate(developerProfile.joinedDate)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-rose-50/60 border border-rose-200 space-y-3">
+                        <div className="text-xs font-semibold text-rose-900">
+                          Session Termination
+                        </div>
+                        <p className="text-xs text-rose-700">
+                          Terminate session credentials and return to guest state.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleSignOut}
+                          className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                        >
+                          <LogOut className="w-3.5 h-3.5" />
+                          <span>Sign Out of RateFactor</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

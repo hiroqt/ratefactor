@@ -4,21 +4,19 @@ import React, { useState, useEffect, useRef } from "react";
 import { useModalSmoothScroll } from "@/hooks/useModalSmoothScroll";
 import { 
   X, 
-  Terminal, 
-  Lock, 
   Mail, 
-  User,
+  User, 
   KeyRound, 
   ArrowRight, 
   AlertCircle, 
   CheckCircle2, 
-  RefreshCw,
-  ShieldCheck,
-  Github,
-  Sparkles,
-  Eye,
-  EyeOff
-} from "lucide-react";
+  RefreshCw, 
+  ShieldCheck, 
+  Github, 
+  Eye, 
+  EyeOff, 
+  ArrowLeft 
+} from "@/components/ui/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { authClient, normalizeUsername } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
@@ -36,19 +34,20 @@ export function AuthModal({
   onAuthSuccess,
   intentMessage = "Sign in to like, comment, or rate developer portfolios.",
 }: AuthModalProps) {
-  const [viewMode, setViewMode] = useState<"better_auth" | "otp">("better_auth");
+  const [viewMode, setViewMode] = useState<"credentials" | "otp">("credentials");
   const [authTab, setAuthTab] = useState<"signin" | "signup">("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
-  // OTP state (for backward compatibility / 2FA flow)
-  const [otpStep, setOtpStep] = useState<"request" | "verify">("request");
+  // OTP Verification state (5-minute lifecycle)
   const [otpCode, setOtpCode] = useState("");
   const [challengeId, setChallengeId] = useState("");
-  const [demoCode, setDemoCode] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState(60);
+  const [countdown, setCountdown] = useState(300); // 5 minutes = 300 seconds
+  const [resendCooldown, setResendCooldown] = useState(60);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,15 +55,21 @@ export function AuthModal({
 
   const modalRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const otpInputRef = useRef<HTMLInputElement>(null);
 
+  // 5-minute Countdown Timer & 60s Resend Cooldown
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (viewMode === "otp" && otpStep === "verify" && countdown > 0) {
-      timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+    if (viewMode === "otp" && countdown > 0) {
+      timer = setTimeout(() => {
+        setCountdown((prev) => prev - 1);
+        setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
     }
     return () => clearTimeout(timer);
-  }, [viewMode, otpStep, countdown]);
+  }, [viewMode, countdown]);
 
+  // Keyboard accessibility
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -80,15 +85,18 @@ export function AuthModal({
     };
   }, [isOpen, onClose]);
 
+  // Reset state on open/close
   useEffect(() => {
     if (!isOpen) {
-      setViewMode("better_auth");
+      setViewMode("credentials");
       setAuthTab("signin");
       setError(null);
       setSuccessMsg(null);
       setOtpCode("");
-      setDemoCode(null);
       setShowPassword(false);
+      setShowConfirmPassword(false);
+      setPassword("");
+      setConfirmPassword("");
     }
   }, [isOpen]);
 
@@ -101,7 +109,14 @@ export function AuthModal({
 
   if (!isOpen) return null;
 
-  // 1. Better Auth - GitHub OAuth sign-in
+  // Format seconds into MM:SS
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  // 1. GitHub OAuth Sign-In
   const handleGithubSignIn = async () => {
     setError(null);
     setIsLoading(true);
@@ -116,76 +131,95 @@ export function AuthModal({
     }
   };
 
-  // 2. Better Auth - Email/Password sign-in and sign-up
-  const handleEmailAuth = async (e: React.FormEvent) => {
+  // 2. Submit Sign In or Initiate Sign Up OTP
+  const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setIsLoading(true);
+    setSuccessMsg(null);
 
     const targetEmail = email.trim();
     if (!targetEmail) {
       setError("Please enter your email address.");
-      setIsLoading(false);
       return;
     }
 
     if (!password || password.length < 6) {
       setError("Password must be at least 6 characters.");
-      setIsLoading(false);
       return;
     }
 
-    try {
-      if (authTab === "signup") {
-        const res = await authClient.signUp.email({
-          email: targetEmail,
-          password,
-          name: name.trim() || targetEmail.split("@")[0],
-        });
-
-        if (res.error) {
-          setError(res.error.message || "Failed to create account. Please try again.");
-          setIsLoading(false);
-          return;
-        }
-
-        const u = res.data?.user;
-        const authenticatedUser = {
-          id: u?.id || "usr_" + Math.random().toString(36).substring(2, 9),
-          name: u?.name || name.trim() || targetEmail.split("@")[0],
-          email: u?.email || targetEmail,
-          avatar: u?.image || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80",
-          role: (u as any)?.role || "developer",
-          username: normalizeUsername(u?.email || targetEmail),
-        };
-
-        onAuthSuccess(authenticatedUser);
-        onClose();
-      } else {
-        const res = await authClient.signIn.email({
-          email: targetEmail,
-          password,
-        });
-
-        if (res.error) {
-          setError(res.error.message || "Invalid email or password.");
-          setIsLoading(false);
-          return;
-        }
-
-        const u = res.data?.user;
-        const authenticatedUser = {
-          id: u?.id || "usr_" + Math.random().toString(36).substring(2, 9),
-          name: u?.name || targetEmail.split("@")[0],
-          email: u?.email || targetEmail,
-          avatar: u?.image || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80",
-          role: (u as any)?.role || "developer",
-          username: normalizeUsername(u?.email || targetEmail),
-        };
-
-        onAuthSuccess(authenticatedUser);
-        onClose();
+    // SIGN UP FLOW: Validate password match and request 5-minute email OTP
+    if (authTab === "signup") {
+      if (password !== confirmPassword) {
+        setError("Passwords do not match. Please verify both password fields.");
+        return;
       }
+
+      setIsLoading(true);
+      try {
+        const res = await fetch("/api/auth/otp/request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: targetEmail,
+            name: name.trim() || targetEmail.split("@")[0],
+            password,
+            purpose: "signup",
+            provider: "email_password",
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.detail || "Failed to dispatch verification code.");
+          setIsLoading(false);
+          return;
+        }
+
+        setChallengeId(data.challengeId);
+        setSuccessMsg(`A 6-digit verification code was sent to ${targetEmail}.`);
+        setViewMode("otp");
+        setCountdown(300); // 5 minutes
+        setResendCooldown(60);
+        setOtpCode("");
+
+        setTimeout(() => {
+          otpInputRef.current?.focus();
+        }, 100);
+      } catch (err: any) {
+        setError("Network error requesting verification code.");
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // SIGN IN FLOW: Direct authentication via Better Auth
+    setIsLoading(true);
+    try {
+      const res = await authClient.signIn.email({
+        email: targetEmail,
+        password,
+      });
+
+      if (res.error) {
+        setError(res.error.message || "Invalid email or password.");
+        setIsLoading(false);
+        return;
+      }
+
+      const u = res.data?.user;
+      const authenticatedUser = {
+        id: u?.id || "usr_" + Math.random().toString(36).substring(2, 9),
+        name: u?.name || targetEmail.split("@")[0],
+        email: u?.email || targetEmail,
+        avatar: u?.image || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80",
+        role: (u as any)?.role || "developer",
+        username: normalizeUsername(u?.email || targetEmail),
+      };
+
+      onAuthSuccess(authenticatedUser);
+      onClose();
     } catch (err: any) {
       setError(err?.message || "Authentication error. Please verify your credentials.");
     } finally {
@@ -193,55 +227,49 @@ export function AuthModal({
     }
   };
 
-  // 3. Fallback OTP challenge request
-  const handleRequestOtp = async () => {
+  // 3. Resend OTP code
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0 || isLoading) return;
     setError(null);
     setIsLoading(true);
-
-    const targetEmail = email.trim();
-    if (!targetEmail) {
-      setError("Please enter your email address.");
-      setIsLoading(false);
-      return;
-    }
 
     try {
       const res = await fetch("/api/auth/otp/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: targetEmail,
+          email: email.trim(),
+          name: name.trim() || email.trim().split("@")[0],
+          password,
+          purpose: "signup",
           provider: "email_password",
-          password: password || undefined,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data.detail || "Failed to request OTP code.");
+        setError(data.detail || "Failed to resend code.");
         setIsLoading(false);
         return;
       }
 
       setChallengeId(data.challengeId);
-      if (data.demoCode) {
-        setDemoCode(data.demoCode);
-      }
-      setSuccessMsg(data.message);
-      setOtpStep("verify");
-      setCountdown(60);
+      setSuccessMsg(`New 6-digit verification code sent to ${email.trim()}.`);
+      setCountdown(300); // Reset 5 minutes
+      setResendCooldown(60);
+      setOtpCode("");
     } catch (err: any) {
-      setError("Network error requesting OTP code.");
+      setError("Failed to resend code. Please check your connection.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 4. Fallback OTP verification
+  // 4. Verify OTP Code and complete registration
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otpCode || otpCode.length !== 6) {
-      setError("Please enter the 6-digit verification code.");
+      setError("Please enter the complete 6-digit verification code.");
       return;
     }
 
@@ -260,7 +288,7 @@ export function AuthModal({
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data.detail || "Invalid OTP verification code.");
+        setError(data.detail || "Invalid or expired verification code.");
         setIsLoading(false);
         return;
       }
@@ -274,6 +302,9 @@ export function AuthModal({
     }
   };
 
+  const isPasswordMatch = confirmPassword.length > 0 && password === confirmPassword;
+  const isPasswordMismatch = confirmPassword.length > 0 && password !== confirmPassword;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-hidden">
       {/* Backdrop */}
@@ -283,7 +314,7 @@ export function AuthModal({
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
         onClick={onClose}
-        className="fixed inset-0 bg-slate-900/50 backdrop-blur-md"
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-md modal-backdrop"
       />
 
       {/* Modal Card */}
@@ -318,9 +349,9 @@ export function AuthModal({
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <h3 id="auth-modal-title" className="text-sm font-bold text-slate-900 tracking-tight truncate">
-                  {viewMode === "better_auth"
+                  {viewMode === "credentials"
                     ? authTab === "signin" ? "Sign In to RateFactor" : "Create Developer Account"
-                    : otpStep === "request" ? "One-Time Password Sign In" : "Verify Authentication Code"}
+                    : "Verify Your Email"}
                 </h3>
                 <span className="text-[9px] font-mono uppercase bg-slate-100 text-slate-600 font-semibold px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
                   beta
@@ -342,7 +373,7 @@ export function AuthModal({
         {/* Intent banner */}
         {intentMessage && (
           <div className="bg-emerald-50/70 border-b border-emerald-100 px-5 sm:px-6 py-2.5 flex items-center gap-2 shrink-0">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
             <p className="text-xs text-emerald-800 font-medium leading-tight">{intentMessage}</p>
           </div>
         )}
@@ -361,27 +392,11 @@ export function AuthModal({
           {successMsg && (
             <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-              <div className="flex-1 font-medium space-y-1.5">
-                <p className="leading-relaxed">{successMsg}</p>
-                {demoCode && (
-                  <div className="flex items-center justify-between bg-white border border-emerald-200/80 rounded-lg px-2.5 py-1.5 shadow-2xs">
-                    <span className="font-mono text-[11px] text-emerald-900">
-                      Demo OTP Code: <strong>{demoCode}</strong>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setOtpCode(demoCode)}
-                      className="text-[10px] font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded transition cursor-pointer"
-                    >
-                      Fill Code
-                    </button>
-                  </div>
-                )}
-              </div>
+              <p className="leading-relaxed flex-1 font-medium">{successMsg}</p>
             </div>
           )}
 
-          {viewMode === "better_auth" ? (
+          {viewMode === "credentials" ? (
             <div className="space-y-4">
               {/* GitHub OAuth Button */}
               <button
@@ -437,7 +452,7 @@ export function AuthModal({
               </div>
 
               {/* Email / Password Form */}
-              <form onSubmit={handleEmailAuth} className="space-y-3.5">
+              <form onSubmit={handleCredentialsSubmit} className="space-y-3.5">
                 {authTab === "signup" && (
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
@@ -449,9 +464,8 @@ export function AuthModal({
                         type="text"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="e.g. Satoshi Nakamoto"
-                        required={authTab === "signup"}
-                        autoComplete="name"
+                        placeholder="Alex Rivera"
+                        required
                         className="w-full bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all"
                       />
                     </div>
@@ -468,34 +482,27 @@ export function AuthModal({
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="dev@ratefactor.dev"
+                      placeholder="alex@ratefactor.dev"
                       required
-                      autoComplete="email"
                       className="w-full bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-semibold text-slate-700">
-                      Password
-                    </label>
-                    {authTab === "signup" && (
-                      <span className="text-[10px] font-mono text-slate-400">Min 6 characters</span>
-                    )}
-                  </div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Password
+                  </label>
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                    <KeyRound className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                     <input
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      required
                       minLength={6}
-                      autoComplete={authTab === "signup" ? "new-password" : "current-password"}
-                      className="w-full bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all font-sans"
+                      required
+                      className="w-full bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all"
                     />
                     <button
                       type="button"
@@ -508,163 +515,157 @@ export function AuthModal({
                   </div>
                 </div>
 
+                {/* Confirm Password Field (Sign Up Only) */}
+                {authTab === "signup" && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+                      <span>Confirm Password</span>
+                      {isPasswordMatch && (
+                        <span className="text-[11px] text-emerald-600 font-medium flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Passwords match
+                        </span>
+                      )}
+                      {isPasswordMismatch && (
+                        <span className="text-[11px] text-rose-500 font-medium">
+                          Passwords do not match
+                        </span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <KeyRound className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="••••••••"
+                        minLength={6}
+                        required
+                        className={cn(
+                          "w-full bg-slate-50/70 hover:bg-slate-50 focus:bg-white border rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all",
+                          isPasswordMismatch
+                            ? "border-rose-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                            : isPasswordMatch
+                            ? "border-emerald-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
+                            : "border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+                        )}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                        aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || (authTab === "signup" && isPasswordMismatch)}
                   className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-black text-white text-sm font-semibold rounded-xl shadow-xs hover:shadow transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
                 >
                   {isLoading ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
                   ) : (
                     <>
-                      <span>{authTab === "signin" ? "Sign In" : "Create Account"}</span>
+                      <span>{authTab === "signin" ? "Sign In" : "Continue with Email Verification"}</span>
                       <ArrowRight className="w-4 h-4 stroke-[2.5]" />
                     </>
                   )}
                 </button>
               </form>
-
-              {/* Toggle to OTP Flow */}
-              <div className="pt-2 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setViewMode("otp");
-                    setOtpStep("request");
-                    setError(null);
-                  }}
-                  className="text-xs text-slate-500 hover:text-slate-900 transition font-medium flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
-                >
-                  <KeyRound className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Or use 2-Step OTP Verification</span>
-                </button>
-              </div>
             </div>
           ) : (
-            /* OTP Mode */
+            /* OTP 5-Minute Email Verification Screen */
             <div className="space-y-4">
-              {otpStep === "request" ? (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleRequestOtp();
-                  }}
-                  className="space-y-3.5"
-                >
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Email Address for OTP
-                    </label>
-                    <div className="relative">
-                      <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="dev@ratefactor.dev"
-                        required
-                        className="w-full bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all"
-                      />
-                    </div>
+              <form onSubmit={handleVerifyOtp} className="space-y-4">
+                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 text-center">
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-2.5 shadow-2xs">
+                    <Mail className="w-5 h-5" />
                   </div>
+                  <h4 className="text-sm font-bold text-slate-900">Check your inbox</h4>
+                  <p className="text-xs text-slate-600 mt-1">
+                    We sent a 6-digit verification code to{" "}
+                    <strong className="text-slate-900 font-mono">{email}</strong>
+                  </p>
+                  <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-slate-200 text-xs font-mono text-slate-700">
+                    <span className={countdown <= 60 ? "text-rose-600 font-bold animate-pulse" : "text-slate-900 font-bold"}>
+                      ⏱️ {formatTime(countdown)}
+                    </span>
+                    <span className="text-[11px] text-slate-400">remaining</span>
+                  </div>
+                </div>
 
+                <div>
+                  <label className="block text-xs font-semibold text-slate-900 mb-1.5 text-center">
+                    Enter 6-Digit Verification Code
+                  </label>
+                  <div className="relative max-w-[280px] mx-auto">
+                    <input
+                      ref={otpInputRef}
+                      type="text"
+                      maxLength={6}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={otpCode}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+                        setOtpCode(val);
+                      }}
+                      placeholder="000000"
+                      autoFocus
+                      required
+                      className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 rounded-xl px-4 py-3 text-2xl font-mono font-extrabold tracking-[0.4em] text-center text-slate-900 placeholder:text-slate-300 outline-none transition-all shadow-2xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
                   <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-black text-white text-sm font-semibold rounded-xl shadow-xs transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                    type="button"
+                    onClick={() => {
+                      setViewMode("credentials");
+                      setError(null);
+                    }}
+                    className="hover:text-slate-900 transition font-medium flex items-center gap-1 cursor-pointer"
                   >
-                    {isLoading ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <span>Send 6-Digit Code</span>
-                        <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-                      </>
-                    )}
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Edit details</span>
                   </button>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyOtp} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-900 mb-1">
-                      Enter 6-Digit Verification Code
-                    </label>
-                    <p className="text-[11px] text-slate-500 mb-3">
-                      Code sent to <span className="text-slate-900 font-mono font-semibold">{email}</span>
-                    </p>
-                    <div className="relative">
-                      <KeyRound className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
-                      <input
-                        type="text"
-                        maxLength={6}
-                        value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                        placeholder="000000"
-                        autoFocus
-                        required
-                        className="w-full bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 rounded-xl pl-10 pr-4 py-3 text-lg font-mono font-bold tracking-[0.4em] text-center text-slate-900 placeholder:text-slate-300 outline-none transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <button
-                      type="button"
-                      onClick={() => setOtpStep("request")}
-                      className="hover:text-slate-900 transition font-medium cursor-pointer"
-                    >
-                      &larr; Change email
-                    </button>
-                    <button
-                      type="button"
-                      disabled={countdown > 0 || isLoading}
-                      onClick={handleRequestOtp}
-                      className="text-slate-900 hover:underline disabled:opacity-50 disabled:no-underline font-medium cursor-pointer"
-                    >
-                      {countdown > 0 ? `Resend code (${countdown}s)` : "Resend Code"}
-                    </button>
-                  </div>
-
                   <button
-                    type="submit"
-                    disabled={isLoading || otpCode.length !== 6}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-black text-white text-sm font-semibold rounded-xl shadow-xs transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                    type="button"
+                    disabled={resendCooldown > 0 || isLoading}
+                    onClick={handleResendOtp}
+                    className="text-slate-900 hover:underline disabled:opacity-50 disabled:no-underline font-medium cursor-pointer"
                   >
-                    {isLoading ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                        <span>Verify Code &amp; Continue</span>
-                      </>
-                    )}
+                    {resendCooldown > 0 ? `Resend code (${resendCooldown}s)` : "Resend Code"}
                   </button>
-                </form>
-              )}
+                </div>
 
-              <div className="pt-2 text-center">
                 <button
-                  type="button"
-                  onClick={() => {
-                    setViewMode("better_auth");
-                    setError(null);
-                  }}
-                  className="text-xs text-slate-500 hover:text-slate-900 transition font-medium cursor-pointer"
+                  type="submit"
+                  disabled={isLoading || otpCode.length !== 6 || countdown === 0}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-black text-white text-sm font-semibold rounded-xl shadow-xs hover:shadow transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
                 >
-                  &larr; Back to GitHub &amp; Password Sign In
+                  {isLoading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span>Verify &amp; Create Account</span>
+                    </>
+                  )}
                 </button>
-              </div>
+              </form>
             </div>
           )}
-
-          {/* Modal Footer Note */}
-          <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-400 font-mono">
-            <Lock className="w-3 h-3 text-slate-400" />
-            <span>Protected by RateFactor Auth &bull; End-to-End Encrypted</span>
-          </div>
         </div>
       </motion.div>
     </div>
   );
 }
+
+export default AuthModal;
 

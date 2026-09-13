@@ -35,28 +35,30 @@ export async function getSessionUser(req: NextRequest): Promise<AuthenticatedUse
     // Database offline or unconfigured in dev; fallback to header credentials
   }
 
-  // 2. Fallback to custom x-user-id header (for API integration/testing)
-  const userId = req.headers.get("x-user-id");
-  if (userId) {
-    return {
-      id: userId,
-      name: "Developer",
-      email: `${userId}@ratefactor.dev`,
-      username: normalizeUsername(userId),
-      role: "developer",
-    };
-  }
+  // 2. Fallback to custom x-user-id header (strictly for dev & test scripts)
+  if (process.env.NODE_ENV !== "production") {
+    const userId = req.headers.get("x-user-id");
+    if (userId) {
+      return {
+        id: userId,
+        name: "Developer",
+        email: `${userId}@ratefactor.dev`,
+        username: normalizeUsername(userId),
+        role: "developer",
+      };
+    }
 
-  // 3. Fallback to Bearer token header
-  const authHeader = req.headers.get("authorization");
-  if (authHeader) {
-    return {
-      id: "bearer_user",
-      name: "Developer",
-      email: "dev@ratefactor.dev",
-      username: "developer",
-      role: "developer",
-    };
+    // 3. Fallback to Bearer token header in dev/test
+    const authHeader = req.headers.get("authorization");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      return {
+        id: "bearer_user",
+        name: "Developer",
+        email: "dev@ratefactor.dev",
+        username: "developer",
+        role: "developer",
+      };
+    }
   }
 
   return null;

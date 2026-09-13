@@ -10,7 +10,7 @@ import {
   useReducedMotion,
   useTransform,
   type Transition,
-} from "motion/react";
+} from "framer-motion";
 
 import { cn } from "@/lib/utils";
 

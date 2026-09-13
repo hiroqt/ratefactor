@@ -2,13 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDown, ArrowRight, Users } from "lucide-react";
+import { ArrowRight, Users } from "@/components/ui/icons";
 import { Portfolio } from "@/types/portfolio";
 import { DeveloperProfile } from "@/types/profile";
-import { cn, formatNumber } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { performanceEngine } from "@/lib/performance";
-import { TakingShader } from "./TakingShader.webgpu";
 
 interface HeroSectionProps {
   showcasePortfolio?: Portfolio | null;
@@ -29,6 +28,7 @@ export function HeroSection({
 }: HeroSectionProps) {
   const [activeKeywordIndex, setActiveKeywordIndex] = useState(0);
   const [animatedCount, setAnimatedCount] = useState(0);
+
   // Grounded in RateFactor ARD & PRD specifications (Sections 1, 4.1, 4.3, 6)
   const keywords = [
     "PORTFOLIO",
@@ -84,22 +84,7 @@ export function HeroSection({
   };
 
   return (
-    <section className="relative w-full min-h-[85vh] lg:min-h-[90vh] flex flex-col justify-between overflow-hidden select-none bg-[#fafafa] text-slate-950">
-      {/* Background WebGPU OpenShaders TakingShader with emerald sparkles */}
-      <div 
-        className="absolute inset-0 pointer-events-none overflow-hidden z-0"
-        aria-hidden="true"
-      >
-        <TakingShader
-          theme="light"
-          background={{ light: "#fafafa", dark: "#090909" }}
-          className="w-full h-full opacity-90 sm:opacity-95"
-          onError={(err) => console.warn("WebGPU hero shader fallback:", err)}
-        />
-        {/* Subtle, soft edge blending for crystal-clear text contrast */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#fafafa]/20 via-transparent to-[#fafafa]/30 pointer-events-none" />
-      </div>
-
+    <section className="relative w-full min-h-[85vh] lg:min-h-[90vh] flex flex-col justify-between overflow-hidden select-none bg-background text-foreground">
       {/* Top spacing to account for floating nav */}
       <div className="h-20 sm:h-24" />
 
@@ -107,18 +92,13 @@ export function HeroSection({
       <div className="flex-1 w-full max-w-[1380px] mx-auto px-4 sm:px-8 lg:px-12 flex flex-col justify-end pb-12 sm:pb-16 lg:pb-20 z-10">
         
         {/* Content Grid: Headline shifted left + Right Subtitle & Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 xl:gap-16 items-end">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 lg:gap-12 xl:gap-16 items-end">
           
-          {/* Left Column (8 cols): Massive Editorial Typography grounded in ARD & PRD */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-            className="lg:col-span-8 flex flex-col justify-end -ml-1 sm:-ml-2 lg:-ml-3"
-          >
-            <h1 className="text-[2.2rem] min-[360px]:text-[2.6rem] xs:text-[3.2rem] sm:text-[4rem] md:text-[4.6rem] lg:text-[4.4rem] xl:text-[5rem] 2xl:text-[5.6rem] font-black uppercase tracking-[-0.04em] leading-[0.93] text-slate-950 font-sans">
-              <span className="block break-words sm:whitespace-nowrap">SHOWCASING</span>
-              <span className="block break-words sm:whitespace-nowrap">
+          {/* Left Column (7 cols): Massive Editorial Typography */}
+          <div className="lg:col-span-7 flex flex-col justify-end min-w-0 pr-0 lg:pr-4 xl:pr-6">
+            <h1 className="text-3xl min-[360px]:text-4xl xs:text-5xl sm:text-6xl md:text-7xl lg:text-[2.75rem] xl:text-[3.5rem] 2xl:text-[4.25rem] font-black uppercase tracking-[-0.04em] leading-[0.92] text-foreground font-sans drop-shadow-xs dark:drop-shadow-[0_2px_14px_rgba(0,0,0,0.85)]">
+              <span className="block break-normal">SHOWCASING</span>
+              <span className="block break-normal">
                 <button
                   type="button"
                   onClick={handleToggleKeyword}
@@ -127,14 +107,14 @@ export function HeroSection({
                   aria-label={`Current focus: ${currentKeyword}. Click to cycle.`}
                 >
                   <span className="inline-block relative overflow-hidden align-baseline">
-                    <AnimatePresence mode="wait">
+                    <AnimatePresence mode="wait" initial={false}>
                       <motion.span
                         key={currentKeyword}
                         initial={{ opacity: 0, y: 14 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -14 }}
                         transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                        className="inline-block text-slate-950 font-black tracking-[-0.04em]"
+                        className="inline-block text-foreground font-black tracking-[-0.04em]"
                       >
                         {currentKeyword}
                       </motion.span>
@@ -143,63 +123,58 @@ export function HeroSection({
                 </button>{" "}
                 TODAY
               </span>
-              <span className="block break-words sm:whitespace-nowrap">RATED BY PEERS.</span>
+              <span className="block break-normal">RATED BY PEERS.</span>
             </h1>
-          </motion.div>
+          </div>
 
-          {/* Right Column (4 cols): ARD/PRD Core Value, Total Developers & Dual Action CTAs */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-            className="lg:col-span-4 flex flex-col items-start lg:items-end justify-end pt-8 sm:pt-10 lg:pt-0"
-          >
-            <div className="max-w-[360px] sm:max-w-[420px] space-y-4 sm:space-y-5 w-full">
+          {/* Right Column (5 cols): ARD/PRD Core Value, Total Developers & Dual Action CTAs */}
+          <div className="lg:col-span-5 flex flex-col items-start lg:items-end justify-end pt-8 sm:pt-10 lg:pt-0 min-w-0 pl-0 lg:pl-2 xl:pl-4">
+            <div className="max-w-[480px] lg:max-w-[520px] space-y-4 sm:space-y-5 lg:space-y-6 w-full">
               {/* Daily Showcase Teaser Link (if available) */}
               {showcasePortfolio && onInspectShowcase && (
                 <div className="flex items-center w-full">
                   <button
                     type="button"
                     onClick={() => onInspectShowcase(showcasePortfolio)}
-                    className="inline-flex items-center gap-2 text-xs font-mono text-slate-600 hover:text-slate-900 transition-colors group cursor-pointer text-left max-w-full"
+                    className="inline-flex items-center gap-2 text-xs font-mono text-muted hover:text-foreground transition-colors group cursor-pointer text-left max-w-full dark:drop-shadow-xs"
                   >
                     <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
                     <span className="truncate">
-                      Daily Pick: <strong className="text-slate-900 group-hover:underline font-semibold">{showcasePortfolio.title}</strong>
+                      Daily Pick: <strong className="text-foreground group-hover:underline font-semibold">{showcasePortfolio.title}</strong>
                     </span>
-                    <ArrowRight className="w-3 h-3 text-slate-400 group-hover:text-slate-900 transition-colors shrink-0" />
+                    <ArrowRight className="w-3 h-3 text-muted group-hover:text-foreground transition-colors shrink-0" />
                   </button>
                 </div>
               )}
 
-              {/* Total Developers Live Counter Badge (Replaced User Profile card) */}
+              {/* Total Developers Live Counter Badge */}
               <div className="flex items-center">
-                <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/90 border border-slate-200/90 shadow-2xs backdrop-blur-xs">
+                <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-surface/85 border border-border shadow-2xs backdrop-blur-xs">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                   </span>
-                  <div className="flex items-center gap-1.5 text-xs text-slate-600">
-                    <Users className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="font-medium text-slate-600">Total Developers:</span>
-                    <span className="font-bold text-slate-950 font-mono tracking-tight text-xs inline-flex items-center">
+                  <div className="flex items-center gap-1.5 text-xs text-muted">
+                    <Users className="w-3.5 h-3.5 text-muted" />
+                    <span className="font-medium text-muted">Total Developers:</span>
+                    <span className="font-bold text-foreground font-mono tracking-tight text-xs inline-flex items-center">
                       <AnimatedCounter value={animatedCount} duration={1.2} />
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Subtitle Paragraph directly quoting PRD Section 1 Core Value */}
-              <p className="text-sm sm:text-[15px] text-slate-600 leading-relaxed font-normal">
-                Discover great developer work, get your work seen, and improve through community feedback. At <strong className="text-slate-950 font-semibold">RateFactor</strong>, engineers showcase codebases, earn authentic peer ratings across our 3-factor rubric, and compete for Daily &amp; Weekly Showcases.
+              {/* Subtitle Paragraph (Natural text with dark mode contrast & drop shadow) */}
+              <p className="text-base sm:text-lg lg:text-[17px] xl:text-[19px] text-slate-700 dark:text-zinc-200 leading-relaxed font-normal tracking-[-0.01em] dark:drop-shadow-[0_1px_8px_rgba(0,0,0,0.9)]">
+                Discover great developer work, get your work seen, and improve through community feedback. At <strong className="text-foreground font-semibold">RateFactor</strong>, engineers showcase codebases, earn authentic peer ratings across our 3-factor rubric, and compete for Daily &amp; Weekly Showcases.
               </p>
 
-              {/* Editorial Action Buttons Row (Submit Portfolio & Explore Feed) */}
+              {/* Action Buttons Row */}
               <div className="flex flex-wrap items-center gap-2.5 pt-1">
                 <button
                   type="button"
                   onClick={onSubmitClick}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-slate-900 hover:bg-black text-white text-xs sm:text-sm font-medium border border-slate-900 transition-all shadow-xs hover:shadow-sm cursor-pointer w-full sm:w-auto"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-foreground text-background hover:opacity-90 text-xs sm:text-sm font-medium transition-all shadow-xs hover:shadow-sm cursor-pointer w-full sm:w-auto"
                 >
                   <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
                   <span>Submit Portfolio</span>
@@ -208,14 +183,14 @@ export function HeroSection({
                 <button
                   type="button"
                   onClick={onExploreClick}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-white hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-medium border border-slate-200 transition-colors shadow-2xs cursor-pointer flex-1 sm:flex-initial"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-surface/90 hover:bg-surface-raised text-foreground text-xs sm:text-sm font-medium border border-border transition-colors shadow-2xs cursor-pointer flex-1 sm:flex-initial backdrop-blur-xs"
                 >
                   <span>Discover Feed</span>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
+                  <ArrowRight className="w-3.5 h-3.5 text-muted" />
                 </button>
               </div>
             </div>
-          </motion.div>
+          </div>
 
         </div>
       </div>

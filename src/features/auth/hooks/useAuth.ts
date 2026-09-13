@@ -19,10 +19,23 @@ export interface UseAuthOptions {
 
 export function useAuth(options?: UseAuthOptions) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authIntentMessage, setAuthIntentMessage] = useState<string>("");
 
   const { data: authSession, isPending } = useSession();
+
+  // Set initialized on client mount
+  useEffect(() => {
+    setIsInitialized(true);
+    try {
+      const savedUser = localStorage.getItem("ratefactor_auth_user");
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        setCurrentUser((prev) => prev || parsed);
+      }
+    } catch (e) {}
+  }, []);
 
   // Synchronize session from Better Auth
   useEffect(() => {
@@ -57,17 +70,6 @@ export function useAuth(options?: UseAuthOptions) {
       });
     }
   }, [authSession?.user?.id, authSession?.user?.email, authSession?.user?.name, authSession?.user?.image]);
-
-  // Read persisted fallback from localStorage only on initial mount
-  useEffect(() => {
-    try {
-      const savedUser = localStorage.getItem("ratefactor_auth_user");
-      if (savedUser) {
-        const parsed = JSON.parse(savedUser);
-        setCurrentUser((prev) => prev || parsed);
-      }
-    } catch (e) {}
-  }, []);
 
   const requireAuth = useCallback((intent: string) => {
     setAuthIntentMessage(intent);
@@ -121,7 +123,8 @@ export function useAuth(options?: UseAuthOptions) {
     currentUser,
     setCurrentUser,
     isAuthenticated: Boolean(currentUser),
-    isLoading: isPending,
+    isLoading: isPending || !isInitialized,
+    isInitialized,
     isAuthModalOpen,
     setIsAuthModalOpen,
     authIntentMessage,

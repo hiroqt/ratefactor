@@ -8,17 +8,16 @@ import {
   Github, 
   Heart, 
   MessageSquare, 
-  Sparkles, 
   SlidersHorizontal, 
   Plus, 
-  Award,
-  Layers,
-  Flame,
-  ArrowUpRight
-} from "lucide-react";
+  Award, 
+  Layers, 
+  Flame, 
+  ArrowUpRight 
+} from "@/components/ui/icons";
 import { Portfolio } from "@/types/portfolio";
 import { cn, formatNumber, formatRating } from "@/lib/utils";
-import { getEmojiDisplay } from "../PortfolioDetailModal";
+import { getEmojiDisplay } from "@/lib/emoji-utils";
 
 interface ShowcaseShelfProps {
   myPortfolios: Portfolio[];
@@ -57,38 +56,38 @@ export function ShowcaseShelf({
   return (
     <section className="space-y-4 w-full min-w-0 max-w-full">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-        <div>
-          <div className="flex items-center gap-2">
-            <Pin className="w-4 h-4 text-slate-900" />
-            <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <Pin className="w-4 h-4 text-slate-900 dark:text-white shrink-0" />
+            <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight">
               Showcase Shelf (Pinned Architectures)
             </h3>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600">
-              {activeShowcases.length} / 6 pinned
+            <span className="whitespace-nowrap shrink-0 inline-flex items-center gap-1 text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 font-medium">
+              <span className="font-bold text-slate-900 dark:text-white">{activeShowcases.length}</span> / 6 pinned
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 leading-relaxed">
             Architectures highlighted on your public profile for peers, reviewers, and engineering teams.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
           <button
             type="button"
             onClick={onCustomizePins}
-            className="px-3 py-1.5 rounded-full bg-white hover:bg-slate-50 border border-slate-200 text-xs text-slate-700 font-medium transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+            className="px-3.5 py-1.5 rounded-full bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-xs text-slate-700 dark:text-zinc-200 font-medium transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer whitespace-nowrap"
           >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
+            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
             <span>Customize Pins</span>
           </button>
 
           <button
             type="button"
             onClick={onOpenSubmitModal}
-            className="px-3.5 py-1.5 rounded-full bg-slate-900 hover:bg-black text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-1 cursor-pointer"
+            className="px-3.5 py-1.5 rounded-full bg-slate-900 dark:bg-white hover:bg-black dark:hover:bg-zinc-200 text-white dark:text-zinc-900 text-xs font-semibold shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
           >
-            <Plus className="w-3 h-3 stroke-[2.5]" />
+            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>New Architecture</span>
           </button>
         </div>
@@ -96,19 +95,19 @@ export function ShowcaseShelf({
 
       {activeShowcases.length === 0 ? (
         /* Empty State */
-        <div className="p-8 border border-dashed border-slate-200 rounded-3xl bg-slate-50/50 text-center space-y-3">
-          <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mx-auto text-slate-400">
+        <div className="p-8 border border-dashed border-slate-200 dark:border-zinc-800 rounded-3xl bg-slate-50/50 dark:bg-zinc-900/50 text-center space-y-3">
+          <div className="w-10 h-10 rounded-2xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center mx-auto text-slate-400 dark:text-zinc-500">
             <Pin className="w-5 h-5" />
           </div>
-          <h4 className="text-sm font-bold text-slate-900">No Showcase Portfolios Pinned Yet</h4>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+          <h4 className="text-sm font-bold text-slate-900 dark:text-white">No Showcase Portfolios Pinned Yet</h4>
+          <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-sm mx-auto">
             Pin up to 6 of your best architectures to showcase them to visiting developers and recruiters.
           </p>
           <div className="flex items-center justify-center gap-2 pt-1">
             <button
               type="button"
               onClick={onCustomizePins}
-              className="px-4 py-2 rounded-full bg-slate-900 text-white text-xs font-semibold hover:bg-black transition-colors"
+              className="px-4 py-2 rounded-full bg-slate-900 dark:bg-white text-white dark:text-zinc-900 text-xs font-semibold hover:bg-black dark:hover:bg-zinc-200 transition-colors cursor-pointer"
             >
               Select Portfolios to Showcase
             </button>
@@ -118,7 +117,7 @@ export function ShowcaseShelf({
         <div className="space-y-4">
           {/* Featured Spotlight Card */}
           {spotlightPortfolio && (
-            <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 text-white shadow-xl relative overflow-hidden group w-full min-w-0">
+            <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-950 text-white shadow-xl relative overflow-hidden group w-full min-w-0 border border-transparent dark:border-white/10">
               {/* Subtle background glow */}
               <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -200,7 +199,7 @@ export function ShowcaseShelf({
                         href={spotlightPortfolio.portfolioUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3.5 py-1.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium transition-colors flex items-center gap-1 shadow-xs"
+                        className="px-3.5 py-1.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
                       >
                         <span>Live Demo</span>
                         <ArrowUpRight className="w-3.5 h-3.5" />
@@ -212,7 +211,7 @@ export function ShowcaseShelf({
                         href={spotlightPortfolio.githubUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors border border-white/10"
+                        className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors border border-white/10 cursor-pointer"
                         title="GitHub Repo"
                       >
                         <Github className="w-4 h-4" />
@@ -222,7 +221,7 @@ export function ShowcaseShelf({
                     <button
                       type="button"
                       onClick={() => onSelectPortfolio(spotlightPortfolio)}
-                      className="px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors border border-white/10"
+                      className="px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors border border-white/10 cursor-pointer"
                     >
                       Inspect Deeply
                     </button>
@@ -238,22 +237,22 @@ export function ShowcaseShelf({
               {secondaryShowcases.map((portfolio, idx) => (
                 <div
                   key={portfolio.id}
-                  className="p-4 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group min-w-0 w-full overflow-hidden"
+                  className="p-4 rounded-2xl bg-white dark:bg-[#121215] border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-zinc-700 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group min-w-0 w-full overflow-hidden"
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <Pin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                        <h5 className="font-bold text-slate-900 text-xs sm:text-sm truncate group-hover:text-emerald-700 transition-colors">
+                        <Pin className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 flex-shrink-0" />
+                        <h5 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                           {portfolio.title}
                         </h5>
                       </div>
-                      <span className="text-[10px] font-mono px-2 py-0.2 rounded-full bg-slate-100 text-slate-600 border border-slate-200 flex-shrink-0">
+                      <span className="text-[10px] font-mono px-2 py-0.2 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 flex-shrink-0">
                         {portfolio.category}
                       </span>
                     </div>
 
-                    <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
+                    <p className="text-[11px] text-slate-600 dark:text-zinc-400 line-clamp-2 leading-relaxed">
                       {portfolio.tagline}
                     </p>
 
@@ -261,22 +260,22 @@ export function ShowcaseShelf({
                       {portfolio.techStack.slice(0, 4).map((tech) => (
                         <span
                           key={tech}
-                          className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-50 text-slate-600 border border-slate-200"
+                          className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-50 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700"
                         >
                           {tech}
                         </span>
                       ))}
                       {portfolio.techStack.length > 4 && (
-                        <span className="text-[10px] font-mono text-slate-400">
+                        <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500">
                           +{portfolio.techStack.length - 4}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-3 font-mono text-[11px] text-slate-500">
-                      <span className="text-amber-800 font-semibold">
+                  <div className="pt-3 mt-3 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-3 font-mono text-[11px] text-slate-500 dark:text-zinc-400">
+                      <span className="text-amber-800 dark:text-amber-400 font-semibold">
                         ★ {formatRating(portfolio.rating)}
                       </span>
                       {portfolio.likesCount > 0 && (
@@ -294,7 +293,7 @@ export function ShowcaseShelf({
                           href={portfolio.portfolioUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-1 rounded-md text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+                          className="p-1 rounded-md text-slate-400 dark:text-zinc-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                           title="Live Demo"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
@@ -303,7 +302,7 @@ export function ShowcaseShelf({
                       <button
                         type="button"
                         onClick={() => onSelectPortfolio(portfolio)}
-                        className="px-2.5 py-1 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-medium transition-colors"
+                        className="px-2.5 py-1 rounded-full bg-slate-50 dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 text-[11px] font-medium transition-colors cursor-pointer"
                       >
                         Inspect
                       </button>

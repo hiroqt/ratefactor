@@ -8,9 +8,8 @@ import {
   Star, 
   Heart, 
   MessageSquare, 
-  CheckCheck, 
-  Sparkles
-} from "lucide-react";
+  CheckCheck
+} from "@/components/ui/icons";
 import { motion } from "framer-motion";
 import { NotificationItem } from "@/types/portfolio";
 import { cn, timeAgo } from "@/lib/utils";
@@ -214,7 +213,7 @@ export function NotificationDropdown({
         >
           {filteredNotifications.length === 0 ? (
             <div className="text-center py-10 text-slate-400 text-xs font-mono space-y-1.5">
-              <Sparkles className="w-5 h-5 mx-auto text-slate-300" />
+              <Bell className="w-5 h-5 mx-auto text-slate-300" />
               <p>No activity signals found in this filter.</p>
             </div>
           ) : (

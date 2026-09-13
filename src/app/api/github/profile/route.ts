@@ -28,9 +28,10 @@ export async function GET(req: NextRequest) {
 
     // 2. Fetch fresh profile
     const token = userId ? await getGithubAccessToken(userId) : null;
-    const profile = await fetchGithubProfile(token, targetUsername);
+    const profile = await fetchGithubProfile(token, queryUsername || (token ? undefined : targetUsername));
 
-    if (userId) {
+    // Only persist to the user's profile if fetching self
+    if (userId && (!queryUsername || queryUsername.toLowerCase() === user?.username?.toLowerCase())) {
       await saveGithubProfile(userId, profile).catch(() => {});
     }
 

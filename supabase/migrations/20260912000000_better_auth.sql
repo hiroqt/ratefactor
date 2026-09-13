@@ -218,7 +218,7 @@ CREATE POLICY "Users delete own accounts" ON public."account"
 -- Controlled by Better Auth service role/backend
 DROP POLICY IF EXISTS "System manage verifications" ON public."verification";
 CREATE POLICY "System manage verifications" ON public."verification"
-  FOR ALL USING (true) WITH CHECK (true);
+  FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
 -- ==========================================================
 -- 7. PROFILES INTEROPERABILITY SYNC TRIGGER

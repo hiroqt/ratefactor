@@ -7,14 +7,14 @@ import {
   Star, 
   Award, 
   Flame, 
-  CheckCircle2,
-  ArrowUpRight
-} from "lucide-react";
+  CheckCircle2, 
+  ArrowUpRight 
+} from "@/components/ui/icons";
 import { Portfolio } from "@/types/portfolio";
-import { cn, formatNumber, formatRating } from "@/lib/utils";
+import { cn, formatNumber, formatRating, getOptimizedImageUrl } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
 import { EmojiReaction } from "@/components/ui/emoji-reaction";
-import { getEmojiDisplay } from "./PortfolioDetailModal";
+import { getEmojiDisplay } from "@/lib/emoji-utils";
 
 export interface PortfolioCardProps {
   portfolio: Portfolio;
@@ -25,8 +25,8 @@ export interface PortfolioCardProps {
   index?: number;
 }
 
-const FALLBACK_THUMBNAIL = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='450' viewBox='0 0 800 450'><rect width='800' height='450' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='22' fill='%2394a3b8'>Preview Unavailable</text></svg>";
-const FALLBACK_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23e2e8f0'/><text x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='32' fill='%2364748b'>DEV</text></svg>";
+const FALLBACK_THUMBNAIL = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='450' viewBox='0 0 800 450'><rect width='800' height='450' fill='%2318181b'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='22' fill='%2371717a'>Preview Unavailable</text></svg>";
+const FALLBACK_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%2327272a'/><text x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='32' fill='%23a1a1aa'>DEV</text></svg>";
 
 function onImgError(e: React.SyntheticEvent<HTMLImageElement>) {
   const target = e.currentTarget;
@@ -89,23 +89,23 @@ export function PortfolioCard({
   const getCategoryColor = (cat: string) => {
     switch (cat) {
       case "Developer":
-        return "text-indigo-800 bg-indigo-50 border-indigo-200";
+        return "text-indigo-800 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/40";
       case "Arts":
-        return "text-rose-800 bg-rose-50 border-rose-200";
+        return "text-rose-800 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/40";
       case "Client":
-        return "text-teal-800 bg-teal-50 border-teal-200";
+        return "text-teal-800 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800/40";
       case "Systems":
-        return "text-amber-800 bg-amber-50 border-amber-200";
+        return "text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/40";
       case "Design Engineer":
-        return "text-pink-800 bg-pink-50 border-pink-200";
+        return "text-pink-800 dark:text-pink-300 bg-pink-50 dark:bg-pink-950/40 border-pink-200 dark:border-pink-800/40";
       case "Frontend":
-        return "text-sky-800 bg-sky-50 border-sky-200";
+        return "text-sky-800 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800/40";
       case "Fullstack":
-        return "text-emerald-800 bg-emerald-50 border-emerald-200";
+        return "text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/40";
       case "AI / ML":
-        return "text-purple-800 bg-purple-50 border-purple-200";
+        return "text-purple-800 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800/40";
       default:
-        return "text-slate-700 bg-slate-100 border-slate-200";
+        return "text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-white/10 border-slate-200 dark:border-white/10";
     }
   };
 
@@ -114,13 +114,13 @@ export function PortfolioCard({
     return (
       <article
         onClick={() => onSelect(portfolio)}
-        className="group relative flex flex-col md:flex-row md:items-center justify-between p-3.5 rounded-lg bg-white border border-slate-200 hover:border-slate-300 cursor-pointer gap-4 transition-colors"
+        className="group relative flex flex-col md:flex-row md:items-center justify-between p-3.5 rounded-lg bg-white dark:bg-[#121215] border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 cursor-pointer gap-4 transition-colors"
       >
         <div className="flex items-center gap-3.5 flex-1 min-w-0">
           {/* Thumbnail */}
-          <div className="relative w-20 h-14 rounded-md overflow-hidden flex-shrink-0 bg-slate-100 border border-slate-200">
+          <div className="relative w-20 h-14 rounded-md overflow-hidden flex-shrink-0 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/10">
             <img
-              src={portfolio.thumbnail}
+              src={getOptimizedImageUrl(portfolio.thumbnail, 200, 75)}
               alt={portfolio.title}
               loading="lazy"
               decoding="async"
@@ -136,24 +136,24 @@ export function PortfolioCard({
                 {portfolio.category}
               </span>
               {portfolio.showcaseType === "daily" && (
-                <span className="flex items-center gap-1 text-[11px] font-mono font-medium text-slate-800 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
+                <span className="flex items-center gap-1 text-[11px] font-mono font-medium text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-2 py-0.5 rounded-md">
                   <Flame className="w-3 h-3 text-amber-500" /> Daily Pick
                 </span>
               )}
               {portfolio.showcaseType === "weekly" && (
-                <span className="flex items-center gap-1 text-[11px] font-mono font-medium text-slate-800 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
+                <span className="flex items-center gap-1 text-[11px] font-mono font-medium text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-2 py-0.5 rounded-md">
                   <Award className="w-3 h-3 text-amber-600" /> Weekly Pick
                 </span>
               )}
               {portfolio.requestCritique && (
-                <span className="flex items-center gap-1 text-[11px] font-mono font-medium text-orange-800 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-md shadow-xs">
-                  <Flame className="w-3 h-3 text-orange-600" /> Roast Welcome
+                <span className="flex items-center gap-1 text-[11px] font-mono font-medium text-orange-800 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800/40 px-2 py-0.5 rounded-md shadow-xs">
+                  <Flame className="w-3 h-3 text-orange-600 dark:text-orange-400" /> Roast Welcome
                 </span>
               )}
             </div>
 
-            <h4 className="text-sm font-semibold text-slate-900 group-hover:underline truncate">{portfolio.title}</h4>
-            <p className="text-xs text-slate-500 truncate max-w-xl">{portfolio.tagline}</p>
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-white group-hover:underline truncate">{portfolio.title}</h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-xl">{portfolio.tagline}</p>
           </div>
         </div>
 
@@ -162,7 +162,7 @@ export function PortfolioCard({
           {/* Tech Stack */}
           <div className="hidden lg:flex items-center gap-1">
             {portfolio.techStack.slice(0, 3).map((tech) => (
-              <span key={tech} className="px-2 py-0.5 rounded-md bg-slate-50 text-slate-700 text-[11px] border border-slate-200">
+              <span key={tech} className="px-2 py-0.5 rounded-md bg-slate-50 dark:bg-white/5 text-slate-700 dark:text-slate-300 text-[11px] border border-slate-200 dark:border-white/10">
                 {tech}
               </span>
             ))}
@@ -174,13 +174,13 @@ export function PortfolioCard({
               src={portfolio.author.avatar}
               alt={portfolio.author.name}
               onError={onAvatarError}
-              className="w-4 h-4 rounded object-cover border border-slate-200"
+              className="w-4 h-4 rounded object-cover border border-slate-200 dark:border-white/10"
             />
-            <span className="text-xs text-slate-600 hidden sm:inline">{portfolio.author.name}</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400 hidden sm:inline">{portfolio.author.name}</span>
           </div>
 
           {/* Rating */}
-          <div className="flex items-center gap-1 text-xs font-mono text-slate-900 bg-slate-50 px-2 py-1 rounded-md border border-slate-200">
+          <div className="flex items-center gap-1 text-xs font-mono text-slate-900 dark:text-white bg-slate-50 dark:bg-white/5 px-2 py-1 rounded-md border border-slate-200 dark:border-white/10">
             <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
             <span className="font-semibold tabular-nums">{formatRating(portfolio.rating)}</span>
           </div>
@@ -198,8 +198,8 @@ export function PortfolioCard({
                 className={cn(
                   "flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors cursor-pointer font-mono",
                   isLiked
-                    ? "bg-amber-50 border-amber-300 text-amber-900 font-semibold shadow-xs"
-                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                    ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-300 font-semibold shadow-xs"
+                    : "bg-white dark:bg-[#18181b] border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white"
                 )}
                 aria-label="React to architecture"
               >
@@ -210,13 +210,13 @@ export function PortfolioCard({
           </div>
 
           {/* Comments */}
-          <div className="flex items-center gap-1 text-xs text-slate-600 font-mono bg-slate-50 px-2 py-1 rounded-md border border-slate-200">
+          <div className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400 font-mono bg-slate-50 dark:bg-white/5 px-2 py-1 rounded-md border border-slate-200 dark:border-white/10">
             <MessageSquare className="w-3 h-3 text-slate-400" />
             <span className="tabular-nums">{portfolio.commentsCount}</span>
           </div>
 
           {/* Inspect Arrow */}
-          <div className="p-1 text-slate-400 group-hover:text-slate-900 transition-colors">
+          <div className="p-1 text-slate-400 dark:text-slate-500 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
             <ArrowUpRight className="w-4 h-4" />
           </div>
         </div>
@@ -224,51 +224,51 @@ export function PortfolioCard({
     );
   }
 
-  // 2. EDITORIAL MOSAIC (Featured Item without glass, specular lines, or fake sparkles)
+  // 2. EDITORIAL MOSAIC (Featured Item)
   const isFeaturedInMosaic = viewMode === "mosaic" && (portfolio.isShowcase || index === 0);
 
   if (isFeaturedInMosaic) {
     return (
       <article
         onClick={() => onSelect(portfolio)}
-        className="col-span-1 md:col-span-2 lg:col-span-3 bg-white rounded-xl p-5 border border-slate-200 hover:border-slate-300 cursor-pointer group transition-colors relative"
+        className="col-span-1 md:col-span-2 lg:col-span-3 bg-white dark:bg-[#121215] rounded-xl p-5 border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 cursor-pointer group transition-colors relative"
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
           {/* Visual Column */}
-          <div className="lg:col-span-7 relative aspect-[16/9] rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+          <div className="lg:col-span-7 relative aspect-[16/9] rounded-lg overflow-hidden border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-900">
             <img
-              src={portfolio.thumbnail}
+              src={getOptimizedImageUrl(portfolio.thumbnail, 700, 75)}
               alt={portfolio.title}
               loading="lazy"
               decoding="async"
               onError={onImgError}
               className="w-full h-full object-cover transition-opacity group-hover:opacity-95"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
             <div className="absolute top-3 left-3 flex items-center gap-2 flex-wrap">
-              <span className={cn("text-[11px] font-mono font-medium px-2 py-0.5 rounded-md border bg-white text-slate-900", getCategoryColor(portfolio.category))}>
+              <span className={cn("text-[11px] font-mono font-medium px-2 py-0.5 rounded-md border", getCategoryColor(portfolio.category))}>
                 {portfolio.category}
               </span>
-              <span className="flex items-center gap-1 text-[11px] font-mono font-medium text-slate-900 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+              <span className="flex items-center gap-1 text-[11px] font-mono font-medium text-slate-900 dark:text-white bg-white/90 dark:bg-[#18181b]/90 border border-slate-200 dark:border-white/10 px-2 py-0.5 rounded-md backdrop-blur-xs">
                 Featured Blueprint
               </span>
               {portfolio.requestCritique && (
-                <span className="flex items-center gap-1 text-[11px] font-mono font-medium text-orange-800 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-md shadow-xs">
-                  <Flame className="w-3 h-3 text-orange-600" /> Roast Welcome
+                <span className="flex items-center gap-1 text-[11px] font-mono font-medium text-orange-800 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800/40 px-2 py-0.5 rounded-md shadow-xs">
+                  <Flame className="w-3 h-3 text-orange-600 dark:text-orange-400" /> Roast Welcome
                 </span>
               )}
             </div>
 
-            <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-white px-2.5 py-1 rounded-md border border-slate-200 text-slate-900">
+            <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-white/95 dark:bg-[#18181b]/95 px-2.5 py-1 rounded-md border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white backdrop-blur-xs">
               <img
-                src={portfolio.author.avatar}
+                src={getOptimizedImageUrl(portfolio.author.avatar, 64, 75)}
                 alt={portfolio.author.name}
                 onError={onAvatarError}
                 className="w-4 h-4 rounded object-cover"
               />
-              <span className="text-xs text-slate-900 font-medium">{portfolio.author.name}</span>
-              {portfolio.author.isVerified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+              <span className="text-xs text-slate-900 dark:text-white font-medium">{portfolio.author.name}</span>
+              {portfolio.author.isVerified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />}
             </div>
           </div>
 
@@ -276,42 +276,42 @@ export function PortfolioCard({
           <div className="lg:col-span-5 flex flex-col justify-between space-y-4">
             <div>
               <div className="flex items-center justify-between gap-2 mb-2">
-                <span className="text-xs font-mono text-slate-500 font-medium">
+                <span className="text-xs font-mono text-slate-500 dark:text-slate-400 font-medium">
                   Verified Blueprint
                 </span>
-                <div className="flex items-center gap-1 text-xs font-mono text-slate-900 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">
+                <div className="flex items-center gap-1 text-xs font-mono text-slate-900 dark:text-white bg-slate-50 dark:bg-white/5 px-2 py-0.5 rounded-md border border-slate-200 dark:border-white/10">
                   <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
                   <span className="font-bold">{formatRating(portfolio.rating)}</span>
-                  <span className="text-slate-500 text-[10px]">({portfolio.ratingCount} reviews)</span>
+                  <span className="text-slate-500 dark:text-slate-400 text-[10px]">({portfolio.ratingCount} reviews)</span>
                 </div>
               </div>
 
-              <h3 className="text-xl font-bold text-slate-900 group-hover:text-black transition-colors">
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                 {portfolio.title}
               </h3>
-              <p className="text-xs sm:text-sm text-slate-600 mt-1.5 leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">
                 {portfolio.tagline}
               </p>
             </div>
 
             {/* Rubric mini summary */}
             {portfolio.ratingBreakdown && (
-              <div className="grid grid-cols-4 gap-2 py-2.5 border-y border-slate-100 text-center font-mono text-xs">
+              <div className="grid grid-cols-4 gap-2 py-2.5 border-y border-slate-100 dark:border-white/10 text-center font-mono text-xs">
                 <div>
-                  <div className="text-[10px] text-slate-500">Code</div>
-                  <div className="font-bold text-slate-900">{portfolio.ratingBreakdown.codeQuality.toFixed(1)}★</div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400">Code</div>
+                  <div className="font-bold text-slate-900 dark:text-white">{portfolio.ratingBreakdown.codeQuality.toFixed(1)}★</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-slate-500">Perf</div>
-                  <div className="font-bold text-emerald-700">{portfolio.ratingBreakdown.performance.toFixed(1)}★</div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400">Perf</div>
+                  <div className="font-bold text-emerald-600 dark:text-emerald-400">{portfolio.ratingBreakdown.performance.toFixed(1)}★</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-slate-500">UX</div>
-                  <div className="font-bold text-amber-700">{portfolio.ratingBreakdown.design.toFixed(1)}★</div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400">UX</div>
+                  <div className="font-bold text-amber-600 dark:text-amber-400">{portfolio.ratingBreakdown.design.toFixed(1)}★</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-slate-500">Doc</div>
-                  <div className="font-bold text-sky-700">{(portfolio.ratingBreakdown.documentation ?? 5.0).toFixed(1)}★</div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400">Doc</div>
+                  <div className="font-bold text-sky-600 dark:text-sky-400">{(portfolio.ratingBreakdown.documentation ?? 5.0).toFixed(1)}★</div>
                 </div>
               </div>
             )}
@@ -320,7 +320,7 @@ export function PortfolioCard({
             <div className="flex items-center justify-between pt-1">
               <div className="flex flex-wrap gap-1.5">
                 {portfolio.techStack.slice(0, 4).map((t) => (
-                  <span key={t} className="px-2 py-0.5 rounded-md bg-slate-50 text-[11px] font-mono text-slate-700 border border-slate-200">
+                  <span key={t} className="px-2 py-0.5 rounded-md bg-slate-50 dark:bg-white/5 text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10">
                     {t}
                   </span>
                 ))}
@@ -339,8 +339,8 @@ export function PortfolioCard({
                       className={cn(
                         "flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors cursor-pointer font-mono",
                         isLiked
-                          ? "bg-amber-50 border-amber-300 text-amber-900 font-semibold shadow-xs"
-                          : "bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50"
+                          ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-300 font-semibold shadow-xs"
+                          : "bg-white dark:bg-[#18181b] border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/10"
                       )}
                       aria-label="React to architecture"
                     >
@@ -350,7 +350,7 @@ export function PortfolioCard({
                   </EmojiReaction>
                 </div>
 
-                <span className="p-1.5 rounded-md bg-slate-900 text-white font-medium hover:bg-black transition-colors">
+                <span className="p-1.5 rounded-md bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-medium hover:bg-black dark:hover:bg-slate-100 transition-colors">
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </span>
               </div>
@@ -362,59 +362,59 @@ export function PortfolioCard({
     );
   }
 
-  // 3. STANDARD GRID CARD (Normal, Clean Container - 12px max radius, no floating glass, no hover transform)
+  // 3. STANDARD GRID CARD
   return (
     <article
       onClick={() => onSelect(portfolio)}
-      className="group relative flex flex-col rounded-xl bg-white border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer"
+      className="group relative flex flex-col rounded-xl bg-white dark:bg-[#121215] border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 transition-colors cursor-pointer"
     >
       {/* Card Header Media */}
-      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-t-xl bg-slate-100 border-b border-slate-200">
+      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-t-xl bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-white/10">
         <img
-          src={portfolio.thumbnail}
+          src={getOptimizedImageUrl(portfolio.thumbnail, 480, 75)}
           alt={portfolio.title}
           loading="lazy"
           decoding="async"
           onError={onImgError}
           className="w-full h-full object-cover transition-opacity group-hover:opacity-95"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
 
         {/* Top Badges */}
         <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
-          <span className={cn("text-[10px] font-mono font-medium px-2 py-0.5 rounded-md bg-white border border-slate-200", getCategoryColor(portfolio.category))}>
+          <span className={cn("text-[10px] font-mono font-medium px-2 py-0.5 rounded-md", getCategoryColor(portfolio.category))}>
             {portfolio.category}
           </span>
           {portfolio.showcaseType === "daily" && (
-            <span className="flex items-center gap-1 text-[10px] font-mono font-medium text-slate-900 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+            <span className="flex items-center gap-1 text-[10px] font-mono font-medium text-slate-900 dark:text-white bg-white/90 dark:bg-[#18181b]/90 border border-slate-200 dark:border-white/10 px-2 py-0.5 rounded-md backdrop-blur-xs">
               <Flame className="w-3 h-3 text-amber-500" /> Daily
             </span>
           )}
           {portfolio.showcaseType === "weekly" && (
-            <span className="flex items-center gap-1 text-[10px] font-mono font-medium text-slate-900 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+            <span className="flex items-center gap-1 text-[10px] font-mono font-medium text-slate-900 dark:text-white bg-white/90 dark:bg-[#18181b]/90 border border-slate-200 dark:border-white/10 px-2 py-0.5 rounded-md backdrop-blur-xs">
               <Award className="w-3 h-3 text-amber-600" /> Weekly
             </span>
           )}
           {portfolio.requestCritique && (
-            <span className="flex items-center gap-1 text-[10px] font-mono font-medium text-orange-800 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-md shadow-xs">
-              <Flame className="w-3 h-3 text-orange-600" /> Roast Welcome
+            <span className="flex items-center gap-1 text-[10px] font-mono font-medium text-orange-800 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800/40 px-2 py-0.5 rounded-md shadow-xs">
+              <Flame className="w-3 h-3 text-orange-600 dark:text-orange-400" /> Roast Welcome
             </span>
           )}
         </div>
 
         {/* Author Badge */}
-        <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 bg-white px-2 py-0.5 rounded-md border border-slate-200 text-slate-900">
+        <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 bg-white/95 dark:bg-[#18181b]/95 px-2 py-0.5 rounded-md border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white backdrop-blur-xs">
           <img
-            src={portfolio.author.avatar}
+            src={getOptimizedImageUrl(portfolio.author.avatar, 48, 75)}
             alt={portfolio.author.name}
             onError={onAvatarError}
             className="w-3.5 h-3.5 rounded object-cover"
           />
-          <span className="text-[11px] font-medium text-slate-900 truncate max-w-[110px]">
+          <span className="text-[11px] font-medium text-slate-900 dark:text-white truncate max-w-[110px]">
             {portfolio.author.name}
           </span>
           {portfolio.author.isVerified && (
-            <CheckCircle2 className="w-3 h-3 text-emerald-600 flex-shrink-0" />
+            <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
           )}
           {portfolio.author.availableForHire && (
             <span
@@ -425,7 +425,7 @@ export function PortfolioCard({
         </div>
 
         {/* Inspect icon */}
-        <div className="absolute bottom-2.5 right-2.5 p-1 rounded-md bg-white border border-slate-200 text-slate-700 group-hover:text-slate-900 transition-colors">
+        <div className="absolute bottom-2.5 right-2.5 p-1 rounded-md bg-white/95 dark:bg-[#18181b]/95 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors backdrop-blur-xs">
           <ArrowUpRight className="w-3 h-3" />
         </div>
       </div>
@@ -433,10 +433,10 @@ export function PortfolioCard({
       {/* Card Body */}
       <div className="flex flex-col flex-1 p-4">
         <div className="mb-2">
-          <h3 className="text-sm font-bold text-slate-900 group-hover:text-black transition-colors line-clamp-1">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-1">
             {portfolio.title}
           </h3>
-          <p className="text-xs text-slate-600 mt-1 line-clamp-2 leading-relaxed">
+          <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 line-clamp-2 leading-relaxed">
             {portfolio.tagline}
           </p>
         </div>
@@ -446,25 +446,25 @@ export function PortfolioCard({
           {portfolio.techStack.slice(0, 3).map((tech) => (
             <span
               key={tech}
-              className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-50 text-slate-600 border border-slate-200 hover:text-slate-900 transition-colors"
+              className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 hover:text-slate-900 dark:hover:text-white transition-colors"
             >
               {tech}
             </span>
           ))}
           {portfolio.techStack.length > 3 && (
-            <span className="text-[10px] font-mono text-slate-400 px-1">
+            <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 px-1">
               +{portfolio.techStack.length - 3}
             </span>
           )}
         </div>
 
         {/* Card Footer */}
-        <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100">
+        <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100 dark:border-white/10">
           {/* Rating Badge */}
-          <div className="flex items-center gap-1 text-xs font-mono text-slate-900 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">
+          <div className="flex items-center gap-1 text-xs font-mono text-slate-900 dark:text-white bg-slate-50 dark:bg-white/5 px-2 py-0.5 rounded-md border border-slate-200 dark:border-white/10">
             <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
             <span className="font-semibold tabular-nums">{formatRating(portfolio.rating)}</span>
-            <span className="text-slate-400 text-[10px] tabular-nums">({portfolio.ratingCount})</span>
+            <span className="text-slate-400 dark:text-slate-500 text-[10px] tabular-nums">({portfolio.ratingCount})</span>
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -481,8 +481,8 @@ export function PortfolioCard({
                   className={cn(
                     "flex items-center gap-1 text-xs px-2 py-0.5 rounded-md border transition-colors cursor-pointer font-mono",
                     isLiked
-                      ? "bg-amber-50 border-amber-300 text-amber-900 font-semibold shadow-xs"
-                      : "bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50"
+                      ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-300 font-semibold shadow-xs"
+                      : "bg-white dark:bg-[#18181b] border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/10"
                   )}
                   aria-label="React to architecture"
                 >
@@ -493,7 +493,7 @@ export function PortfolioCard({
             </div>
 
             {/* Comments */}
-            <div className="flex items-center gap-1 text-xs text-slate-600 font-mono bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">
+            <div className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400 font-mono bg-slate-50 dark:bg-white/5 px-2 py-0.5 rounded-md border border-slate-200 dark:border-white/10">
               <MessageSquare className="w-3 h-3 text-slate-400" />
               <span className="text-[11px] tabular-nums">{portfolio.commentsCount}</span>
             </div>

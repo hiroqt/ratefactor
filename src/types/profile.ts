@@ -42,6 +42,7 @@ export interface DeveloperProfile {
   spotlightPortfolioId?: string;
   skills: string[];
   joinedDate: string;
+  isVerified?: boolean;
 }
 
 export interface ShowcaseAccolade {

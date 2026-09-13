@@ -40,8 +40,35 @@ export async function fetchGithubProfile(
     }
   }
 
-  // 1. Try Authenticated /user endpoint if token is present
-  if (token) {
+  // 1. If target username is specified, fetch that specific user's profile
+  if (targetUsername) {
+    try {
+      const u: any = await githubFetch(token || null, `/users/${encodeURIComponent(targetUsername)}`);
+      if (u && u.id) {
+        const profile: GithubProfileData = {
+          githubId: u.id,
+          username: u.login || targetUsername,
+          displayName: u.name || targetUsername,
+          bio: u.bio || "",
+          avatarUrl: u.avatar_url || `https://github.com/${targetUsername}.png`,
+          profileUrl: u.html_url || `https://github.com/${targetUsername}`,
+          company: u.company || "",
+          location: u.location || "",
+          website: u.blog || "",
+          twitter: u.twitter_username ? `https://twitter.com/${u.twitter_username}` : "",
+          linkedin: "",
+          publicRepositoryCount: u.public_repos || 0,
+          followers: u.followers || 0,
+          following: u.following || 0,
+          lastSyncedAt: new Date().toISOString(),
+        };
+
+        githubCache.set(cacheKey, profile, CACHE_TTL.PROFILE);
+        return profile;
+      }
+    } catch {}
+  } else if (token) {
+    // 2. If no target username is specified, query authenticated /user endpoint
     try {
       const u: any = await githubFetch(token, "/user");
       if (u && u.id) {
@@ -88,35 +115,8 @@ export async function fetchGithubProfile(
     }
   }
 
-  // 2. Try Public REST /users/{username} if username is available
+  // 3. Fallback to HTML Scraping (bypasses GitHub unauthenticated IP rate-limits)
   if (targetUsername) {
-    try {
-      const u: any = await githubFetch(null, `/users/${encodeURIComponent(targetUsername)}`);
-      if (u && u.id) {
-        const profile: GithubProfileData = {
-          githubId: u.id,
-          username: u.login || targetUsername,
-          displayName: u.name || targetUsername,
-          bio: u.bio || "",
-          avatarUrl: u.avatar_url || `https://github.com/${targetUsername}.png`,
-          profileUrl: u.html_url || `https://github.com/${targetUsername}`,
-          company: u.company || "",
-          location: u.location || "",
-          website: u.blog || "",
-          twitter: u.twitter_username ? `https://twitter.com/${u.twitter_username}` : "",
-          linkedin: "",
-          publicRepositoryCount: u.public_repos || 0,
-          followers: u.followers || 0,
-          following: u.following || 0,
-          lastSyncedAt: new Date().toISOString(),
-        };
-
-        githubCache.set(cacheKey, profile, CACHE_TTL.PROFILE);
-        return profile;
-      }
-    } catch {}
-
-    // 3. Fallback to HTML Scraping (bypasses GitHub unauthenticated IP rate-limits)
     try {
       const htmlRes = await fetch(`https://github.com/${encodeURIComponent(targetUsername)}`, {
         headers: {

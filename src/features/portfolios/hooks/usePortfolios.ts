@@ -557,6 +557,13 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         );
       }
 
+      // Sync deletion with backend API
+      fetch(`/api/portfolios/${portfolioId}/comments/${commentId}`, {
+        method: "DELETE",
+      }).catch((err) => {
+        console.warn("[handleDeleteComment] Backend delete failed:", err);
+      });
+
       options?.onToast?.("Comment deleted.");
     },
     [options, selectedPortfolio]
@@ -564,7 +571,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
 
   // Submit new portfolio
   const handleSubmitPortfolio = useCallback(
-    (newPortfolio: Portfolio) => {
+    async (newPortfolio: Portfolio) => {
       setPortfolios((prev) => [newPortfolio, ...prev]);
 
       const myUname = options?.currentUser?.username || options?.currentUsername;
@@ -579,6 +586,32 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
       });
 
       options?.onToast?.(`Portfolio '${newPortfolio.title}' submitted and indexed!`);
+
+      // Persist to backend server API
+      try {
+        await fetch("/api/portfolios", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: newPortfolio.title,
+            tagline: newPortfolio.tagline,
+            description: newPortfolio.description,
+            portfolioUrl: newPortfolio.portfolioUrl,
+            githubUrl: newPortfolio.githubUrl,
+            demoUrl: newPortfolio.demoUrl,
+            thumbnailUrl: newPortfolio.thumbnail,
+            imageSizeBytes: newPortfolio.imageSizeBytes || 1024 * 500,
+            category: newPortfolio.category,
+            techStack: newPortfolio.techStack,
+            requestCritique: Boolean(newPortfolio.requestCritique),
+            authorName: newPortfolio.author.name,
+            authorUsername: newPortfolio.author.username,
+            authorAvatar: newPortfolio.author.avatar,
+          }),
+        });
+      } catch (err) {
+        console.warn("[handleSubmitPortfolio] Failed to persist to backend:", err);
+      }
     },
     [options]
   );

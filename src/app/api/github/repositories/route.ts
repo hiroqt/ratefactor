@@ -30,11 +30,18 @@ export async function GET(req: NextRequest) {
     const token = userId ? await getGithubAccessToken(userId) : null;
     const repositories = await fetchGithubRepositories(token, targetUsername);
 
-    if (userId && repositories.length > 0) {
-      await saveGithubRepositories(userId, repositories).catch(() => {});
+    const isSelf = Boolean(
+      userId && (!queryUsername || queryUsername.toLowerCase() === user?.username?.toLowerCase())
+    );
+
+    if (isSelf && repositories.length > 0) {
+      await saveGithubRepositories(userId!, repositories).catch(() => {});
     }
 
-    return NextResponse.json({ repositories }, { status: 200 });
+    // Never leak private repositories to third-party viewers
+    const publicSafeRepos = isSelf ? repositories : repositories.filter((r) => !r.isPrivate);
+
+    return NextResponse.json({ repositories: publicSafeRepos }, { status: 200 });
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || "Failed to fetch GitHub repositories", repositories: [] },

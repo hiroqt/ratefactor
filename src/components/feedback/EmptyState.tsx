@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { FolderSearch } from "lucide-react";
+import { FolderSearch } from "@/components/ui/icons";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 

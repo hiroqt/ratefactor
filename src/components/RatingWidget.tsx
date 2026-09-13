@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Star, Layers, Cpu, Zap, BookOpen } from "lucide-react";
+import { Star, Layers, Cpu, Zap, BookOpen } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { RatingBreakdown } from "@/types/portfolio";
 

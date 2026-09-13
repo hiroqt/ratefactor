@@ -2,15 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { commentSubmissionSchema } from "@/lib/validations/portfolio";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { validateCommentContent } from "@/lib/guardrails";
-import { INITIAL_PORTFOLIOS } from "@/data/mockPortfolios";
 import { getSessionUser } from "@/lib/auth/server-session";
-
-// In-memory comments store initialized from mock portfolios
-const portfolioComments = new Map<string, any[]>();
-
-INITIAL_PORTFOLIOS.forEach((p) => {
-  portfolioComments.set(p.id, [...p.comments]);
-});
+import { portfolioComments } from "@/lib/comments-store";
 
 export async function GET(
   req: NextRequest,

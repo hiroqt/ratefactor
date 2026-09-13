@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { WifiOff, AlertTriangle, CheckCircle2, X } from "lucide-react";
+import { WifiOff, AlertTriangle, CheckCircle2, X } from "@/components/ui/icons";
 import { onNetworkStatusChange, NetworkStatus } from "@/lib/network";
 
 export function NetworkStatusBanner() {

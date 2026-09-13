@@ -73,6 +73,7 @@ export interface Portfolio {
   githubUrl: string;
   demoUrl?: string;
   thumbnail: string;
+  imageSizeBytes?: number;
   author: {
     name: string;
     username: string;

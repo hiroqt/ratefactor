@@ -3,26 +3,46 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar, Footer } from "@/components/layout";
-import {
-  HeroSection,
-  ShowcaseBanner,
-  DiscoverApps,
-  PortfolioDetailModal,
-  SubmitPortfolioModal,
-  usePortfolios,
-} from "@/features/portfolios";
-import {
-  DeveloperDashboard,
-  DeveloperDashboardModal,
-  useDeveloperProfile,
-} from "@/features/dashboard";
-import { AuthModal, useAuth } from "@/features/auth";
+import dynamic from "next/dynamic";
+import { HeroSection } from "@/components/HeroSection";
+import { ShowcaseBanner } from "@/components/ShowcaseBanner";
+import { usePortfolios } from "@/features/portfolios/hooks/usePortfolios";
+import { useDeveloperProfile } from "@/features/dashboard/hooks/useDeveloperProfile";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useNotifications } from "@/features/notifications";
 import { useToast } from "@/hooks/useToast";
 import { Portfolio, PortfolioCategory } from "@/types/portfolio";
 import { DeveloperProfile } from "@/types/profile";
-import { PublicProfileModal } from "@/components/PublicProfileModal";
-import { Terminal, ArrowLeft } from "lucide-react";
+import { Terminal, ArrowLeft } from "@/components/ui/icons";
+
+const DiscoverApps = dynamic(
+  () => import("@/components/DiscoverApps").then((m) => m.DiscoverApps),
+  { ssr: false }
+);
+const PortfolioDetailModal = dynamic(
+  () => import("@/components/PortfolioDetailModal").then((m) => m.PortfolioDetailModal),
+  { ssr: false }
+);
+const SubmitPortfolioModal = dynamic(
+  () => import("@/components/SubmitPortfolioModal").then((m) => m.SubmitPortfolioModal),
+  { ssr: false }
+);
+const DeveloperDashboardModal = dynamic(
+  () => import("@/components/DeveloperDashboardModal").then((m) => m.DeveloperDashboardModal),
+  { ssr: false }
+);
+const DeveloperDashboard = dynamic(
+  () => import("@/components/dashboard/DeveloperDashboard").then((m) => m.DeveloperDashboard),
+  { ssr: false }
+);
+const AuthModal = dynamic(
+  () => import("@/components/AuthModal").then((m) => m.AuthModal),
+  { ssr: false }
+);
+const PublicProfileModal = dynamic(
+  () => import("@/components/PublicProfileModal").then((m) => m.PublicProfileModal),
+  { ssr: false }
+);
 
 export default function Home() {
   const router = useRouter();
@@ -45,7 +65,9 @@ export default function Home() {
       toast.success(`Authenticated as @${u.username || u.name} (${(u.role || "developer").toUpperCase()})`);
     },
     onSignOut: () => {
-      toast.info("Signed out. You are now browsing as a guest.");
+      setActiveNavTab("discover");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      toast.info("Signed out successfully.");
     },
   });
 
@@ -195,24 +217,24 @@ export default function Home() {
         {/* Dedicated Full Developer Dashboard View */}
         {activeNavTab === "dashboard" ? (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in duration-300">
-            <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-200">
+            <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-200 dark:border-white/10">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setActiveNavTab("discover")}
-                  className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+                  className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Back to Discover</span>
                 </button>
-                <div className="h-4 w-px bg-slate-200" />
+                <div className="h-4 w-px bg-slate-200 dark:bg-white/10" />
                 <div className="flex items-center gap-2">
-                  <Terminal className="w-5 h-5 text-indigo-600" />
-                  <h1 className="text-xl font-bold text-slate-900">Developer Dashboard</h1>
+                  <Terminal className="w-5 h-5 text-indigo-500" />
+                  <h1 className="text-xl font-bold text-slate-900 dark:text-white">Developer Dashboard</h1>
                 </div>
               </div>
             </div>
 
-            <div className="bg-slate-50 rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-xs">
+            <div className="bg-slate-50 dark:bg-[#121215] rounded-3xl border border-slate-200 dark:border-white/10 p-4 sm:p-8 shadow-xs">
               <DeveloperDashboard
                 profile={developerProfile}
                 onUpdateProfile={updateProfile}
@@ -297,68 +319,75 @@ export default function Home() {
       <Footer />
 
       {/* Modals & Drawers */}
-      <PublicProfileModal
-        userProfile={visitedUser}
-        isOpen={Boolean(visitedUser)}
-        onClose={() => setVisitedUser(null)}
-        userPortfolios={
-          visitedUser
-            ? portfolios.filter(
-                (p) =>
-                  p.author?.username?.toLowerCase() === visitedUser.username.toLowerCase() ||
-                  p.author?.name?.toLowerCase() === visitedUser.name.toLowerCase()
-              )
-            : []
-        }
-        onSelectPortfolio={(p) => setSelectedPortfolio(p)}
-      />
+      {/* Modals & Drawers (Lazy-loaded on demand) */}
+      {visitedUser && (
+        <PublicProfileModal
+          userProfile={visitedUser}
+          isOpen={Boolean(visitedUser)}
+          onClose={() => setVisitedUser(null)}
+          userPortfolios={portfolios.filter(
+            (p) =>
+              p.author?.username?.toLowerCase() === visitedUser.username.toLowerCase() ||
+              p.author?.name?.toLowerCase() === visitedUser.name.toLowerCase()
+          )}
+          onSelectPortfolio={(p) => setSelectedPortfolio(p)}
+        />
+      )}
 
-      <PortfolioDetailModal
-        portfolio={selectedPortfolio}
-        onClose={() => setSelectedPortfolio(null)}
-        onLikeToggle={handleLikeToggle}
-        onReact={handleReact}
-        onAddComment={handleAddComment}
-        onDeleteComment={handleDeleteComment}
-        onRatePortfolio={handleRatePortfolio}
-        currentUser={currentUser}
-        onRequireAuth={requireAuth}
-      />
+      {selectedPortfolio && (
+        <PortfolioDetailModal
+          portfolio={selectedPortfolio}
+          onClose={() => setSelectedPortfolio(null)}
+          onLikeToggle={handleLikeToggle}
+          onReact={handleReact}
+          onAddComment={handleAddComment}
+          onDeleteComment={handleDeleteComment}
+          onRatePortfolio={handleRatePortfolio}
+          currentUser={currentUser}
+          onRequireAuth={requireAuth}
+        />
+      )}
 
-      <SubmitPortfolioModal
-        isOpen={isSubmitModalOpen}
-        onClose={() => setIsSubmitModalOpen(false)}
-        onSubmit={handleSubmitPortfolio}
-        existingPortfolios={portfolios}
-        profile={developerProfile}
-        currentUser={currentUser}
-      />
+      {isSubmitModalOpen && (
+        <SubmitPortfolioModal
+          isOpen={isSubmitModalOpen}
+          onClose={() => setIsSubmitModalOpen(false)}
+          onSubmit={handleSubmitPortfolio}
+          existingPortfolios={portfolios}
+          profile={developerProfile}
+          currentUser={currentUser}
+        />
+      )}
 
-      <DeveloperDashboardModal
-        isOpen={isDashboardOpen}
-        onClose={() => setIsDashboardOpen(false)}
-        profile={developerProfile}
-        onUpdateProfile={updateProfile}
-        myPortfolios={myPortfolios}
-        onSelectPortfolio={(p) => setSelectedPortfolio(p)}
-        onDeletePortfolio={handleDeletePortfolio}
-        onOpenSubmitModal={() => {
-          if (!currentUser) {
-            requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
-            return;
-          }
-          setIsSubmitModalOpen(true);
-        }}
-        onRequireAuth={requireAuth}
-      />
+      {isDashboardOpen && (
+        <DeveloperDashboardModal
+          isOpen={isDashboardOpen}
+          onClose={() => setIsDashboardOpen(false)}
+          profile={developerProfile}
+          onUpdateProfile={updateProfile}
+          myPortfolios={myPortfolios}
+          onSelectPortfolio={(p) => setSelectedPortfolio(p)}
+          onDeletePortfolio={handleDeletePortfolio}
+          onOpenSubmitModal={() => {
+            if (!currentUser) {
+              requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
+              return;
+            }
+            setIsSubmitModalOpen(true);
+          }}
+          onRequireAuth={requireAuth}
+        />
+      )}
 
       {/* RBAC Multi-Factor Authentication & OTP Modal */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onAuthSuccess={handleAuthSuccess}
-        intentMessage={authIntentMessage}
-      />
+      {isAuthModalOpen && (
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onAuthSuccess={handleAuthSuccess}
+          intentMessage={authIntentMessage}
+        />
+      )}
     </div>
   );
 }

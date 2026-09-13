@@ -7,12 +7,18 @@ import { NetworkStatusBanner } from "@/components/NetworkStatusBanner";
 const inter = Inter({
   subsets: ["latin"],
   display: "swap",
+  preload: true,
+  fallback: ["system-ui", "-apple-system", "sans-serif"],
+  adjustFontFallback: true,
   variable: "--font-sans",
 });
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   display: "swap",
+  preload: true,
+  fallback: ["ui-monospace", "monospace"],
+  adjustFontFallback: true,
   variable: "--font-mono",
 });
 
@@ -43,8 +49,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`scroll-smooth ${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
-      <body className="min-h-screen bg-background text-foreground selection:bg-slate-900 selection:text-white relative overflow-x-hidden">
+    <html lang="en" suppressHydrationWarning className={`scroll-smooth ${inter.variable} ${jetbrainsMono.variable}`}>
+      <head>
+        <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://images.unsplash.com" />
+      </head>
+      <body suppressHydrationWarning className="min-h-screen bg-background text-foreground selection:bg-slate-900 selection:text-white relative overflow-x-hidden">
         <AppProviders>
           <div className="relative z-10">
             {children}

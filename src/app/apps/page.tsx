@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Navbar, Footer } from "@/components/layout";
 import {
   DiscoverApps,
@@ -20,6 +21,7 @@ import { DeveloperProfile } from "@/types/profile";
 import { PublicProfileModal } from "@/components/PublicProfileModal";
 
 export default function AppsPage() {
+  const router = useRouter();
   const { toast } = useToast();
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [visitedUser, setVisitedUser] = useState<DeveloperProfile | null>(null);
@@ -39,7 +41,8 @@ export default function AppsPage() {
       toast.success(`Authenticated as @${u.username || u.name} (${(u.role || "developer").toUpperCase()})`);
     },
     onSignOut: () => {
-      toast.info("Signed out. You are now browsing as a guest.");
+      toast.info("Signed out successfully.");
+      router.push("/");
     },
   });
 

@@ -1,3 +1,1 @@
-"use client";
-
-export { AuthModal } from "@/components/AuthModal";
+export { AuthModal, default } from "@/components/AuthModal";

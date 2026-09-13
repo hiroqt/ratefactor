@@ -3,7 +3,9 @@ import { otpRequestSchema, otpVerifySchema } from "@/lib/validations/portfolio";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { createOTPChallenge, verifyOTPChallenge } from "@/lib/auth/otp";
 import { normalizeUsername } from "@/lib/auth/client";
-import { canonicalizeEmail, registerCanonicalEmail } from "@/lib/auth/email";
+import { canonicalizeEmail, registerCanonicalEmail, isCanonicalEmailRegistered } from "@/lib/auth/email";
+import { sendOtpEmail } from "@/lib/email/sender";
+import { auth } from "@/lib/auth/better-auth";
 
 export async function handleOtpRequest(req: NextRequest) {
   try {
@@ -24,27 +26,62 @@ export async function handleOtpRequest(req: NextRequest) {
       );
     }
 
-    const { email, provider } = parseResult.data;
+    const { email, provider, name, password, purpose } = parseResult.data;
     const canonical = canonicalizeEmail(email);
 
-    // Rate limitation: Max 3 OTP requests per 10 minutes per IP/canonical email (prevents Gmail +/dot bypass)
+    // 1. If registering a new account, prevent duplicate email aliases
+    if (purpose === "signup" && isCanonicalEmailRegistered(canonical)) {
+      return NextResponse.json(
+        {
+          type: "https://ratefactor.dev/errors/email-already-registered",
+          title: "Email Already Registered",
+          status: 409,
+          detail: "An account with this email address already exists. Please sign in instead.",
+        },
+        { status: 409 }
+      );
+    }
+
+    // 2. Sliding window rate limitation: Max 3 OTP requests per 10 minutes per IP/canonical email
     const rateCheck = checkRateLimit(`otp-req:${canonical}:${ip}`, "OTP_REQUEST");
     if (!rateCheck.allowed) {
       return createRateLimitResponse(rateCheck);
     }
 
-    // Generate challenge and cryptographically secure 6-digit OTP
-    const { challengeId, rawCode, expiresAt } = createOTPChallenge(email, provider);
+    // 3. Generate challenge and cryptographically secure 6-digit OTP (Strictly 5-minute expiry)
+    const { challengeId, rawCode, expiresAt } = createOTPChallenge(email, provider, {
+      name,
+      password,
+      purpose,
+    });
 
-    console.log(`[AUTH OTP DISPATCH] [Provider: ${provider}] To: ${email} -> Code: ${rawCode}`);
+    // 4. Send email directly via Resend to the recipient
+    const emailResult = await sendOtpEmail({
+      to: email,
+      code: rawCode,
+      name,
+      expiresInMinutes: 5,
+    });
+
+    if (!emailResult.success) {
+      return NextResponse.json(
+        {
+          type: "https://ratefactor.dev/errors/email-dispatch-failed",
+          title: "Email Dispatch Failed",
+          status: 500,
+          detail: emailResult.error || "Failed to deliver verification code to your email. Please verify your email address.",
+        },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(
       {
         message: `A 6-digit one-time verification code has been dispatched to ${email}.`,
         challengeId,
         expiresAt,
+        expiresInSeconds: 300,
         provider,
-        demoCode: process.env.NODE_ENV !== "production" ? rawCode : undefined,
       },
       { status: 200 }
     );
@@ -82,11 +119,13 @@ export async function handleOtpVerify(req: NextRequest) {
 
     const { challengeId, code } = parseResult.data;
 
+    // Sliding window check on verification attempts per IP
     const rateCheck = checkRateLimit(`otp-verify:${ip}`, { limit: 10, windowSeconds: 300, debounceSeconds: 1 });
     if (!rateCheck.allowed) {
       return createRateLimitResponse(rateCheck);
     }
 
+    // Verify OTP against stored challenge (checks 5-minute expiry, attempts < 5, SHA-256 hash)
     const verification = verifyOTPChallenge(challengeId, code);
 
     if (!verification.success) {
@@ -106,11 +145,32 @@ export async function handleOtpVerify(req: NextRequest) {
     registerCanonicalEmail(challenge.email);
     const username = normalizeUsername(challenge.email);
 
+    let createdUserId = challenge.userId || `user_${username}_${Date.now()}`;
+
+    // Auto-create user in Better Auth if signing up with password
+    if (challenge.purpose === "signup" && challenge.password) {
+      try {
+        const signupRes = await auth.api.signUpEmail({
+          body: {
+            email: challenge.email,
+            password: challenge.password,
+            name: challenge.name || challenge.email.split("@")[0],
+          },
+        });
+        if (signupRes?.user) {
+          createdUserId = signupRes.user.id;
+        }
+      } catch (signupErr: any) {
+        // If user already exists or pool is simulated, continue with resilient verified profile
+        console.warn("[OTP Verify / Better Auth Auto-Signup]:", signupErr?.message || signupErr);
+      }
+    }
+
     const user = {
-      id: challenge.userId || `user_${username}`,
+      id: createdUserId,
       email: challenge.email,
       username,
-      name: username.charAt(0).toUpperCase() + username.slice(1),
+      name: challenge.name || username.charAt(0).toUpperCase() + username.slice(1),
       role: "developer",
       isVerified: true,
       avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
@@ -118,7 +178,7 @@ export async function handleOtpVerify(req: NextRequest) {
 
     return NextResponse.json(
       {
-        message: "OTP verification successful. Welcome to RateFactor!",
+        message: "Email verification successful. Welcome to RateFactor!",
         user,
       },
       { status: 200 }

@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useModalSmoothScroll } from "@/hooks/useModalSmoothScroll";
-import { X, User, ExternalLink } from "lucide-react";
+import { X, User, ExternalLink } from "@/components/ui/icons";
 import { motion } from "framer-motion";
 import { Portfolio } from "@/types/portfolio";
 import { DeveloperProfile } from "@/types/profile";
@@ -17,68 +17,8 @@ export interface PublicProfileModalProps {
   onSelectPortfolio: (p: Portfolio) => void;
 }
 
-export function createProfileFromAuthor(
-  author: {
-    name: string;
-    username: string;
-    avatar?: string;
-    role?: string;
-    isVerified?: boolean;
-    availableForHire?: boolean;
-    customHireMessage?: string;
-  },
-  portfolios: Portfolio[],
-  baseProfile?: DeveloperProfile
-): DeveloperProfile {
-  const authorPortfolios = portfolios.filter(
-    (p) =>
-      p.author?.username?.toLowerCase() === author.username.toLowerCase() ||
-      p.author?.name?.toLowerCase() === author.name.toLowerCase()
-  );
-
-  const allSkills = Array.from(new Set(authorPortfolios.flatMap((p) => p.techStack || [])));
-
-  if (baseProfile && baseProfile.username.toLowerCase() === author.username.toLowerCase()) {
-    return {
-      ...baseProfile,
-      availableForHire: baseProfile.availableForHire ?? true,
-      customHireMessage:
-        baseProfile.customHireMessage ||
-        "Open for contract engineering and full-time architecture roles.",
-      pinnedPortfolioIds:
-        baseProfile.pinnedPortfolioIds.length > 0
-          ? baseProfile.pinnedPortfolioIds
-          : authorPortfolios.slice(0, 6).map((p) => p.id),
-      spotlightPortfolioId: baseProfile.spotlightPortfolioId || authorPortfolios[0]?.id,
-      skills: baseProfile.skills.length > 0 ? baseProfile.skills : allSkills,
-    };
-  }
-
-  return {
-    id: `profile-${author.username}`,
-    name: author.name,
-    username: author.username.replace(/^@/, ""),
-    avatar:
-      author.avatar ||
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
-    role: author.role || "Fullstack Architect",
-    bio: `${author.name} is a developer and builder showcasing architectures on RateFactor.`,
-    status: {
-      emoji: "⚡",
-      message: "Building architectures",
-      statusType: "available",
-    },
-    availableForHire: author.availableForHire ?? true,
-    customHireMessage:
-      author.customHireMessage ||
-      "Open for contract engineering and full-time architecture roles.",
-    github: `https://github.com/${author.username.replace(/^@/, "")}`,
-    pinnedPortfolioIds: authorPortfolios.slice(0, 6).map((p) => p.id),
-    spotlightPortfolioId: authorPortfolios[0]?.id,
-    skills: allSkills.length > 0 ? allSkills : ["TypeScript", "Next.js", "React"],
-    joinedDate: authorPortfolios[0]?.createdAt || new Date().toISOString(),
-  };
-}
+import { createProfileFromAuthor } from "@/lib/profile-utils";
+export { createProfileFromAuthor };
 
 export function PublicProfileModal({
   userProfile,
@@ -120,7 +60,7 @@ export function PublicProfileModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-md"
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-md modal-backdrop"
         onClick={onClose}
       />
 
@@ -134,17 +74,17 @@ export function PublicProfileModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 15 }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-5xl bg-slate-50 rounded-2xl border border-slate-200 shadow-2xl overflow-hidden z-10 flex flex-col max-h-[90vh]"
+        className="relative w-full max-w-5xl bg-slate-50 dark:bg-[#09090b] rounded-2xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden z-10 flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header Bar */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-200 bg-white shrink-0">
-          <div className="flex items-center gap-2 text-xs font-mono text-slate-600">
-            <User className="w-4 h-4 text-slate-400" />
-            <span id="public-profile-modal-title" className="font-semibold text-slate-900">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#121215] shrink-0">
+          <div className="flex items-center gap-2 text-xs font-mono text-slate-600 dark:text-zinc-400">
+            <User className="w-4 h-4 text-slate-400 dark:text-zinc-500" />
+            <span id="public-profile-modal-title" className="font-semibold text-slate-900 dark:text-white">
               @{userProfile.username}
             </span>
-            <span className="text-slate-300">•</span>
+            <span className="text-slate-300 dark:text-zinc-600">•</span>
             <span>Public Profile Preview</span>
           </div>
 
@@ -152,7 +92,7 @@ export function PublicProfileModal({
             <Link
               href={`/u/${userProfile.username}`}
               onClick={onClose}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 text-xs font-medium transition-colors"
             >
               <span>Open Full Page</span>
               <ExternalLink className="w-3 h-3" />
@@ -161,7 +101,7 @@ export function PublicProfileModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+              className="p-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
               aria-label="Close public profile modal"
             >
               <X className="w-4 h-4" />

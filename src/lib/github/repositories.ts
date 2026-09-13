@@ -42,12 +42,12 @@ export async function fetchGithubRepositories(
 
   let repos: any[] = [];
 
-  // 1. Try Authenticated /user/repos
-  if (token) {
+  // 1. If target username is specified, fetch that user's public repositories
+  if (targetUsername) {
     try {
       const data = await githubFetch(
-        token,
-        "/user/repos?per_page=100&sort=pushed&affiliation=owner,collaborator"
+        token || null,
+        `/users/${encodeURIComponent(targetUsername)}/repos?per_page=100&sort=pushed`
       );
       if (Array.isArray(data)) {
         repos = data;
@@ -55,14 +55,12 @@ export async function fetchGithubRepositories(
     } catch {
       // Fallback
     }
-  }
-
-  // 2. Try Public /users/{username}/repos
-  if (repos.length === 0 && targetUsername) {
+  } else if (token) {
+    // 2. If no target username, fetch authenticated user's own repositories
     try {
       const data = await githubFetch(
-        null,
-        `/users/${encodeURIComponent(targetUsername)}/repos?per_page=100&sort=pushed`
+        token,
+        "/user/repos?per_page=100&sort=pushed&affiliation=owner,collaborator"
       );
       if (Array.isArray(data)) {
         repos = data;

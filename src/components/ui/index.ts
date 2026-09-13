@@ -6,3 +6,6 @@ export * from "./Card";
 export * from "./Avatar";
 export * from "./Toast";
 export * from "./Tabs";
+export * from "./GrainyGradient";
+export * from "./HireSwitch";
+export * from "./icons";

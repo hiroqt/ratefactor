@@ -4,11 +4,14 @@ export interface OTPChallenge {
   id: string;
   userId?: string;
   email: string;
+  name?: string;
+  password?: string;
+  purpose?: "signup" | "signin" | "2fa";
   otpHash: string;
   provider: "google" | "email_password";
   attempts: number;
   maxAttempts: number;
-  expiresAt: number; // timestamp in ms
+  expiresAt: number; // timestamp in ms (5 minutes)
   isVerified: boolean;
 }
 
@@ -31,22 +34,30 @@ export function hashOTP(otp: string): string {
 
 /**
  * Creates and registers a new OTP challenge
- * Expires in 5 minutes. Maximum 5 attempts.
+ * Expires strictly in 5 minutes (300,000 ms). Maximum 5 attempts.
  */
 export function createOTPChallenge(
   email: string,
   provider: "google" | "email_password",
-  userId?: string
+  options?: {
+    userId?: string;
+    name?: string;
+    password?: string;
+    purpose?: "signup" | "signin" | "2fa";
+  }
 ): { challengeId: string; rawCode: string; expiresAt: number } {
   const challengeId = crypto.randomUUID();
   const rawCode = generateOTPCode();
   const otpHash = hashOTP(rawCode);
-  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+  const expiresAt = Date.now() + 5 * 60 * 1000; // Strictly 5 minutes
 
   const challenge: OTPChallenge = {
     id: challengeId,
-    userId,
+    userId: options?.userId,
     email: email.toLowerCase().trim(),
+    name: options?.name,
+    password: options?.password,
+    purpose: options?.purpose || "signin",
     otpHash,
     provider,
     attempts: 0,

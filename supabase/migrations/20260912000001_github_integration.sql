@@ -110,7 +110,8 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 DO $$ BEGIN
-  CREATE POLICY "Public profiles can view github_repositories" ON public.github_repositories FOR SELECT USING (true);
+  CREATE POLICY "Public profiles can view github_repositories" ON public.github_repositories 
+    FOR SELECT USING (is_private = false OR user_id = auth.uid());
 EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 DO $$ BEGIN
