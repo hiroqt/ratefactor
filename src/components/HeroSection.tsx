@@ -8,6 +8,7 @@ import { DeveloperProfile } from "@/types/profile";
 import { cn, formatNumber } from "@/lib/utils";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { performanceEngine } from "@/lib/performance";
+import { TakingShader } from "./TakingShader.webgpu";
 
 interface HeroSectionProps {
   showcasePortfolio?: Portfolio | null;
@@ -84,6 +85,21 @@ export function HeroSection({
 
   return (
     <section className="relative w-full min-h-[85vh] lg:min-h-[90vh] flex flex-col justify-between overflow-hidden select-none bg-[#fafafa] text-slate-950">
+      {/* Background WebGPU OpenShaders TakingShader with emerald sparkles */}
+      <div 
+        className="absolute inset-0 pointer-events-none overflow-hidden z-0"
+        aria-hidden="true"
+      >
+        <TakingShader
+          theme="light"
+          background={{ light: "#fafafa", dark: "#090909" }}
+          className="w-full h-full opacity-90 sm:opacity-95"
+          onError={(err) => console.warn("WebGPU hero shader fallback:", err)}
+        />
+        {/* Subtle, soft edge blending for crystal-clear text contrast */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#fafafa]/20 via-transparent to-[#fafafa]/30 pointer-events-none" />
+      </div>
+
       {/* Top spacing to account for floating nav */}
       <div className="h-20 sm:h-24" />
 
