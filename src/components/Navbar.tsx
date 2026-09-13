@@ -86,6 +86,8 @@ export function Navbar({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const { data: session } = useSession();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const effectiveUser = currentUser || (session?.user ? {
     id: session.user.id,
@@ -126,6 +128,16 @@ export function Navbar({
   const notificationContainerRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Prefetch main routes on idle for instant page switches
+  useEffect(() => {
+    try {
+      router.prefetch("/");
+      router.prefetch("/apps");
+      router.prefetch("/profile");
+      router.prefetch("/dashboard");
+    } catch {}
+  }, [router]);
 
   // Keyboard shortcut (Cmd+K / Ctrl+K)
   useEffect(() => {
@@ -211,9 +223,6 @@ export function Navbar({
       };
     }
   }, [isMobileMenuOpen]);
-
-  const router = useRouter();
-  const pathname = usePathname();
 
   // Close menus on route change
   useEffect(() => {

@@ -25,6 +25,23 @@ export interface PortfolioCardProps {
   index?: number;
 }
 
+const FALLBACK_THUMBNAIL = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='450' viewBox='0 0 800 450'><rect width='800' height='450' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='22' fill='%2394a3b8'>Preview Unavailable</text></svg>";
+const FALLBACK_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23e2e8f0'/><text x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='32' fill='%2364748b'>DEV</text></svg>";
+
+function onImgError(e: React.SyntheticEvent<HTMLImageElement>) {
+  const target = e.currentTarget;
+  if (!target.src.startsWith("data:")) {
+    target.src = FALLBACK_THUMBNAIL;
+  }
+}
+
+function onAvatarError(e: React.SyntheticEvent<HTMLImageElement>) {
+  const target = e.currentTarget;
+  if (!target.src.startsWith("data:")) {
+    target.src = FALLBACK_AVATAR;
+  }
+}
+
 export function PortfolioCard({
   portfolio,
   onSelect,
@@ -105,6 +122,9 @@ export function PortfolioCard({
             <img
               src={portfolio.thumbnail}
               alt={portfolio.title}
+              loading="lazy"
+              decoding="async"
+              onError={onImgError}
               className="w-full h-full object-cover transition-opacity group-hover:opacity-95"
             />
           </div>
@@ -126,25 +146,21 @@ export function PortfolioCard({
                 </span>
               )}
               {portfolio.requestCritique && (
-                <span className="flex items-center gap-1 text-[11px] font-mono font-medium text-orange-800 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-md">
+                <span className="flex items-center gap-1 text-[11px] font-mono font-medium text-orange-800 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-md shadow-xs">
                   <Flame className="w-3 h-3 text-orange-600" /> Roast Welcome
                 </span>
               )}
             </div>
 
-            <h3 className="font-bold text-slate-900 text-sm sm:text-base group-hover:text-black transition-colors truncate">
-              {portfolio.title}
-            </h3>
-            <p className="text-xs text-slate-600 truncate max-w-xl">
-              {portfolio.tagline}
-            </p>
+            <h4 className="text-sm font-semibold text-slate-900 group-hover:underline truncate">{portfolio.title}</h4>
+            <p className="text-xs text-slate-500 truncate max-w-xl">{portfolio.tagline}</p>
           </div>
         </div>
 
-        {/* Right Details & Metrics */}
-        <div className="flex items-center gap-3 self-end md:self-auto flex-wrap">
-          {/* Tech stack */}
-          <div className="hidden lg:flex items-center gap-1.5 font-mono text-xs">
+        {/* Right Details */}
+        <div className="flex items-center gap-4 shrink-0">
+          {/* Tech Stack */}
+          <div className="hidden lg:flex items-center gap-1">
             {portfolio.techStack.slice(0, 3).map((tech) => (
               <span key={tech} className="px-2 py-0.5 rounded-md bg-slate-50 text-slate-700 text-[11px] border border-slate-200">
                 {tech}
@@ -157,6 +173,7 @@ export function PortfolioCard({
             <img
               src={portfolio.author.avatar}
               alt={portfolio.author.name}
+              onError={onAvatarError}
               className="w-4 h-4 rounded object-cover border border-slate-200"
             />
             <span className="text-xs text-slate-600 hidden sm:inline">{portfolio.author.name}</span>
@@ -222,6 +239,9 @@ export function PortfolioCard({
             <img
               src={portfolio.thumbnail}
               alt={portfolio.title}
+              loading="lazy"
+              decoding="async"
+              onError={onImgError}
               className="w-full h-full object-cover transition-opacity group-hover:opacity-95"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
@@ -244,6 +264,7 @@ export function PortfolioCard({
               <img
                 src={portfolio.author.avatar}
                 alt={portfolio.author.name}
+                onError={onAvatarError}
                 className="w-4 h-4 rounded object-cover"
               />
               <span className="text-xs text-slate-900 font-medium">{portfolio.author.name}</span>
@@ -352,6 +373,9 @@ export function PortfolioCard({
         <img
           src={portfolio.thumbnail}
           alt={portfolio.title}
+          loading="lazy"
+          decoding="async"
+          onError={onImgError}
           className="w-full h-full object-cover transition-opacity group-hover:opacity-95"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
@@ -383,6 +407,7 @@ export function PortfolioCard({
           <img
             src={portfolio.author.avatar}
             alt={portfolio.author.name}
+            onError={onAvatarError}
             className="w-3.5 h-3.5 rounded object-cover"
           />
           <span className="text-[11px] font-medium text-slate-900 truncate max-w-[110px]">

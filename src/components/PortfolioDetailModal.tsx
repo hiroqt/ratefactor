@@ -106,6 +106,7 @@ export function PortfolioDetailModal({
 
   // Handle ESC key & lock body scrolling
   useEffect(() => {
+    if (!portfolio) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         onClose();
@@ -117,7 +118,7 @@ export function PortfolioDetailModal({
       document.body.style.overflow = "unset";
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose]);
+  }, [portfolio, onClose]);
 
   useModalSmoothScroll({
     isOpen: !!portfolio,

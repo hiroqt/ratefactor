@@ -8,10 +8,7 @@ export const authClient = createAuthClient({
       : process.env.NEXT_PUBLIC_APP_URL ||
         process.env.BETTER_AUTH_URL ||
         "http://localhost:3000",
-  plugins: [
-    dashClient(),
-    sentinelClient({ autoSolveChallenge: true }),
-  ],
+  plugins: [],
 });
 
 export const auth = authClient;

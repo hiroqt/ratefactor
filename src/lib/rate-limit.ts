@@ -29,6 +29,18 @@ export const RATE_LIMIT_PRESETS: Record<string, RateLimitConfig> = {
     windowSeconds: 900,
     debounceSeconds: 2,
   },
+  // Signin attempts alias
+  SIGNIN_ATTEMPT: {
+    limit: 5,
+    windowSeconds: 900,
+    debounceSeconds: 2,
+  },
+  // Account creation: Max 3 accounts per hour per IP to prevent spam bot floods
+  ACCOUNT_CREATION: {
+    limit: 3,
+    windowSeconds: 3600,
+    debounceSeconds: 15,
+  },
   // OTP requests: Max 3 requests per 10 minutes to prevent SMS/email flooding
   OTP_REQUEST: {
     limit: 3,

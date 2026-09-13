@@ -88,15 +88,23 @@ export async function GET(req: NextRequest) {
     const total = filtered.length;
     const paginated = filtered.slice(offset, offset + limit);
 
-    return NextResponse.json({
-      portfolios: paginated,
-      pagination: {
-        total,
-        offset,
-        limit,
-        hasMore: offset + limit < total,
+    return NextResponse.json(
+      {
+        portfolios: paginated,
+        pagination: {
+          total,
+          offset,
+          limit,
+          hasMore: offset + limit < total,
+        },
       },
-    });
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+        },
+      }
+    );
   } catch (error: any) {
     return NextResponse.json(
       {

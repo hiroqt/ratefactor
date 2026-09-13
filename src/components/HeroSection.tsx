@@ -8,6 +8,7 @@ import { DeveloperProfile } from "@/types/profile";
 import { cn, formatNumber } from "@/lib/utils";
 import { AdykrniShader } from "./AdykrniShader.webgl";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
+import { performanceEngine } from "@/lib/performance";
 
 interface HeroSectionProps {
   showcasePortfolio?: Portfolio | null;
@@ -17,6 +18,11 @@ interface HeroSectionProps {
   profile?: DeveloperProfile;
   totalDevelopers?: number;
 }
+
+const SHADER_BACKGROUND = { light: "#fafafa", dark: "#090909" };
+const handleShaderError = (err: Error) => {
+  console.warn("WebGL shader fallback:", err);
+};
 
 export function HeroSection({
   showcasePortfolio,
@@ -37,12 +43,35 @@ export function HeroSection({
   ];
   const currentKeyword = keywords[activeKeywordIndex];
 
-  // Auto-cycle keywords every 3.5s with graceful interval
+  // Auto-cycle keywords every 3.5s with graceful interval, paused in background tab
   useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveKeywordIndex((prev) => (prev + 1) % keywords.length);
-    }, 3500);
-    return () => clearInterval(timer);
+    let timer: any = null;
+
+    const startTimer = () => {
+      if (timer) clearInterval(timer);
+      if (document.hidden) return;
+      timer = setInterval(() => {
+        if (!document.hidden) {
+          setActiveKeywordIndex((prev) => (prev + 1) % keywords.length);
+        }
+      }, 3500);
+    };
+
+    startTimer();
+
+    const unbindVis = performanceEngine.onVisibilityChange((visible) => {
+      if (visible) {
+        startTimer();
+      } else if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    });
+
+    return () => {
+      if (timer) clearInterval(timer);
+      unbindVis();
+    };
   }, [keywords.length]);
 
   const devCount = totalDevelopers ?? 0;
@@ -69,9 +98,9 @@ export function HeroSection({
       >
         <AdykrniShader
           theme="light"
-          background={{ light: "#fafafa", dark: "#090909" }}
+          background={SHADER_BACKGROUND}
           className="w-full h-full opacity-70 sm:opacity-85"
-          onError={(err) => console.warn("WebGL shader fallback:", err)}
+          onError={handleShaderError}
         />
         {/* Subtle gradient vignette to preserve pristine editorial typography contrast */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#fafafa] via-transparent to-[#fafafa]/50 pointer-events-none" />

@@ -144,7 +144,13 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
 
     // If viewing current user's profile
     if (myDevProfile.username.toLowerCase().replace(/^@/, "") === rawUsername.toLowerCase()) {
-      return myDevProfile;
+      return {
+        ...myDevProfile,
+        availableForHire: myDevProfile.availableForHire ?? true,
+        customHireMessage:
+          myDevProfile.customHireMessage ||
+          "Open for contract engineering and full-time architecture roles.",
+      };
     }
 
     // If matched in portfolios
@@ -166,6 +172,8 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
         message: "Building architectures",
         statusType: "available",
       },
+      availableForHire: true,
+      customHireMessage: "Open for contract engineering and full-time architecture roles.",
       github: `https://github.com/${rawUsername}`,
       pinnedPortfolioIds: targetAuthorPortfolios.slice(0, 6).map((p) => p.id),
       spotlightPortfolioId: targetAuthorPortfolios[0]?.id,

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "npx tsx scripts/verify-backend.ts && npx tsx scripts/verify-better-auth.ts && npx tsx scripts/verify-monitoring.ts && npx tsx scripts/verify-contributions-e2e.ts && npx tsx scripts/verify-discover-apps.ts"
+    "test": "npx tsx scripts/verify-backend.ts && npx tsx scripts/verify-better-auth.ts && npx tsx scripts/verify-monitoring.ts && npx tsx scripts/verify-contributions-e2e.ts && npx tsx scripts/verify-discover-apps.ts && npx tsx scripts/verify-edgecases.ts"
   },
   "dependencies": {
     "@better-auth/infra": "^0.4.9",

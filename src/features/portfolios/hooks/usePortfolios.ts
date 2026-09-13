@@ -28,8 +28,16 @@ export interface UsePortfoliosOptions {
   onUnpin?: (portfolioId: string) => void;
 }
 
+// Shared in-memory singleton cache across Next.js client route transitions
+let memoryPortfoliosCache: Portfolio[] | null = null;
+
 export function usePortfolios(options?: UsePortfoliosOptions) {
-  const [portfolios, setPortfolios] = useState<Portfolio[]>(INITIAL_PORTFOLIOS);
+  const [portfolios, setPortfolios] = useState<Portfolio[]>(() => {
+    if (memoryPortfoliosCache && memoryPortfoliosCache.length > 0) {
+      return memoryPortfoliosCache;
+    }
+    return INITIAL_PORTFOLIOS;
+  });
 
   // Hydration-safe initial load from localStorage
   useEffect(() => {
@@ -57,11 +65,19 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
             }
           });
           const merged = Array.from(map.values());
+          memoryPortfoliosCache = merged;
           setPortfolios(merged);
         }
       }
     } catch (e) {}
   }, []);
+
+  // Synchronize memory cache whenever state changes
+  useEffect(() => {
+    if (portfolios && portfolios.length > 0) {
+      memoryPortfoliosCache = portfolios;
+    }
+  }, [portfolios]);
 
   const [selectedPortfolio, setSelectedPortfolio] = useState<Portfolio | null>(null);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);

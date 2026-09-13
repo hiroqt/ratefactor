@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { ratingSubmissionSchema } from "@/lib/validations/portfolio";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { getSessionUser } from "@/lib/auth/server-session";
+import { getCanonicalEmailHash } from "@/lib/auth/email";
 
-// In-memory rating storage
-const userRatings = new Map<string, any>(); // key: `${userId}:${portfolioId}`
+// In-memory rating storage keyed by canonical mailbox hash to prevent multi-account Sybil manipulation
+const userRatings = new Map<string, any>(); // key: `${mailboxHash}:${portfolioId}`
 
 export async function POST(
   req: NextRequest,
@@ -29,9 +30,10 @@ export async function POST(
     }
 
     const actorId = authUser.id;
+    const mailboxHash = authUser.email ? getCanonicalEmailHash(authUser.email) : actorId;
 
     // Rate limitation: Max 10 rating updates per minute
-    const rateCheck = checkRateLimit(`rate:${actorId}:${portfolioId}:${ip}`, { limit: 10, windowSeconds: 60, debounceSeconds: 1 });
+    const rateCheck = checkRateLimit(`rate:${mailboxHash}:${portfolioId}:${ip}`, { limit: 10, windowSeconds: 60, debounceSeconds: 1 });
     if (!rateCheck.allowed) {
       return createRateLimitResponse(rateCheck);
     }
@@ -57,9 +59,11 @@ export async function POST(
       ((design + codeQuality + performance + documentation) / 4).toFixed(2)
     );
 
-    const key = `${actorId}:${portfolioId}`;
+    // Keyed by canonical mailbox hash to eliminate Sybil multi-account duplicate voting
+    const key = `${mailboxHash}:${portfolioId}`;
     userRatings.set(key, {
       userId: actorId,
+      mailboxHash,
       portfolioId,
       score: averageScore,
       breakdown: { design, codeQuality, performance, documentation },

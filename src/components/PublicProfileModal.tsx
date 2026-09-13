@@ -18,7 +18,15 @@ export interface PublicProfileModalProps {
 }
 
 export function createProfileFromAuthor(
-  author: { name: string; username: string; avatar?: string; role?: string; isVerified?: boolean },
+  author: {
+    name: string;
+    username: string;
+    avatar?: string;
+    role?: string;
+    isVerified?: boolean;
+    availableForHire?: boolean;
+    customHireMessage?: string;
+  },
   portfolios: Portfolio[],
   baseProfile?: DeveloperProfile
 ): DeveloperProfile {
@@ -33,6 +41,10 @@ export function createProfileFromAuthor(
   if (baseProfile && baseProfile.username.toLowerCase() === author.username.toLowerCase()) {
     return {
       ...baseProfile,
+      availableForHire: baseProfile.availableForHire ?? true,
+      customHireMessage:
+        baseProfile.customHireMessage ||
+        "Open for contract engineering and full-time architecture roles.",
       pinnedPortfolioIds:
         baseProfile.pinnedPortfolioIds.length > 0
           ? baseProfile.pinnedPortfolioIds
@@ -56,6 +68,10 @@ export function createProfileFromAuthor(
       message: "Building architectures",
       statusType: "available",
     },
+    availableForHire: author.availableForHire ?? true,
+    customHireMessage:
+      author.customHireMessage ||
+      "Open for contract engineering and full-time architecture roles.",
     github: `https://github.com/${author.username.replace(/^@/, "")}`,
     pinnedPortfolioIds: authorPortfolios.slice(0, 6).map((p) => p.id),
     spotlightPortfolioId: authorPortfolios[0]?.id,
@@ -75,15 +91,14 @@ export function PublicProfileModal({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         onClose();
       }
     };
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      window.addEventListener("keydown", handleKeyDown);
-    }
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
     return () => {
       document.body.style.overflow = "unset";
       window.removeEventListener("keydown", handleKeyDown);

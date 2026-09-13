@@ -3,6 +3,7 @@ import { otpRequestSchema, otpVerifySchema } from "@/lib/validations/portfolio";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { createOTPChallenge, verifyOTPChallenge } from "@/lib/auth/otp";
 import { normalizeUsername } from "@/lib/auth/client";
+import { canonicalizeEmail, registerCanonicalEmail } from "@/lib/auth/email";
 
 export async function handleOtpRequest(req: NextRequest) {
   try {
@@ -24,9 +25,10 @@ export async function handleOtpRequest(req: NextRequest) {
     }
 
     const { email, provider } = parseResult.data;
+    const canonical = canonicalizeEmail(email);
 
-    // Rate limitation: Max 3 OTP requests per 10 minutes per IP/email
-    const rateCheck = checkRateLimit(`otp-req:${email}:${ip}`, "OTP_REQUEST");
+    // Rate limitation: Max 3 OTP requests per 10 minutes per IP/canonical email (prevents Gmail +/dot bypass)
+    const rateCheck = checkRateLimit(`otp-req:${canonical}:${ip}`, "OTP_REQUEST");
     if (!rateCheck.allowed) {
       return createRateLimitResponse(rateCheck);
     }
@@ -101,6 +103,7 @@ export async function handleOtpVerify(req: NextRequest) {
     }
 
     const challenge = verification.challenge!;
+    registerCanonicalEmail(challenge.email);
     const username = normalizeUsername(challenge.email);
 
     const user = {

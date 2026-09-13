@@ -23,6 +23,23 @@ export interface AppCardProps {
   index?: number;
 }
 
+const FALLBACK_THUMBNAIL = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='450' viewBox='0 0 800 450'><rect width='800' height='450' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='22' fill='%2394a3b8'>Preview Unavailable</text></svg>";
+const FALLBACK_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23e2e8f0'/><text x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='32' fill='%2364748b'>DEV</text></svg>";
+
+function onImgError(e: React.SyntheticEvent<HTMLImageElement>) {
+  const target = e.currentTarget;
+  if (!target.src.startsWith("data:")) {
+    target.src = FALLBACK_THUMBNAIL;
+  }
+}
+
+function onAvatarError(e: React.SyntheticEvent<HTMLImageElement>) {
+  const target = e.currentTarget;
+  if (!target.src.startsWith("data:")) {
+    target.src = FALLBACK_AVATAR;
+  }
+}
+
 export function AppCard({
   portfolio,
   onSelect,
@@ -106,6 +123,8 @@ export function AppCard({
           src={portfolio.thumbnail}
           alt={portfolio.title}
           loading="lazy"
+          decoding="async"
+          onError={onImgError}
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -150,6 +169,7 @@ export function AppCard({
           <img
             src={portfolio.author.avatar}
             alt={portfolio.author.name}
+            onError={onAvatarError}
             className="w-4 h-4 rounded-full object-cover border border-slate-200 shrink-0"
           />
           <span className="text-[11px] text-slate-700 font-medium truncate flex-1">

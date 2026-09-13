@@ -23,6 +23,8 @@ export const pool =
   new Pool({
     connectionString,
     ssl: useSsl ? { rejectUnauthorized: false } : undefined,
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
   });
 
 // Handle idle connection errors gracefully without crashing the Node process
@@ -43,9 +45,7 @@ const appUrl =
     ? `https://${process.env.VERCEL_URL}`
     : "http://localhost:3000");
 
-const apiKey =
-  process.env.BETTER_AUTH_API_KEY ||
-  "ba_dnip5uv46vm1en7wykkvi2e0rbigqqym";
+const apiKey = process.env.BETTER_AUTH_API_KEY;
 
 export const auth = betterAuth({
   database: pool,
@@ -78,12 +78,8 @@ export const auth = betterAuth({
     },
   },
   plugins: [
-    dash({
-      apiKey,
-    }),
-    sentinel({
-      apiKey,
-    }),
+    dash(apiKey ? { apiKey } : {}),
+    sentinel(apiKey ? { apiKey } : {}),
   ],
   user: {
     additionalFields: {

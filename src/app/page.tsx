@@ -19,7 +19,7 @@ import {
 import { AuthModal, useAuth } from "@/features/auth";
 import { useNotifications } from "@/features/notifications";
 import { useToast } from "@/hooks/useToast";
-import { PortfolioCategory } from "@/types/portfolio";
+import { Portfolio, PortfolioCategory } from "@/types/portfolio";
 import { DeveloperProfile } from "@/types/profile";
 import { PublicProfileModal } from "@/components/PublicProfileModal";
 import { Terminal, ArrowLeft } from "lucide-react";
@@ -99,7 +99,7 @@ export default function Home() {
     onRequireAuth: requireAuth,
     onNotify: addNotification,
     onToast: (msg) => toast.info(msg),
-    onAutoPin: (newPortfolio) => {
+    onAutoPin: React.useCallback((newPortfolio: Portfolio) => {
       if (
         developerProfile.pinnedPortfolioIds.length < 6 &&
         !developerProfile.pinnedPortfolioIds.includes(newPortfolio.id)
@@ -109,8 +109,8 @@ export default function Home() {
           developerProfile.spotlightPortfolioId || newPortfolio.id
         );
       }
-    },
-    onUnpin: (portfolioId) => {
+    }, [developerProfile.pinnedPortfolioIds, developerProfile.spotlightPortfolioId, updatePins]),
+    onUnpin: React.useCallback((portfolioId: string) => {
       if (developerProfile.pinnedPortfolioIds.includes(portfolioId)) {
         const nextPinned = developerProfile.pinnedPortfolioIds.filter((id) => id !== portfolioId);
         updatePins(
@@ -120,7 +120,7 @@ export default function Home() {
             : developerProfile.spotlightPortfolioId
         );
       }
-    },
+    }, [developerProfile.pinnedPortfolioIds, developerProfile.spotlightPortfolioId, updatePins]),
   });
 
   // Navigation tab switcher

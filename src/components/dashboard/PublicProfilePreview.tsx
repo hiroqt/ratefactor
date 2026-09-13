@@ -18,7 +18,9 @@ import {
   MessageSquare,
   Sparkles,
   ArrowUpRight,
-  FileText
+  FileText,
+  Mail,
+  Briefcase
 } from "lucide-react";
 import { DeveloperProfile } from "@/types/profile";
 import { Portfolio } from "@/types/portfolio";
@@ -156,6 +158,37 @@ export function PublicProfilePreview({
               <p className="text-xs font-medium text-slate-700">{profile.role}</p>
 
               <p className="text-xs text-slate-600 max-w-xl leading-relaxed break-words [overflow-wrap:anywhere]">{profile.bio}</p>
+
+              {/* Available for Hire Beacon & Contact Trigger */}
+              {(profile.availableForHire ?? true) && (
+                <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 max-w-xl">
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                      </span>
+                      <span className="text-xs font-semibold text-emerald-900">Available for Hire</span>
+                    </div>
+                    {profile.customHireMessage && (
+                      <p className="text-[11px] text-emerald-800 leading-relaxed truncate">
+                        {profile.customHireMessage}
+                      </p>
+                    )}
+                  </div>
+                  {(profile.website || profile.github || profile.twitter || profile.linkedin) && (
+                    <a
+                      href={profile.website || profile.github || profile.twitter || profile.linkedin || "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors shrink-0"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      <span>Contact Developer</span>
+                    </a>
+                  )}
+                </div>
+              )}
 
               <div className="flex items-center gap-4 text-[11px] text-slate-500 flex-wrap pt-1">
                 {profile.company && (

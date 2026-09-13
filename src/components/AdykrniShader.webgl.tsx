@@ -13,7 +13,8 @@
 
 "use client";
 
-import { type CSSProperties, useEffect, useRef } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { performanceEngine } from "@/lib/performance";
 
 const VERTEX_SHADER = `#version 300 es
 void main() {
@@ -22,7 +23,8 @@ void main() {
 }
 `;
 
-const FIELD_SHADER = `#version 300 es
+function getFieldShader(layers: number = 83.0) {
+  return `#version 300 es
 precision highp float;
 
 uniform vec2 iResolution;
@@ -41,7 +43,7 @@ const float COLOUR_CYCLE = 0.0931247994;
 const float THETA = 2.11261058;
 const float SHEAR = 0.968279302;
 const float SHRINK = 0.946246147;
-const float LAYERS = 83.0;
+const float LAYERS = ${layers.toFixed(1)};
 const float WARP_FREQ_X = 0.363280535;
 const float WARP_FREQ_Y = 2.82314897;
 const float WARP_AMP_X = 0.119004056;
@@ -139,6 +141,7 @@ void main() {
   fragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
 }
 `;
+}
 
 export type ShaderTheme = "dark" | "light";
 
@@ -175,6 +178,8 @@ export function AdykrniShader({ theme = "dark", background, time, onError, class
   const light = background?.light ?? "#ffffff";
   const animated = time === undefined;
 
+  const [hasError, setHasError] = useState(false);
+
   useEffect(() => {
     latestTheme.current = theme;
     shader.current?.setTheme(theme);
@@ -190,6 +195,7 @@ export function AdykrniShader({ theme = "dark", background, time, onError, class
   }, [onError]);
 
   useEffect(() => {
+    if (hasError) return;
     const element = canvas.current;
     if (!element) return;
     let handle: ShaderHandle | null = null;
@@ -201,8 +207,9 @@ export function AdykrniShader({ theme = "dark", background, time, onError, class
       signal: controller.signal,
       onError: (error) => {
         if (controller.signal.aborted) return;
+        setHasError(true);
         if (latestOnError.current) latestOnError.current(error);
-        else console.error(error);
+        else console.warn("WebGL shader fallback to gradient:", error);
       },
     };
     try {
@@ -210,6 +217,7 @@ export function AdykrniShader({ theme = "dark", background, time, onError, class
       shader.current = handle;
       if (latestTime.current !== undefined) handle.render(latestTime.current);
     } catch (error) {
+      setHasError(true);
       options.onError?.(error instanceof Error ? error : new Error(String(error)));
     }
     return () => {
@@ -217,12 +225,32 @@ export function AdykrniShader({ theme = "dark", background, time, onError, class
       handle?.destroy();
       shader.current = null;
     };
-  }, [dark, light, animated]);
+  }, [dark, light, animated, hasError]);
+
+  if (hasError) {
+    return (
+      <div
+        className={className}
+        style={{
+          display: "block",
+          width: "100%",
+          height: "100%",
+          background:
+            theme === "light"
+              ? "radial-gradient(ellipse at 70% 30%, #e2e8f0 0%, #f8fafc 50%, #fafafa 100%)"
+              : "radial-gradient(ellipse at 70% 30%, #1e293b 0%, #0f172a 50%, #090909 100%)",
+          ...style,
+        }}
+        aria-hidden="true"
+      />
+    );
+  }
 
   return <canvas ref={canvas} className={className} style={{ display: "block", width: "100%", height: "100%", ...style }} aria-hidden="true" />;
 }
 
-const MAX_PIXELS = 2400000;
+const MAX_PIXELS_DESKTOP = 1600000;
+const MAX_PIXELS_LOW_POWER = 900000;
 const THEME_EASE = 7;
 
 function parseHex(hex: string): [number, number, number] {
@@ -234,6 +262,8 @@ function parseHex(hex: string): [number, number, number] {
 function animate(options: ShaderOptions, draw: (time: number, theme: number, pixelRatio: number) => void, canvas: HTMLCanvasElement, release: () => void, maxDimension = Infinity): ShaderHandle {
   const autoplay = options.autoplay !== false;
   const stillness = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let isLowPower = performanceEngine.getIsLowPower();
+  let isActivelyScrolling = false;
   let resolution = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
   let deviceRatio = window.devicePixelRatio || 1;
   let width = canvas.clientWidth, height = canvas.clientHeight;
@@ -247,17 +277,23 @@ function animate(options: ShaderOptions, draw: (time: number, theme: number, pix
   let previous: number | null = null;
 
   function canDraw() {
-    return !disposed && !document.hidden && visible && width > 0 && height > 0;
+    const w = width || canvas.clientWidth;
+    const h = height || canvas.clientHeight;
+    return !disposed && !document.hidden && visible && w > 0 && h > 0;
   }
 
   function fitCanvas() {
-    const scale = Math.min(deviceRatio, 2, Math.sqrt(MAX_PIXELS / (width * height)), maxDimension / width, maxDimension / height);
-    const w = Math.max(1, Math.floor(width * scale)), h = Math.max(1, Math.floor(height * scale));
+    const maxPixels = isLowPower ? MAX_PIXELS_LOW_POWER : MAX_PIXELS_DESKTOP;
+    const maxRatio = isLowPower ? 1.0 : Math.min(deviceRatio, 1.5);
+    const currentW = Math.max(1, width || canvas.clientWidth || 300);
+    const currentH = Math.max(1, height || canvas.clientHeight || 200);
+    const scale = Math.min(maxRatio, Math.sqrt(maxPixels / (currentW * currentH)), maxDimension / currentW, maxDimension / currentH);
+    const w = Math.max(1, Math.floor(currentW * scale)), h = Math.max(1, Math.floor(currentH * scale));
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w;
       canvas.height = h;
     }
-    return w / width;
+    return w / currentW;
   }
 
   function render(time: number) {
@@ -275,11 +311,14 @@ function animate(options: ShaderOptions, draw: (time: number, theme: number, pix
   }
 
   function schedule() {
-    if (!frame && canDraw()) frame = requestAnimationFrame(tick);
+    // If user is actively scrolling, pause animation frames to dedicate 100% GPU bandwidth to buttery 60fps+ compositor scrolling
+    if (!frame && canDraw() && !isActivelyScrolling) {
+      frame = requestAnimationFrame(tick);
+    }
   }
 
   function refresh() {
-    if (!canDraw()) {
+    if (!canDraw() || isActivelyScrolling) {
       cancelAnimationFrame(frame);
       frame = 0;
       previous = null;
@@ -288,7 +327,7 @@ function animate(options: ShaderOptions, draw: (time: number, theme: number, pix
 
   function tick(now: number) {
     frame = 0;
-    if (!canDraw()) { previous = null; return; }
+    if (!canDraw() || isActivelyScrolling) { previous = null; return; }
     const delta = previous === null ? 0 : Math.min((now - previous) / 1000, 0.1);
     previous = now;
     if (autoplay) {
@@ -312,6 +351,24 @@ function animate(options: ShaderOptions, draw: (time: number, theme: number, pix
     refresh();
   }
 
+  // Listen to performance engine scroll state to throttle/pause during user scroll
+  const unbindScroll = performanceEngine.onScrollState((scrolling) => {
+    isActivelyScrolling = scrolling;
+    if (scrolling) {
+      if (frame) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      }
+    } else {
+      refresh();
+    }
+  });
+
+  const unbindLowPower = performanceEngine.onLowPowerChange((lowPower) => {
+    isLowPower = lowPower;
+    fitCanvas();
+  });
+
   const observer = new ResizeObserver(([entry]) => {
     if (disposed || !entry) return;
     const next = entry.contentRect;
@@ -329,6 +386,8 @@ function animate(options: ShaderOptions, draw: (time: number, theme: number, pix
   function destroy() {
     if (disposed) return;
     disposed = true;
+    unbindScroll();
+    unbindLowPower();
     cancelAnimationFrame(frame);
     frame = 0;
     observer.disconnect();
@@ -392,7 +451,11 @@ export function createShader(canvas: HTMLCanvasElement, options: ShaderOptions =
   const dark = parseHex(options.background?.dark ?? "#090909");
   const light = parseHex(options.background?.light ?? "#ffffff");
 
-  const field = compile(gl, FIELD_SHADER);
+  // On low power / battery saver devices, compile with 32 layers instead of 83 for 60%+ GPU savings
+  const isLowPower = performanceEngine.getIsLowPower();
+  const layerCount = isLowPower ? 32.0 : 83.0;
+
+  const field = compile(gl, getFieldShader(layerCount));
   const fieldUniforms = uniforms(gl, field, ["iResolution", "iTime", "uLightMode", "uDarkBackground", "uLightBackground"]);
 
   const setFrame = (locations: Record<string, WebGLUniformLocation | null>, time: number, theme: number) => {
@@ -413,3 +476,4 @@ export function createShader(canvas: HTMLCanvasElement, options: ShaderOptions =
     gl.deleteProgram(field);
   }, Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE), gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)));
 }
+

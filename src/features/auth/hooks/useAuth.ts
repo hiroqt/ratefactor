@@ -27,36 +27,47 @@ export function useAuth(options?: UseAuthOptions) {
   // Synchronize session from Better Auth
   useEffect(() => {
     if (authSession?.user) {
-      const u: AuthUser = {
-        id: authSession.user.id,
-        name: authSession.user.name || authSession.user.email?.split("@")[0] || "Developer",
-        email: authSession.user.email,
-        avatar:
-          authSession.user.image ||
-          "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80",
-        role: (authSession.user as any).role || "developer",
-        username: normalizeUsername(authSession.user.email || authSession.user.name),
-      };
-      setCurrentUser(u);
-      try {
-        localStorage.setItem("ratefactor_auth_user", JSON.stringify(u));
-      } catch (e) {
-        // ignore
-      }
-    }
-  }, [authSession]);
+      const nextUsername = normalizeUsername(authSession.user.email || authSession.user.name);
+      setCurrentUser((prev) => {
+        if (
+          prev &&
+          prev.id === authSession.user.id &&
+          prev.name === (authSession.user.name || authSession.user.email?.split("@")[0] || "Developer") &&
+          prev.email === authSession.user.email &&
+          prev.username === nextUsername &&
+          prev.avatar === (authSession.user.image || prev.avatar)
+        ) {
+          return prev;
+        }
 
-  // Read persisted fallback from localStorage if no active session yet
+        const u: AuthUser = {
+          id: authSession.user.id,
+          name: authSession.user.name || authSession.user.email?.split("@")[0] || "Developer",
+          email: authSession.user.email,
+          avatar:
+            authSession.user.image ||
+            "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80",
+          role: (authSession.user as any).role || "developer",
+          username: nextUsername,
+        };
+        try {
+          localStorage.setItem("ratefactor_auth_user", JSON.stringify(u));
+        } catch (e) {}
+        return u;
+      });
+    }
+  }, [authSession?.user?.id, authSession?.user?.email, authSession?.user?.name, authSession?.user?.image]);
+
+  // Read persisted fallback from localStorage only on initial mount
   useEffect(() => {
     try {
       const savedUser = localStorage.getItem("ratefactor_auth_user");
-      if (savedUser && !authSession?.user) {
-        setCurrentUser(JSON.parse(savedUser));
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        setCurrentUser((prev) => prev || parsed);
       }
-    } catch (e) {
-      // ignore
-    }
-  }, [authSession]);
+    } catch (e) {}
+  }, []);
 
   const requireAuth = useCallback((intent: string) => {
     setAuthIntentMessage(intent);

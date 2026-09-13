@@ -39,7 +39,8 @@ import {
   Cpu,
   Boxes,
   Compass,
-  Smile
+  Smile,
+  Briefcase
 } from "lucide-react";
 import { Navbar, Footer } from "@/components/layout";
 import { DeveloperDashboard, useDeveloperProfile } from "@/features/dashboard";
@@ -552,6 +553,48 @@ function ProfilePageContent() {
                     </button>
                   </div>
                 )}
+
+                {/* Available for Hire Quick Toggle */}
+                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      {(developerProfile.availableForHire ?? true) && (
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      )}
+                      <span
+                        className={cn(
+                          "relative inline-flex rounded-full h-2.5 w-2.5",
+                          (developerProfile.availableForHire ?? true) ? "bg-emerald-500" : "bg-slate-300"
+                        )}
+                      />
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-800">
+                      {(developerProfile.availableForHire ?? true) ? "Available for Hire" : "Not for Hire"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={developerProfile.availableForHire ?? true}
+                    onClick={() => {
+                      const next = !(developerProfile.availableForHire ?? true);
+                      updateProfile({ ...developerProfile, availableForHire: next });
+                      toast.success(next ? "Status updated: Available for Hire 🟢" : "Status updated: Not looking for work ⚪");
+                    }}
+                    className={cn(
+                      "relative inline-flex h-4.5 w-8 items-center rounded-full transition-colors cursor-pointer",
+                      (developerProfile.availableForHire ?? true) ? "bg-emerald-500" : "bg-slate-300"
+                    )}
+                    title="Toggle Available for Hire status"
+                  >
+                    <span
+                      className={cn(
+                        "inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow-xs",
+                        (developerProfile.availableForHire ?? true) ? "translate-x-4" : "translate-x-0.5"
+                      )}
+                    />
+                  </button>
+                </div>
               </div>
 
               {/* Rare-UI Hook-Sidebar Navigation with Animated Hooked Rail */}

@@ -2,6 +2,7 @@
 
 import React, { useEffect, createContext, useContext, useRef } from "react";
 import Lenis from "lenis";
+import { performanceEngine } from "@/lib/performance";
 
 interface SmoothScrollContextType {
   lenis: Lenis | null;
@@ -18,32 +19,57 @@ export function SmoothScrollProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      return;
+
+    // 1. If reduced motion or mobile touch device is detected, rely on native GPU-composited scrolling
+    const isTouch = performanceEngine.getIsTouchDevice();
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (prefersReducedMotion || isTouch) {
+      document.documentElement.style.scrollBehavior = prefersReducedMotion ? "auto" : "smooth";
+      return () => {
+        document.documentElement.style.scrollBehavior = "";
+      };
     }
 
-    const lenis = new Lenis({
-      duration: 1.15,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      wheelMultiplier: 0.95,
-      touchMultiplier: 1.4,
-      infinite: false,
-    });
+    // 2. High-performance desktop trackpad & mouse wheel Lenis instance
+    let lenis: Lenis | null = null;
+    let rafId: number | null = null;
 
-    lenisRef.current = lenis;
+    try {
+      lenis = new Lenis({
+        duration: 1.0,
+        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+        wheelMultiplier: 1.0,
+        touchMultiplier: 1.0,
+        smoothWheel: true,
+        syncTouch: false,
+        autoResize: true,
+      });
 
-    let rafId: number;
-    function raf(time: number) {
-      lenis.raf(time);
+      lenisRef.current = lenis;
+
+      // 3. Continuous high-efficiency RAF pump
+      const raf = (time: number) => {
+        lenis?.raf(time);
+        rafId = requestAnimationFrame(raf);
+      };
+
       rafId = requestAnimationFrame(raf);
+    } catch (err) {
+      console.warn("Lenis smooth scroll fallback to native:", err);
+      document.documentElement.style.scrollBehavior = "smooth";
     }
-
-    rafId = requestAnimationFrame(raf);
 
     return () => {
-      cancelAnimationFrame(rafId);
-      lenis.destroy();
-      lenisRef.current = null;
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      if (lenis) {
+        lenis.destroy();
+        lenisRef.current = null;
+      }
+      document.documentElement.style.scrollBehavior = "";
     };
   }, []);
 
@@ -53,3 +79,4 @@ export function SmoothScrollProvider({ children }: { children: React.ReactNode }
     </SmoothScrollContext.Provider>
   );
 }
+

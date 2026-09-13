@@ -1,12 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { DeveloperProfile, UserStatus } from "@/types/profile";
 import { INITIAL_DEVELOPER_PROFILE } from "@/data/mockProfile";
 import { AuthUser } from "@/features/auth/hooks/useAuth";
 
+// Shared in-memory profile cache across route transitions
+let memoryProfileCache: DeveloperProfile | null = null;
+
 export function useDeveloperProfile(currentUser?: AuthUser | null) {
-  const [developerProfile, setDeveloperProfile] = useState<DeveloperProfile>(INITIAL_DEVELOPER_PROFILE);
+  const [developerProfile, setDeveloperProfile] = useState<DeveloperProfile>(() => {
+    if (memoryProfileCache) {
+      return memoryProfileCache;
+    }
+    return INITIAL_DEVELOPER_PROFILE;
+  });
+
+  const lastSyncedHandleRef = useRef<string | null>(null);
 
   // Load from localStorage on mount and sanitize any legacy placeholder strings
   useEffect(() => {
@@ -25,12 +35,19 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
         ) {
           parsed.readmeMarkdown = "";
         }
+        memoryProfileCache = parsed;
         setDeveloperProfile(parsed);
       }
     } catch (e) {
       // ignore
     }
   }, []);
+
+  useEffect(() => {
+    if (developerProfile) {
+      memoryProfileCache = developerProfile;
+    }
+  }, [developerProfile]);
 
   // Sync developerProfile with active Better Auth user
   useEffect(() => {
@@ -67,8 +84,14 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
         return updated;
       });
 
-      // Auto-sync GitHub bio, public README.md, and contributions (only if handle is valid)
-      if (targetHandle && targetHandle !== "developer" && targetHandle !== "user-default") {
+      // Auto-sync GitHub bio, public README.md, and contributions (only once per handle)
+      if (
+        targetHandle &&
+        targetHandle !== "developer" &&
+        targetHandle !== "user-default" &&
+        lastSyncedHandleRef.current !== targetHandle
+      ) {
+        lastSyncedHandleRef.current = targetHandle;
         fetch(`/api/github/contributions?username=${encodeURIComponent(targetHandle)}`)
           .then((res) => (res.ok ? res.json() : null))
           .then((data) => {

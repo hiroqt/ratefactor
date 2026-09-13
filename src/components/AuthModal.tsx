@@ -66,15 +66,22 @@ export function AuthModal({
   }, [viewMode, otpStep, countdown]);
 
   useEffect(() => {
+    if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         onClose();
       }
     };
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      window.addEventListener("keydown", handleKeyDown);
-    } else {
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = "unset";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) {
       setViewMode("better_auth");
       setAuthTab("signin");
       setError(null);
@@ -83,11 +90,7 @@ export function AuthModal({
       setDemoCode(null);
       setShowPassword(false);
     }
-    return () => {
-      document.body.style.overflow = "unset";
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   useModalSmoothScroll({
     isOpen,

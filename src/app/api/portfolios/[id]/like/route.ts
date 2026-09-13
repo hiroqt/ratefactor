@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { getSessionUser } from "@/lib/auth/server-session";
+import { getCanonicalEmailHash } from "@/lib/auth/email";
 
-// In-memory like tracker for fast lookup and state management
-const userLikes = new Map<string, Set<string>>(); // userId -> Set of portfolioIds
+// In-memory like tracker keyed by canonical mailbox hash to prevent multi-account like manipulation
+const userLikes = new Map<string, Set<string>>(); // mailboxHash -> Set of portfolioIds
 
 export async function POST(
   req: NextRequest,
@@ -29,17 +30,18 @@ export async function POST(
     }
 
     const actorId = authUser.id;
+    const mailboxHash = authUser.email ? getCanonicalEmailHash(authUser.email) : actorId;
 
     // Anti-Abuse Rate Limitation: Max 20 likes per minute, min 1s cooldown
-    const rateCheck = checkRateLimit(`like:${actorId}:${portfolioId}:${ip}`, "LIKE");
+    const rateCheck = checkRateLimit(`like:${mailboxHash}:${portfolioId}:${ip}`, "LIKE");
     if (!rateCheck.allowed) {
       return createRateLimitResponse(rateCheck);
     }
 
-    let likedSet = userLikes.get(actorId);
+    let likedSet = userLikes.get(mailboxHash);
     if (!likedSet) {
       likedSet = new Set();
-      userLikes.set(actorId, likedSet);
+      userLikes.set(mailboxHash, likedSet);
     }
 
     const currentlyLiked = likedSet.has(portfolioId);
