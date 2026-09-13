@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "npx tsx scripts/verify-backend.ts && npx tsx scripts/verify-better-auth.ts && npx tsx scripts/verify-monitoring.ts && npx tsx scripts/verify-contributions-e2e.ts && npx tsx scripts/verify-discover-apps.ts && npx tsx scripts/verify-edgecases.ts && npx tsx scripts/verify-email-otp-registration.ts"
+    "test": "npx tsx scripts/verify-backend.ts && npx tsx scripts/verify-better-auth.ts && npx tsx scripts/verify-monitoring.ts && npx tsx scripts/verify-contributions-e2e.ts && npx tsx scripts/verify-discover-apps.ts && npx tsx scripts/verify-edgecases.ts && npx tsx scripts/verify-email-otp-registration.ts && npx tsx scripts/verify-accurate-counts-and-notifications.ts"
   },
   "dependencies": {
     "@better-auth/infra": "^0.4.9",
@@ -19,6 +19,7 @@
     "@supabase/supabase-js": "^2.116.0",
     "@types/marked": "^5.0.2",
     "better-auth": "^1.7.4",
+    "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
     "framer-motion": "^13.2.0",
     "hugeicons-react": "^0.4.0",
@@ -38,6 +39,7 @@
     "zod": "^4.6.2"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^22.10.5",
     "@types/pg": "^8.23.1",
     "@types/react": "^19.0.4",

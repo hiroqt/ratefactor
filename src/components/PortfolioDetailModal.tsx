@@ -62,6 +62,7 @@ export function PortfolioDetailModal({
   const [likesCount, setLikesCount] = useState(0);
   const [userRating, setUserRating] = useState<number | null>(null);
   const [reportedComments, setReportedComments] = useState<Record<string, boolean>>({});
+  const [commentsList, setCommentsList] = useState<CommentItem[]>(portfolio?.comments || []);
   const [activeTab, setActiveTab] = useState<"overview" | "reviews" | "discussion">("overview");
 
   const modalRef = useRef<HTMLDivElement>(null);
@@ -79,6 +80,7 @@ export function PortfolioDetailModal({
       setIsLiked(portfolio.isLiked || false);
       setLikesCount(portfolio.likesCount);
       setUserRating(portfolio.userRating || null);
+      setCommentsList(portfolio.comments || []);
       if (portfolio.userRatingBreakdown) {
         setCriteria(portfolio.userRatingBreakdown);
       } else if (portfolio.ratingBreakdown) {
@@ -90,6 +92,19 @@ export function PortfolioDetailModal({
         title: portfolio.title,
         category: portfolio.category,
       });
+
+      // Ensure fresh approved comments are pulled directly from server
+      fetch(`/api/portfolios/${portfolio.id}/comments`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-store" },
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.comments && Array.isArray(data.comments)) {
+            setCommentsList(data.comments);
+          }
+        })
+        .catch(() => {});
     }
   }, [portfolio]);
 
@@ -171,6 +186,21 @@ export function PortfolioDetailModal({
       setCommentError(check.error || `Comments must be at least ${MIN_COMMENT_LENGTH} characters of constructive feedback.`);
       return;
     }
+
+    const optimisticComment: CommentItem = {
+      id: "comment-" + Date.now(),
+      authorName: currentUser.name || "Developer",
+      authorUsername: currentUser.username || "dev",
+      authorAvatar:
+        currentUser.avatar ||
+        "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
+      content: commentText.trim(),
+      createdAt: new Date().toISOString(),
+      likes: 0,
+      isUserOwner: true,
+      critiqueTag: selectedCritiqueTag || null,
+    };
+    setCommentsList((prev) => [optimisticComment, ...prev]);
 
     onAddComment(portfolio.id, commentText.trim(), selectedCritiqueTag);
     trackEvent("portfolio_comment", {
@@ -455,7 +485,7 @@ export function PortfolioDetailModal({
               )}
             >
               <MessageSquare className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
-              <span>Discussion ({portfolio.commentsCount})</span>
+              <span>Discussion ({commentsList.length > 0 ? commentsList.length : portfolio.commentsCount})</span>
             </button>
           </div>
 
@@ -727,12 +757,12 @@ export function PortfolioDetailModal({
 
               {/* Comment Threads */}
               <div className="space-y-3">
-                {portfolio.comments.length === 0 ? (
+                {commentsList.length === 0 ? (
                   <div className="text-center py-8 border border-dashed border-slate-200 dark:border-zinc-800 rounded-2xl text-slate-400 dark:text-zinc-500 text-xs">
                     No critique posted yet. Initiate the peer review dialogue!
                   </div>
                 ) : (
-                  portfolio.comments.map((comment) => (
+                  commentsList.map((comment) => (
                     <div
                       key={comment.id}
                       className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-900/60 border border-slate-200 dark:border-white/10 space-y-2"
@@ -793,7 +823,10 @@ export function PortfolioDetailModal({
                             ))) && (
                             <button
                               type="button"
-                              onClick={() => onDeleteComment(portfolio.id, comment.id)}
+                              onClick={() => {
+                                setCommentsList((prev) => prev.filter((c) => c.id !== comment.id));
+                                onDeleteComment(portfolio.id, comment.id);
+                              }}
                               className="p-1 rounded-md text-slate-400 dark:text-zinc-500 hover:text-rose-600 dark:hover:text-rose-400 text-xs transition-colors cursor-pointer"
                               title="Delete comment"
                               aria-label="Delete your comment"

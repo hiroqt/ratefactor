@@ -56,6 +56,10 @@ interface WindowEntry {
 
 const windowStore = new Map<string, WindowEntry>();
 
+export function resetRateLimitStore() {
+  windowStore.clear();
+}
+
 export interface RateLimitResult {
   allowed: boolean;
   limit: number;

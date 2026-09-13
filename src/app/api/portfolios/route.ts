@@ -19,6 +19,19 @@ export async function GET(req: NextRequest) {
 
     let dynamicPortfolios = [...getDynamicPortfolios()];
 
+    // Resolve authenticated user profile ID if present to determine isLiked
+    let currentProfileId: string | null = null;
+    try {
+      const authUser = await getSessionUser(req).catch(() => null);
+      if (authUser) {
+        const pCheck = await pool.query(
+          `SELECT id FROM public.profiles WHERE id::text = $1 OR LOWER(username) = LOWER($2) LIMIT 1`,
+          [authUser.id, authUser.username || ""]
+        );
+        if (pCheck.rows[0]) currentProfileId = String(pCheck.rows[0].id);
+      }
+    } catch {}
+
     // Attempt to query PostgreSQL database if connection is available
     try {
       const dbRes = await pool.query(`
@@ -40,8 +53,8 @@ export async function GET(req: NextRequest) {
           p.rating_code_quality as "ratingCodeQuality",
           p.rating_performance as "ratingPerformance",
           p.rating_documentation as "ratingDocumentation",
-          p.likes_count as "likesCount",
-          p.comments_count as "commentsCount",
+          COALESCE((SELECT COUNT(*)::int FROM public.likes l WHERE l.portfolio_id = p.id), p.likes_count, 0) as "likesCount",
+          COALESCE((SELECT COUNT(*)::int FROM public.comments c WHERE c.portfolio_id = p.id AND c.status = 'approved' AND c.is_reported = false), p.comments_count, 0) as "commentsCount",
           p.is_showcase as "isShowcase",
           p.showcase_type as "showcaseType",
           p.showcase_reason as "showcaseReason",
@@ -60,44 +73,104 @@ export async function GET(req: NextRequest) {
         ORDER BY p.created_at DESC
       `);
 
+      // Batch load real approved comments from database
+      const dbCommentsMap = new Map<string, any[]>();
+      try {
+        const commentsQuery = await pool.query(`
+          SELECT 
+            c.id,
+            c.portfolio_id as "portfolioId",
+            c.user_id as "userId",
+            c.content,
+            c.critique_tag as "critiqueTag",
+            c.created_at as "createdAt",
+            c.status,
+            c.is_reported as "isReported",
+            COALESCE(pr.full_name, 'Developer') as "authorName",
+            COALESCE(pr.username, 'dev') as "authorUsername",
+            COALESCE(pr.avatar_url, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80') as "authorAvatar"
+          FROM public.comments c
+          LEFT JOIN public.profiles pr ON c.user_id = pr.id
+          WHERE c.status = 'approved' AND c.is_reported = false
+          ORDER BY c.created_at DESC
+        `);
+
+        for (const row of commentsQuery.rows) {
+          const item = {
+            id: String(row.id),
+            authorName: row.authorName,
+            authorUsername: row.authorUsername,
+            authorAvatar: row.authorAvatar,
+            content: row.content,
+            createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : new Date().toISOString(),
+            likes: 0,
+            isUserOwner: Boolean(currentProfileId && String(row.userId) === currentProfileId),
+            critiqueTag: row.critiqueTag || null,
+          };
+          const existing = dbCommentsMap.get(row.portfolioId) || [];
+          existing.push(item);
+          dbCommentsMap.set(row.portfolioId, existing);
+        }
+      } catch {}
+
+      // Batch load user's likes if authenticated
+      const userLikedSet = new Set<string>();
+      if (currentProfileId) {
+        try {
+          const likesRes = await pool.query(
+            `SELECT portfolio_id FROM public.likes WHERE user_id = $1`,
+            [currentProfileId]
+          );
+          likesRes.rows.forEach((r) => userLikedSet.add(r.portfolio_id));
+        } catch {}
+      }
+
       if (dbRes.rows && dbRes.rows.length > 0) {
-        const dbPortfolios: Portfolio[] = dbRes.rows.map((row) => ({
-          id: row.id,
-          title: row.title,
-          tagline: row.tagline,
-          description: row.description || "",
-          portfolioUrl: row.portfolioUrl,
-          githubUrl: row.githubUrl,
-          demoUrl: row.demoUrl || row.portfolioUrl,
-          thumbnail: row.thumbnail,
-          imageSizeBytes: row.imageSizeBytes || 1024 * 500,
-          category: row.category,
-          techStack: Array.isArray(row.techStack) ? row.techStack : [],
-          rating: Number(row.rating) || 5.0,
-          ratingCount: Number(row.ratingCount) || 1,
-          ratingBreakdown: {
-            design: Number(row.ratingDesign) || 5.0,
-            codeQuality: Number(row.ratingCodeQuality) || 5.0,
-            performance: Number(row.ratingPerformance) || 5.0,
-            documentation: Number(row.ratingDocumentation) || 5.0,
-          },
-          likesCount: Number(row.likesCount) || 0,
-          commentsCount: Number(row.commentsCount) || 0,
-          comments: portfolioComments.get(row.id) || [],
-          isShowcase: Boolean(row.isShowcase),
-          showcaseType: row.showcaseType || null,
-          showcaseReason: row.showcaseReason || null,
-          requestCritique: Boolean(row.requestCritique),
-          createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : new Date().toISOString(),
-          author: {
-            name: row.authorName || "Developer",
-            username: row.authorUsername || "dev",
-            avatar: row.authorAvatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
-            role: row.authorRole || "developer",
-            isVerified: Boolean(row.authorIsVerified),
-            availableForHire: row.authorAvailableForHire ?? true,
-          },
-        }));
+        const dbPortfolios: Portfolio[] = dbRes.rows.map((row) => {
+          const pid = row.id;
+          const comments = dbCommentsMap.get(pid) || portfolioComments.get(pid) || [];
+          const likesCount = Number(row.likesCount) || 0;
+          const commentsCount = Math.max(Number(row.commentsCount) || 0, comments.length);
+
+          return {
+            id: pid,
+            title: row.title,
+            tagline: row.tagline,
+            description: row.description || "",
+            portfolioUrl: row.portfolioUrl,
+            githubUrl: row.githubUrl,
+            demoUrl: row.demoUrl || row.portfolioUrl,
+            thumbnail: row.thumbnail,
+            imageSizeBytes: row.imageSizeBytes || 1024 * 500,
+            category: row.category,
+            techStack: Array.isArray(row.techStack) ? row.techStack : [],
+            rating: Number(row.rating) || 5.0,
+            ratingCount: Number(row.ratingCount) || 1,
+            ratingBreakdown: {
+              design: Number(row.ratingDesign) || 5.0,
+              codeQuality: Number(row.ratingCodeQuality) || 5.0,
+              performance: Number(row.ratingPerformance) || 5.0,
+              documentation: Number(row.ratingDocumentation) || 5.0,
+            },
+            likesCount,
+            isLiked: userLikedSet.has(pid),
+            commentsCount,
+            comments,
+            isShowcase: Boolean(row.isShowcase),
+            showcaseType: row.showcaseType || null,
+            showcaseReason: row.showcaseReason || null,
+            requestCritique: Boolean(row.requestCritique),
+            createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : new Date().toISOString(),
+            author: {
+              name: row.authorName || "Developer",
+              username: row.authorUsername || "dev",
+              avatar: row.authorAvatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
+              role: row.authorRole || "developer",
+              isVerified: Boolean(row.authorIsVerified),
+              availableForHire: row.authorAvailableForHire ?? true,
+            },
+          };
+        });
 
         // Merge DB rows into dynamicPortfolios without duplicates
         const map = new Map<string, Portfolio>();

@@ -307,11 +307,32 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         })
       );
 
-      // Trigger asynchronous API call to server
+      // Trigger asynchronous API call to server and sync exact database count
       fetch(`/api/portfolios/${portfolioId}/like`, { method: "POST" })
-        .then((res) => {
+        .then(async (res) => {
           if (res.status === 429) {
             options?.onToast?.("Rate limit reached. Please slow down like actions.");
+            return;
+          }
+          if (res.ok) {
+            const data = await res.json();
+            if (typeof data.likesCount === "number") {
+              setPortfolios((prev) =>
+                prev.map((p) =>
+                  p.id === portfolioId
+                    ? { ...p, likesCount: data.likesCount, isLiked: data.isLiked }
+                    : p
+                )
+              );
+              setSelectedPortfolio((prev) =>
+                prev && prev.id === portfolioId
+                  ? { ...prev, likesCount: data.likesCount, isLiked: data.isLiked }
+                  : prev
+              );
+            }
+            try {
+              localStorage.setItem("ratefactor_notifs_sync", Date.now().toString());
+            } catch {}
           }
         })
         .catch(() => {});
@@ -385,8 +406,31 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         })
       );
 
-      // Async API like sync
-      fetch(`/api/portfolios/${portfolioId}/like`, { method: "POST" }).catch(() => {});
+      // Async API like sync with authoritative server count
+      fetch(`/api/portfolios/${portfolioId}/like`, { method: "POST" })
+        .then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            if (typeof data.likesCount === "number") {
+              setPortfolios((prev) =>
+                prev.map((p) =>
+                  p.id === portfolioId
+                    ? { ...p, likesCount: data.likesCount, isLiked: data.isLiked }
+                    : p
+                )
+              );
+              setSelectedPortfolio((prev) =>
+                prev && prev.id === portfolioId
+                  ? { ...prev, likesCount: data.likesCount, isLiked: data.isLiked }
+                  : prev
+              );
+            }
+            try {
+              localStorage.setItem("ratefactor_notifs_sync", Date.now().toString());
+            } catch {}
+          }
+        })
+        .catch(() => {});
 
       trackEvent("portfolio_reaction", { portfolioId, reaction: emojiName });
     },
@@ -544,7 +588,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         );
       }
 
-      // Persist structured critique comment via API endpoint
+      // Persist structured critique comment via API endpoint and sync exact count
       fetch(`/api/portfolios/${portfolioId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -553,7 +597,51 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
           content,
           critiqueTag: critiqueTag || undefined,
         }),
-      }).catch(() => {});
+      })
+        .then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            const serverComment = data.comment || newComment;
+            const finalCount = typeof data.commentsCount === "number" ? data.commentsCount : undefined;
+
+            setPortfolios((prev) =>
+              prev.map((p) => {
+                if (p.id === portfolioId) {
+                  const nextComments = [
+                    serverComment,
+                    ...p.comments.filter((c) => c.id !== newComment.id && c.id !== serverComment.id),
+                  ];
+                  return {
+                    ...p,
+                    comments: nextComments,
+                    commentsCount: finalCount !== undefined ? finalCount : nextComments.length,
+                  };
+                }
+                return p;
+              })
+            );
+
+            setSelectedPortfolio((prev) => {
+              if (prev && prev.id === portfolioId) {
+                const nextComments = [
+                  serverComment,
+                  ...prev.comments.filter((c) => c.id !== newComment.id && c.id !== serverComment.id),
+                ];
+                return {
+                  ...prev,
+                  comments: nextComments,
+                  commentsCount: finalCount !== undefined ? finalCount : nextComments.length,
+                };
+              }
+              return prev;
+            });
+
+            try {
+              localStorage.setItem("ratefactor_notifs_sync", Date.now().toString());
+            } catch {}
+          }
+        })
+        .catch(() => {});
 
       options?.onToast?.("Comment posted successfully.");
     },
@@ -589,12 +677,40 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         );
       }
 
-      // Sync deletion with backend API
+      // Sync deletion with backend API and sync exact count
       fetch(`/api/portfolios/${portfolioId}/comments/${commentId}`, {
         method: "DELETE",
-      }).catch((err) => {
-        console.warn("[handleDeleteComment] Backend delete failed:", err);
-      });
+      })
+        .then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            if (typeof data.commentsCount === "number") {
+              setPortfolios((prev) =>
+                prev.map((p) =>
+                  p.id === portfolioId
+                    ? {
+                        ...p,
+                        comments: p.comments.filter((c) => c.id !== commentId),
+                        commentsCount: data.commentsCount,
+                      }
+                    : p
+                )
+              );
+              setSelectedPortfolio((prev) =>
+                prev && prev.id === portfolioId
+                  ? {
+                      ...prev,
+                      comments: prev.comments.filter((c) => c.id !== commentId),
+                      commentsCount: data.commentsCount,
+                    }
+                  : prev
+              );
+            }
+          }
+        })
+        .catch((err) => {
+          console.warn("[handleDeleteComment] Backend delete failed:", err);
+        });
 
       options?.onToast?.("Comment deleted.");
     },
@@ -758,17 +874,53 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
     [options, portfolios, selectedPortfolio, showcaseHistoryIds]
   );
 
+  // Fetch fresh comments from server API
+  const fetchPortfolioComments = useCallback(async (portfolioId: string) => {
+    try {
+      const res = await fetch(`/api/portfolios/${portfolioId}/comments`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-store" },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.comments && Array.isArray(data.comments)) {
+        setPortfolios((prev) =>
+          prev.map((p) => {
+            if (p.id === portfolioId) {
+              return {
+                ...p,
+                comments: data.comments,
+                commentsCount: data.total ?? data.comments.length,
+              };
+            }
+            return p;
+          })
+        );
+        setSelectedPortfolio((prev) =>
+          prev && prev.id === portfolioId
+            ? {
+                ...prev,
+                comments: data.comments,
+                commentsCount: data.total ?? data.comments.length,
+              }
+            : prev
+        );
+      }
+    } catch {}
+  }, []);
+
   // Select portfolio by ID
   const handleSelectPortfolioById = useCallback(
     (id: string) => {
       const found = portfolios.find((p) => p.id === id);
       if (found) {
         setSelectedPortfolio(found);
+        fetchPortfolioComments(id);
       } else {
         options?.onToast?.("Selected portfolio not found in current registry.");
       }
     },
-    [options, portfolios]
+    [options, portfolios, fetchPortfolioComments]
   );
 
   return {
@@ -797,6 +949,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
     handleDeletePortfolio,
     handleRunShowcaseCron,
     handleSelectPortfolioById,
+    fetchPortfolioComments,
     refreshPortfolios,
   };
 }

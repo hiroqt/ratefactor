@@ -38,24 +38,41 @@ export async function DELETE(
       return createRateLimitResponse(rateCheck);
     }
 
-    const comments = portfolioComments.get(portfolioId);
-    if (!comments) {
-      return NextResponse.json(
-        {
-          type: "https://ratefactor.dev/errors/not-found",
-          title: "Portfolio Comments Not Found",
-          status: 404,
-          detail: `Portfolio ${portfolioId} was not found.`,
-        },
-        {
-          status: 404,
-          headers: { "Content-Type": "application/problem+json" },
-        }
-      );
-    }
+    let isAuthorized = false;
+    const isStaff = authUser.role === "moderator" || authUser.role === "admin";
+    let dbFound = false;
 
-    const commentIndex = comments.findIndex((c) => c.id === commentId);
-    if (commentIndex === -1) {
+    // Check PostgreSQL database first
+    try {
+      const dbCheck = await pool.query(
+        `SELECT c.id, c.user_id, pr.username as author_username, pr.full_name as author_name
+         FROM public.comments c
+         LEFT JOIN public.profiles pr ON c.user_id = pr.id
+         WHERE c.id::text = $1 AND c.portfolio_id = $2
+         LIMIT 1`,
+        [commentId, portfolioId]
+      );
+
+      if (dbCheck.rows && dbCheck.rows.length > 0) {
+        dbFound = true;
+        const row = dbCheck.rows[0];
+        const isDbAuthor =
+          (row.author_username &&
+            row.author_username.toLowerCase() === authUser.username.toLowerCase()) ||
+          (row.author_name &&
+            row.author_name.toLowerCase() === authUser.name.toLowerCase()) ||
+          String(row.user_id) === String(authUser.id);
+
+        if (isDbAuthor || isStaff) {
+          isAuthorized = true;
+        }
+      }
+    } catch {}
+
+    const comments = portfolioComments.get(portfolioId);
+    const commentIndex = comments ? comments.findIndex((c) => c.id === commentId) : -1;
+
+    if (!dbFound && commentIndex === -1) {
       return NextResponse.json(
         {
           type: "https://ratefactor.dev/errors/not-found",
@@ -70,19 +87,21 @@ export async function DELETE(
       );
     }
 
-    const comment = comments[commentIndex];
+    if (!isAuthorized && commentIndex !== -1 && comments) {
+      const memComment = comments[commentIndex];
+      const isMemAuthor =
+        (memComment.authorUsername &&
+          memComment.authorUsername.toLowerCase() === authUser.username.toLowerCase()) ||
+        (memComment.authorName &&
+          memComment.authorName.toLowerCase() === authUser.name.toLowerCase()) ||
+        memComment.isUserOwner;
 
-    // Authorization: User must be comment author, moderator, or admin
-    const isAuthor =
-      (comment.authorUsername &&
-        comment.authorUsername.toLowerCase() === authUser.username.toLowerCase()) ||
-      (comment.authorName &&
-        comment.authorName.toLowerCase() === authUser.name.toLowerCase()) ||
-      comment.isUserOwner;
+      if (isMemAuthor || isStaff) {
+        isAuthorized = true;
+      }
+    }
 
-    const isStaff = authUser.role === "moderator" || authUser.role === "admin";
-
-    if (!isAuthor && !isStaff) {
+    if (!isAuthorized) {
       return NextResponse.json(
         {
           type: "https://ratefactor.dev/errors/forbidden",
@@ -97,17 +116,33 @@ export async function DELETE(
       );
     }
 
-    // Remove comment from in-memory cache
-    comments.splice(commentIndex, 1);
+    // Remove from in-memory cache if present
+    if (comments && commentIndex !== -1) {
+      comments.splice(commentIndex, 1);
+    }
 
-    // Also attempt PostgreSQL deletion if database is online
+    let finalCommentsCount = comments ? comments.length : 0;
+
+    // Remove from PostgreSQL and recount exact approved comments
     try {
       await pool.query(
-        `DELETE FROM public.comments WHERE id = $1 OR id::text = $1`,
-        [commentId]
+        `DELETE FROM public.comments WHERE id::text = $1 AND portfolio_id = $2`,
+        [commentId, portfolioId]
       );
-    } catch {
-      // Graceful fallback in offline/mock environment
+
+      const countRes = await pool.query(
+        `SELECT COUNT(*)::int as count FROM public.comments 
+         WHERE portfolio_id = $1 AND status = 'approved' AND is_reported = false`,
+        [portfolioId]
+      );
+      finalCommentsCount = countRes.rows[0]?.count ?? finalCommentsCount;
+
+      await pool.query(
+        `UPDATE public.portfolios SET comments_count = $1, updated_at = NOW() WHERE id = $2`,
+        [finalCommentsCount, portfolioId]
+      );
+    } catch (err) {
+      console.warn("[DELETE comment] Database cleanup error:", err);
     }
 
     return NextResponse.json(
@@ -115,6 +150,7 @@ export async function DELETE(
         message: "Comment successfully deleted.",
         portfolioId,
         commentId,
+        commentsCount: finalCommentsCount,
       },
       { status: 200 }
     );
