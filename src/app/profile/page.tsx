@@ -1334,6 +1334,8 @@ function ProfilePageContent() {
         existingPortfolios={portfolios}
         profile={developerProfile}
         currentUser={currentUser}
+        onViewPortfolio={(p) => setSelectedPortfolio(p)}
+        onRequireAuth={requireAuth}
       />
 
       {/* Public Profile Modal */}

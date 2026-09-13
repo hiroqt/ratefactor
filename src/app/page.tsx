@@ -356,6 +356,8 @@ export default function Home() {
           existingPortfolios={portfolios}
           profile={developerProfile}
           currentUser={currentUser}
+          onViewPortfolio={(p) => setSelectedPortfolio(p)}
+          onRequireAuth={requireAuth}
         />
       )}
 

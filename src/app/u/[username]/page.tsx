@@ -1236,6 +1236,8 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
         existingPortfolios={portfolios}
         profile={myDevProfile}
         currentUser={currentUser}
+        onViewPortfolio={(p) => setSelectedPortfolio(p)}
+        onRequireAuth={requireAuth}
       />
 
       {/* Auth Modal */}

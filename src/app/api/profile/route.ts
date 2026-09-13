@@ -153,8 +153,8 @@ export async function GET(req: NextRequest) {
         }
       } else if (authUser?.id) {
         const res = await pool.query(
-          `SELECT id, full_name as name, username, avatar_url, bio, skills, available_for_hire, custom_hire_message, company, location, website, github, twitter, linkedin FROM profiles WHERE id = $1 LIMIT 1`,
-          [authUser.id]
+          `SELECT id, full_name as name, username, avatar_url, bio, skills, available_for_hire, custom_hire_message, company, location, website, github, twitter, linkedin FROM profiles WHERE id::text = $1 OR LOWER(username) = LOWER($2) LIMIT 1`,
+          [authUser.id, authUser.username || ""]
         );
         if (res.rows && res.rows.length > 0) {
           const row = res.rows[0];
@@ -199,7 +199,7 @@ export async function GET(req: NextRequest) {
              p.request_critique as "requestCritique", p.created_at as "createdAt"
            FROM public.portfolios p
            JOIN public.profiles pr ON p.author_id = pr.id
-           WHERE pr.id = $1 OR LOWER(pr.username) = LOWER($2)
+           WHERE pr.id::text = $1 OR LOWER(pr.username) = LOWER($2)
            ORDER BY p.created_at DESC`,
           [profile.id, targetUser]
         );
@@ -447,7 +447,7 @@ export async function PATCH(req: NextRequest) {
              p.request_critique as "requestCritique", p.created_at as "createdAt"
            FROM public.portfolios p
            JOIN public.profiles pr ON p.author_id = pr.id
-           WHERE pr.id = $1 OR LOWER(pr.username) = LOWER($2)
+           WHERE pr.id::text = $1 OR LOWER(pr.username) = LOWER($2)
            ORDER BY p.created_at DESC`,
           [updated.id, targetUser]
         );

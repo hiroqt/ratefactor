@@ -40,7 +40,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Cache-Control",
-            value: "public, s-maxage=60, stale-while-revalidate=300",
+            value: "no-store, no-cache, must-revalidate, proxy-revalidate",
           },
         ],
       },

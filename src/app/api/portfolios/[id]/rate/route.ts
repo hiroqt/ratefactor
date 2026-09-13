@@ -80,7 +80,7 @@ export async function POST(
     try {
       let authorProfileId: string | null = null;
       const profileCheck = await pool.query(
-        `SELECT id FROM public.profiles WHERE id = $1 OR LOWER(username) = LOWER($2) LIMIT 1`,
+        `SELECT id FROM public.profiles WHERE id::text = $1 OR LOWER(username) = LOWER($2) LIMIT 1`,
         [authUser.id, authUser.username || ""]
       );
       if (profileCheck.rows && profileCheck.rows.length > 0) {

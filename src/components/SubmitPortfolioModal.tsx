@@ -7,12 +7,16 @@ import {
   Terminal, 
   Upload, 
   Check, 
+  CheckCircle2,
   AlertCircle, 
   Link as LinkIcon, 
   Github, 
   Globe, 
   Eye, 
-  Plus 
+  Plus,
+  ArrowRight,
+  RefreshCw,
+  ExternalLink
 } from "@/components/ui/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { Portfolio, PortfolioCategory } from "@/types/portfolio";
@@ -25,13 +29,15 @@ import {
   MIN_DESCRIPTION_CHARACTERS,
 } from "@/lib/guardrails";
 
-interface SubmitPortfolioModalProps {
+export interface SubmitPortfolioModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (newPortfolio: Portfolio) => void;
+  onSubmit: (newPortfolio: Portfolio) => void | Promise<any>;
   existingPortfolios: Portfolio[];
   profile?: DeveloperProfile;
   currentUser?: any;
+  onViewPortfolio?: (portfolio: Portfolio) => void;
+  onRequireAuth?: (intent: string) => void;
 }
 
 const PRESET_THUMBNAILS = [
@@ -73,6 +79,8 @@ export function SubmitPortfolioModal({
   existingPortfolios,
   profile,
   currentUser,
+  onViewPortfolio,
+  onRequireAuth,
 }: SubmitPortfolioModalProps) {
   const [title, setTitle] = useState("");
   const [tagline, setTagline] = useState("");
@@ -88,6 +96,11 @@ export function SubmitPortfolioModal({
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"form" | "preview">("form");
 
+  // Submission & Success state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [submittedPortfolio, setSubmittedPortfolio] = useState<Portfolio | null>(null);
+
   // Single image upload & quota tracking (Free tier standard: Max 2 MB, 1 image)
   const [uploadedFile, setUploadedFile] = useState<{ name: string; size: number; url: string } | null>(null);
   const [fileUploadError, setFileUploadError] = useState<string | null>(null);
@@ -97,6 +110,18 @@ export function SubmitPortfolioModal({
 
   // Description character count (optional field, min 200 chars if provided)
   const descriptionChars = description.trim().length;
+
+  useEffect(() => {
+    if (!isOpen) {
+      const timeout = setTimeout(() => {
+        setIsSuccess(false);
+        setSubmittedPortfolio(null);
+        setError(null);
+        setIsSubmitting(false);
+      }, 250);
+      return () => clearTimeout(timeout);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -169,9 +194,15 @@ export function SubmitPortfolioModal({
     setTechStack(techStack.filter((t) => t !== tech));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!currentUser) {
+      setError("You must be signed in with an active account to submit a developer portfolio.");
+      onRequireAuth?.("Sign in with GitHub or Email to submit a developer portfolio.");
+      return;
+    }
 
     if (!title.trim()) {
       setError("Project title is required.");
@@ -233,17 +264,19 @@ export function SubmitPortfolioModal({
       id,
       title: title.trim(),
       tagline: tagline.trim(),
-      description: description.trim() || tagline.trim(),
+      description: description.trim(),
       portfolioUrl: portfolioUrl.trim(),
       githubUrl: githubUrl.trim(),
       demoUrl: demoUrl.trim() || portfolioUrl.trim(),
       thumbnail,
+      imageSizeBytes: uploadedFile?.size || 1024 * 500,
       author: {
         name: currentUser?.name || profile?.name || "Developer",
         username: currentUser?.username || profile?.username || "developer",
         avatar: currentUser?.avatar || profile?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
         role: currentUser?.role || profile?.role || "Software Engineer",
         isVerified: true,
+        availableForHire: profile?.availableForHire ?? true,
       },
       techStack,
       category,
@@ -264,9 +297,20 @@ export function SubmitPortfolioModal({
       requestCritique: Boolean(requestCritique),
     };
 
-    onSubmit(newPortfolio);
-    resetForm();
-    onClose();
+    setIsSubmitting(true);
+    try {
+      const result = await onSubmit(newPortfolio);
+      const confirmedPortfolio = (result && typeof result === "object" && "title" in result)
+        ? (result as Portfolio)
+        : newPortfolio;
+      setSubmittedPortfolio(confirmedPortfolio);
+      setIsSuccess(true);
+      resetForm();
+    } catch (err: any) {
+      setError(err?.message || "Failed to submit portfolio. Please check your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const previewPortfolio: Portfolio = {
@@ -332,42 +376,61 @@ export function SubmitPortfolioModal({
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 dark:border-white/10 bg-slate-50/80 dark:bg-zinc-900/80 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white border border-slate-200 dark:border-zinc-700 shrink-0">
-              <Terminal className="w-4 h-4" />
+            <div className={cn(
+              "p-1.5 rounded-lg border shrink-0 transition-colors",
+              isSuccess 
+                ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60" 
+                : "bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white border-slate-200 dark:border-zinc-700"
+            )}>
+              {isSuccess ? <CheckCircle2 className="w-4 h-4" /> : <Terminal className="w-4 h-4" />}
             </div>
             <h3 id="submit-modal-title" className="font-bold text-slate-900 dark:text-white text-sm truncate">
-              <span className="hidden sm:inline">Submit Portfolio for Peer Review</span>
-              <span className="sm:hidden">Submit Portfolio</span>
+              {isSuccess ? (
+                <span>Portfolio Successfully Published</span>
+              ) : (
+                <>
+                  <span className="hidden sm:inline">Submit Portfolio for Peer Review</span>
+                  <span className="sm:hidden">Submit Portfolio</span>
+                </>
+              )}
             </h3>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center rounded-lg bg-slate-100 dark:bg-zinc-800 p-0.5 border border-slate-200 dark:border-zinc-700">
-              <button
-                type="button"
-                onClick={() => setActiveTab("form")}
-                className={cn(
-                  "px-2.5 sm:px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer",
-                  activeTab === "form" ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs font-semibold" : "text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200"
-                )}
-              >
-                Editor
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("preview")}
-                className={cn(
-                  "px-2.5 sm:px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 cursor-pointer",
-                  activeTab === "preview" ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs font-semibold" : "text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200"
-                )}
-              >
-                <Eye className="w-3 h-3" />
-                <span className="hidden sm:inline">Preview</span>
-              </button>
-            </div>
+            {!isSuccess && (
+              <div className="flex items-center rounded-lg bg-slate-100 dark:bg-zinc-800 p-0.5 border border-slate-200 dark:border-zinc-700">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("form")}
+                  className={cn(
+                    "px-2.5 sm:px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer",
+                    activeTab === "form" ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs font-semibold" : "text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200"
+                  )}
+                >
+                  Editor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("preview")}
+                  className={cn(
+                    "px-2.5 sm:px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 cursor-pointer",
+                    activeTab === "preview" ? "bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs font-semibold" : "text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200"
+                  )}
+                >
+                  <Eye className="w-3 h-3" />
+                  <span className="hidden sm:inline">Preview</span>
+                </button>
+              </div>
+            )}
 
             <button
-              onClick={onClose}
+              onClick={() => {
+                if (isSuccess) {
+                  setIsSuccess(false);
+                  setSubmittedPortfolio(null);
+                }
+                onClose();
+              }}
               className="p-1.5 rounded-full text-slate-400 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors ml-0.5 cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -384,7 +447,114 @@ export function SubmitPortfolioModal({
             </div>
           )}
 
-          {activeTab === "preview" ? (
+          {isSuccess && submittedPortfolio ? (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3 }}
+              className="py-4 sm:py-6 flex flex-col items-center text-center"
+            >
+              {/* Celebratory badge */}
+              <div className="relative mb-5">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-xl shadow-emerald-500/10">
+                  <CheckCircle2 className="w-8 h-8 sm:w-10 sm:h-10" />
+                </div>
+                <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500"></span>
+                </span>
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-xs font-mono font-medium mb-3 border border-emerald-200 dark:border-emerald-800/60">
+                <span>✨ Published &amp; Indexed for Peer Review</span>
+              </div>
+
+              <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight mb-2">
+                Portfolio Live on RateFactor!
+              </h3>
+
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-md leading-relaxed mb-6">
+                Your portfolio <span className="font-semibold text-slate-900 dark:text-white">“{submittedPortfolio.title}”</span> has been published and indexed. It is now discoverable by other developers for ratings, reviews, and constructive critiques.
+              </p>
+
+              {/* Mini Portfolio Preview Card */}
+              <div className="w-full max-w-lg rounded-2xl bg-slate-50 dark:bg-zinc-900/80 border border-slate-200 dark:border-white/10 p-4 mb-6 text-left shadow-xs">
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                  <div className="w-full sm:w-24 h-28 sm:h-24 rounded-xl overflow-hidden bg-slate-200 dark:bg-zinc-800 shrink-0 border border-slate-200 dark:border-white/10 relative">
+                    <img
+                      src={submittedPortfolio.thumbnail}
+                      alt={submittedPortfolio.title}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0 w-full">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-semibold">
+                        {submittedPortfolio.category}
+                      </span>
+                      {submittedPortfolio.requestCritique && (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800/50 flex items-center gap-1">
+                          <span>🔥 Critique Requested</span>
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="text-base font-bold text-slate-900 dark:text-white truncate">
+                      {submittedPortfolio.title}
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400 line-clamp-1 mt-0.5">
+                      {submittedPortfolio.tagline}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mt-2.5 items-center">
+                      {submittedPortfolio.techStack.slice(0, 4).map((tech) => (
+                        <span key={tech} className="text-[10px] text-slate-600 dark:text-zinc-300 bg-white dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-zinc-700 font-mono">
+                          {tech}
+                        </span>
+                      ))}
+                      {submittedPortfolio.techStack.length > 4 && (
+                        <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">
+                          +{submittedPortfolio.techStack.length - 4} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* CTAs */}
+              <div className="w-full max-w-lg flex flex-col-reverse sm:flex-row gap-3 items-center justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSuccess(false);
+                    setSubmittedPortfolio(null);
+                    onClose();
+                  }}
+                  className={cn(
+                    "w-full py-2.5 px-5 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-medium text-xs hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors text-center cursor-pointer",
+                    onViewPortfolio ? "sm:w-1/2" : "sm:w-auto"
+                  )}
+                >
+                  Done
+                </button>
+                {onViewPortfolio && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const p = submittedPortfolio;
+                      setIsSuccess(false);
+                      setSubmittedPortfolio(null);
+                      onClose();
+                      onViewPortfolio(p);
+                    }}
+                    className="w-full sm:w-1/2 py-2.5 px-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-zinc-900 font-semibold text-xs hover:bg-black dark:hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                  >
+                    <span>View Live Listing</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          ) : activeTab === "preview" ? (
             <div className="space-y-4">
               <div className="text-xs text-slate-500 dark:text-zinc-400 font-mono flex items-center gap-1.5">
                 <Eye className="w-3.5 h-3.5 text-amber-500" />
@@ -678,16 +848,25 @@ export function SubmitPortfolioModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-full sm:w-auto px-4 py-2 rounded-lg border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-zinc-800 text-xs font-medium transition-colors text-center cursor-pointer"
+                  disabled={isSubmitting}
+                  className="w-full sm:w-auto px-4 py-2 rounded-lg border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-zinc-800 text-xs font-medium transition-colors text-center cursor-pointer disabled:opacity-50"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-slate-900 dark:bg-white hover:bg-black dark:hover:bg-zinc-200 text-white dark:text-zinc-900 text-xs font-semibold shadow-xs transition-colors cursor-pointer text-center"
+                  disabled={isSubmitting}
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-slate-900 dark:bg-white hover:bg-black dark:hover:bg-zinc-200 text-white dark:text-zinc-900 text-xs font-semibold shadow-xs transition-colors cursor-pointer text-center disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Submit for Peer Review
+                  {isSubmitting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Publishing Portfolio...</span>
+                    </>
+                  ) : (
+                    <span>Submit for Peer Review</span>
+                  )}
                 </button>
               </div>
             </form>

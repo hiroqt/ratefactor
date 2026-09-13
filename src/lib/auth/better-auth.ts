@@ -64,6 +64,7 @@ export const auth = betterAuth({
         appUrl,
         process.env.BETTER_AUTH_URL,
         process.env.NEXT_PUBLIC_APP_URL,
+        "https://ratefactor.vercel.app",
         process.env.VERCEL_PROJECT_PRODUCTION_URL
           ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
           : undefined,

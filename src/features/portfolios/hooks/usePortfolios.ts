@@ -39,6 +39,31 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
   });
 
   // Hydration-safe initial load from localStorage and dynamic fetch from server API
+  const refreshPortfolios = useCallback(async () => {
+    try {
+      const res = await fetch("/api/portfolios?limit=50", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.portfolios && Array.isArray(data.portfolios)) {
+        // Only keep genuine real user portfolios
+        const realPortfolios = data.portfolios.filter(
+          (p: Portfolio) =>
+            p &&
+            p.id &&
+            !p.id.startsWith("app-") &&
+            p.id !== "hyperion-lsm" &&
+            p.id !== "kubelens-tui" &&
+            p.id !== "zenith-state"
+        );
+        setPortfolios(realPortfolios);
+        memoryPortfoliosCache = realPortfolios;
+        try {
+          localStorage.setItem("ratefactor_portfolios", JSON.stringify(realPortfolios));
+        } catch {}
+      }
+    } catch (e) {}
+  }, []);
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem("ratefactor_portfolios");
@@ -67,30 +92,19 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
       }
     } catch (e) {}
 
-    // Fetch dynamic real portfolios from backend API
-    fetch("/api/portfolios?limit=50")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.portfolios && Array.isArray(data.portfolios)) {
-          // Only keep genuine real user portfolios
-          const realPortfolios = data.portfolios.filter(
-            (p: Portfolio) =>
-              p &&
-              p.id &&
-              !p.id.startsWith("app-") &&
-              p.id !== "hyperion-lsm" &&
-              p.id !== "kubelens-tui" &&
-              p.id !== "zenith-state"
-          );
-          setPortfolios(realPortfolios);
-          memoryPortfoliosCache = realPortfolios;
-          try {
-            localStorage.setItem("ratefactor_portfolios", JSON.stringify(realPortfolios));
-          } catch {}
-        }
-      })
-      .catch(() => {});
-  }, []);
+    refreshPortfolios();
+
+    // Re-fetch on tab focus and network reconnect to keep feed real-time across users
+    window.addEventListener("focus", refreshPortfolios);
+    window.addEventListener("online", refreshPortfolios);
+    const interval = setInterval(refreshPortfolios, 25000);
+
+    return () => {
+      window.removeEventListener("focus", refreshPortfolios);
+      window.removeEventListener("online", refreshPortfolios);
+      clearInterval(interval);
+    };
+  }, [refreshPortfolios]);
 
   // Synchronize memory cache whenever state changes
   useEffect(() => {
@@ -590,46 +604,65 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
   // Submit new portfolio
   const handleSubmitPortfolio = useCallback(
     async (newPortfolio: Portfolio) => {
-      setPortfolios((prev) => [newPortfolio, ...prev]);
-
       const myUname = options?.currentUser?.username || options?.currentUsername;
-      if (myUname && newPortfolio.author.username === myUname) {
-        options?.onAutoPin?.(newPortfolio);
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (options?.currentUser?.id) {
+        headers["x-user-id"] = options.currentUser.id;
+      }
+      if (myUname) {
+        headers["x-user-username"] = myUname;
+      }
+
+      // Persist to backend server API
+      const res = await fetch("/api/portfolios", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          title: newPortfolio.title,
+          tagline: newPortfolio.tagline,
+          description: newPortfolio.description?.trim() || "",
+          portfolioUrl: newPortfolio.portfolioUrl,
+          githubUrl: newPortfolio.githubUrl,
+          demoUrl: newPortfolio.demoUrl,
+          thumbnailUrl: newPortfolio.thumbnail,
+          imageSizeBytes: newPortfolio.imageSizeBytes || 1024 * 500,
+          category: newPortfolio.category,
+          techStack: newPortfolio.techStack,
+          requestCritique: Boolean(newPortfolio.requestCritique),
+          authorName: newPortfolio.author.name,
+          authorUsername: newPortfolio.author.username,
+          authorAvatar: newPortfolio.author.avatar,
+        }),
+      });
+
+      if (!res.ok) {
+        let errMessage = "Failed to submit portfolio.";
+        try {
+          const errData = await res.json();
+          errMessage = errData.detail || errData.title || errMessage;
+        } catch {}
+        throw new Error(errMessage);
+      }
+
+      const resData = await res.json().catch(() => ({}));
+      const savedPortfolio: Portfolio = resData.portfolio || newPortfolio;
+
+      setPortfolios((prev) => [savedPortfolio, ...prev.filter((p) => p.id !== savedPortfolio.id)]);
+
+      if (myUname && savedPortfolio.author.username === myUname) {
+        options?.onAutoPin?.(savedPortfolio);
       }
 
       trackEvent("portfolio_submit", {
-        portfolioId: newPortfolio.id,
-        title: newPortfolio.title,
-        category: newPortfolio.category,
+        portfolioId: savedPortfolio.id,
+        title: savedPortfolio.title,
+        category: savedPortfolio.category,
       });
 
-      options?.onToast?.(`Portfolio '${newPortfolio.title}' submitted and indexed!`);
-
-      // Persist to backend server API
-      try {
-        await fetch("/api/portfolios", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: newPortfolio.title,
-            tagline: newPortfolio.tagline,
-            description: newPortfolio.description,
-            portfolioUrl: newPortfolio.portfolioUrl,
-            githubUrl: newPortfolio.githubUrl,
-            demoUrl: newPortfolio.demoUrl,
-            thumbnailUrl: newPortfolio.thumbnail,
-            imageSizeBytes: newPortfolio.imageSizeBytes || 1024 * 500,
-            category: newPortfolio.category,
-            techStack: newPortfolio.techStack,
-            requestCritique: Boolean(newPortfolio.requestCritique),
-            authorName: newPortfolio.author.name,
-            authorUsername: newPortfolio.author.username,
-            authorAvatar: newPortfolio.author.avatar,
-          }),
-        });
-      } catch (err) {
-        console.warn("[handleSubmitPortfolio] Failed to persist to backend:", err);
-      }
+      options?.onToast?.(`Portfolio '${savedPortfolio.title}' submitted and indexed!`);
+      return savedPortfolio;
     },
     [options]
   );
@@ -764,5 +797,6 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
     handleDeletePortfolio,
     handleRunShowcaseCron,
     handleSelectPortfolioById,
+    refreshPortfolios,
   };
 }

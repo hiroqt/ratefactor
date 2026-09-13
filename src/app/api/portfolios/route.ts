@@ -215,7 +215,9 @@ export async function GET(req: NextRequest) {
       {
         status: 200,
         headers: {
-          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
         },
       }
     );
@@ -319,26 +321,41 @@ export async function POST(req: NextRequest) {
     try {
       let authorProfileId: string | null = null;
       const profileCheck = await pool.query(
-        `SELECT id FROM public.profiles WHERE id = $1 OR LOWER(username) = LOWER($2) LIMIT 1`,
-        [authUser.id, authUser.username || ""]
+        `SELECT id FROM public.profiles 
+         WHERE id::text = $1 
+            OR LOWER(username) = LOWER($2) 
+            OR LOWER(username) = LOWER($3) 
+         LIMIT 1`,
+        [authUser.id, authUser.username || "", body.authorUsername || ""]
       );
 
       if (profileCheck.rows && profileCheck.rows.length > 0) {
         authorProfileId = profileCheck.rows[0].id;
       } else {
-        const insertProfile = await pool.query(
-          `INSERT INTO public.profiles (id, username, full_name, avatar_url, role)
-           VALUES ($1, $2, $3, $4, $5)
-           ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username
-           RETURNING id`,
-          [
-            authUser.id,
-            authUser.username || `dev_${Date.now().toString(36)}`,
-            authUser.name || "Developer",
-            authUser.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
-            authUser.role || "developer",
-          ]
-        );
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authUser.id);
+        const targetUsername = authUser.username || body.authorUsername || `dev_${Date.now().toString(36)}`;
+        const targetName = authUser.name || body.authorName || "Developer";
+        const targetAvatar = authUser.avatar || body.authorAvatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80";
+        const targetRole = authUser.role || "developer";
+
+        let insertProfile;
+        if (isUuid) {
+          insertProfile = await pool.query(
+            `INSERT INTO public.profiles (id, username, full_name, avatar_url, role)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (username) DO UPDATE SET full_name = EXCLUDED.full_name
+             RETURNING id`,
+            [authUser.id, targetUsername, targetName, targetAvatar, targetRole]
+          );
+        } else {
+          insertProfile = await pool.query(
+            `INSERT INTO public.profiles (username, full_name, avatar_url, role)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (username) DO UPDATE SET full_name = EXCLUDED.full_name
+             RETURNING id`,
+            [targetUsername, targetName, targetAvatar, targetRole]
+          );
+        }
         if (insertProfile.rows && insertProfile.rows.length > 0) {
           authorProfileId = insertProfile.rows[0].id;
         }
@@ -351,14 +368,14 @@ export async function POST(req: NextRequest) {
             thumbnail_url, image_size_bytes, category, tech_stack, rating, rating_count,
             rating_design, rating_code_quality, rating_performance, rating_documentation,
             likes_count, comments_count, is_showcase, status, request_critique
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 5.0, 1, 5.0, 5.0, 5.0, 5.0, 1, 0, false, 'published', $13)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::public.portfolio_category, $12, 5.0, 1, 5.0, 5.0, 5.0, 5.0, 1, 0, false, 'published', $13)
           ON CONFLICT (id) DO NOTHING`,
           [
             id,
             authorProfileId,
             data.title,
             data.tagline,
-            data.description || null,
+            data.description?.trim() || null,
             data.portfolioUrl,
             data.githubUrl,
             data.demoUrl || data.portfolioUrl,
@@ -371,7 +388,7 @@ export async function POST(req: NextRequest) {
         );
       }
     } catch (dbErr) {
-      console.warn("[POST /api/portfolios] Database persist notice:", dbErr);
+      console.error("[POST /api/portfolios] Database persist error:", dbErr);
     }
 
     const currentPortfolios = getDynamicPortfolios();

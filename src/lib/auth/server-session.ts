@@ -12,8 +12,10 @@ export interface AuthenticatedUser {
   avatar?: string;
 }
 
+import { pool } from "./better-auth";
+
 /**
- * Resolves the authenticated user from Better Auth session cookies or authorization headers.
+ * Resolves the authenticated user from Better Auth session cookies, database sessions, or authorization headers.
  * Safe against offline database in local development.
  */
 export async function getSessionUser(req: NextRequest): Promise<AuthenticatedUser | null> {
@@ -32,23 +34,88 @@ export async function getSessionUser(req: NextRequest): Promise<AuthenticatedUse
       };
     }
   } catch {
-    // Database offline or unconfigured in dev; fallback to header credentials
+    // Database offline or unconfigured in dev; fallback to direct session/header credentials
   }
 
-  // 2. Fallback to custom x-user-id header (strictly for dev & test scripts)
-  if (process.env.NODE_ENV !== "production") {
-    const userId = req.headers.get("x-user-id");
-    if (userId) {
+  // 2. Direct session lookup from database if cookie is present
+  try {
+    const cookieHeader = req.headers.get("cookie") || "";
+    const sessionMatch = cookieHeader.match(/(?:better-auth\.session_token|session_token)=([^;]+)/);
+    if (sessionMatch) {
+      const rawToken = decodeURIComponent(sessionMatch[1].trim()).split(".")[0];
+      const dbRes = await pool.query(
+        `SELECT s.id, s."userId", u.name, u.email, u.image, u.role
+         FROM public.session s
+         JOIN public."user" u ON s."userId" = u.id
+         WHERE s.token = $1 AND s."expiresAt" > NOW()
+         LIMIT 1`,
+        [rawToken]
+      );
+      if (dbRes.rows && dbRes.rows.length > 0) {
+        const row = dbRes.rows[0];
+        return {
+          id: row.userId,
+          name: row.name || "Developer",
+          email: row.email || undefined,
+          username: normalizeUsername(row.email || row.name),
+          role: (row.role as AppRole) || "developer",
+          avatar: row.image || undefined,
+        };
+      }
+    }
+  } catch {}
+
+  // 3. Fallback to custom x-user-id header verified against database
+  const userId = req.headers.get("x-user-id");
+  if (userId) {
+    try {
+      const userRes = await pool.query(
+        `SELECT id, name, email, image, role FROM public."user" WHERE id = $1 LIMIT 1`,
+        [userId]
+      );
+      if (userRes.rows && userRes.rows.length > 0) {
+        const u = userRes.rows[0];
+        return {
+          id: u.id,
+          name: u.name || "Developer",
+          email: u.email || undefined,
+          username: normalizeUsername(u.email || u.name),
+          role: (u.role as AppRole) || "developer",
+          avatar: u.image || undefined,
+        };
+      }
+
+      // Check profiles table as well
+      const profileRes = await pool.query(
+        `SELECT id, full_name, username, avatar_url, role FROM public.profiles WHERE id::text = $1 OR LOWER(username) = LOWER($1) LIMIT 1`,
+        [userId]
+      );
+      if (profileRes.rows && profileRes.rows.length > 0) {
+        const p = profileRes.rows[0];
+        return {
+          id: p.id,
+          name: p.full_name || "Developer",
+          username: p.username || normalizeUsername(userId),
+          role: (p.role as AppRole) || "developer",
+          avatar: p.avatar_url || undefined,
+        };
+      }
+    } catch {}
+
+    // Development fallback
+    if (process.env.NODE_ENV !== "production") {
       return {
         id: userId,
-        name: "Developer",
+        name: req.headers.get("x-user-name") || "Developer",
         email: `${userId}@ratefactor.dev`,
-        username: normalizeUsername(userId),
+        username: req.headers.get("x-user-username") || normalizeUsername(userId),
         role: "developer",
       };
     }
+  }
 
-    // 3. Fallback to Bearer token header in dev/test
+  // 4. Fallback to Bearer token header in dev/test
+  if (process.env.NODE_ENV !== "production") {
     const authHeader = req.headers.get("authorization");
     if (authHeader && authHeader.startsWith("Bearer ")) {
       return {
