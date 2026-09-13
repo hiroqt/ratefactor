@@ -2,16 +2,21 @@ import { betterAuth } from "better-auth";
 import { dash, sentinel } from "@better-auth/infra";
 import { Pool } from "pg";
 
-const connectionString =
+const rawConnectionString =
   process.env.DATABASE_URL ||
   "postgres://postgres:postgres@localhost:5432/ratefactor";
 
 const isProduction = process.env.NODE_ENV === "production";
 const useSsl =
-  connectionString.includes("supabase.co") ||
-  connectionString.includes("pooler.supabase.com") ||
-  connectionString.includes("sslmode=require") ||
-  (isProduction && !connectionString.includes("localhost"));
+  rawConnectionString.includes("supabase.co") ||
+  rawConnectionString.includes("pooler.supabase.com") ||
+  rawConnectionString.includes("sslmode=require") ||
+  (isProduction && !rawConnectionString.includes("localhost"));
+
+// Strip sslmode query parameter to prevent pg from overriding ssl: { rejectUnauthorized: false }
+const connectionString = rawConnectionString
+  .replace(/([?&])sslmode=[^&]+(&|$)/, (_, p1, p2) => (p2 ? p1 : ""))
+  .replace(/[?&]$/, "");
 
 // Reuse pg Pool across Next.js HMR reloads in development
 const globalForAuth = globalThis as unknown as {
@@ -23,7 +28,7 @@ export const pool =
   new Pool({
     connectionString,
     ssl: useSsl ? { rejectUnauthorized: false } : undefined,
-    connectionTimeoutMillis: 5000,
+    connectionTimeoutMillis: 10000,
     idleTimeoutMillis: 30000,
   });
 

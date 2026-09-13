@@ -57,20 +57,33 @@ export async function POST(req: NextRequest | Request) {
     }
   }
 
-  const res = await betterAuthHandlers.POST(req as any);
+  try {
+    const res = await betterAuthHandlers.POST(req as any);
 
-  // If signup succeeded, register the canonical mailbox
-  if (url.pathname.includes("/sign-up") && res.status < 400) {
-    try {
-      const cloned = req.clone();
-      const body = await cloned.json();
-      if (body?.email) {
-        registerCanonicalEmail(body.email);
-      }
-    } catch {}
+    // If signup succeeded, register the canonical mailbox
+    if (url.pathname.includes("/sign-up") && res.status < 400) {
+      try {
+        const cloned = req.clone();
+        const body = await cloned.json();
+        if (body?.email) {
+          registerCanonicalEmail(body.email);
+        }
+      } catch {}
+    }
+
+    return res;
+  } catch (error: any) {
+    console.error("[Auth API Route POST Error]:", error);
+    return NextResponse.json(
+      {
+        type: "https://ratefactor.dev/errors/auth-failure",
+        title: "Authentication Error",
+        status: 500,
+        detail: error?.message || "An unexpected error occurred during authentication processing.",
+      },
+      { status: 500 }
+    );
   }
-
-  return res;
 }
 
 export async function GET(req: NextRequest | Request) {
