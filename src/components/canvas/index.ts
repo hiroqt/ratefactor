@@ -1,1 +1,0 @@
-export * from "./AdykrniShader.webgl";

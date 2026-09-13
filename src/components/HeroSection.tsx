@@ -6,7 +6,6 @@ import { ArrowDown, ArrowRight, Users } from "lucide-react";
 import { Portfolio } from "@/types/portfolio";
 import { DeveloperProfile } from "@/types/profile";
 import { cn, formatNumber } from "@/lib/utils";
-import { AdykrniShader } from "./AdykrniShader.webgl";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { performanceEngine } from "@/lib/performance";
 
@@ -18,11 +17,6 @@ interface HeroSectionProps {
   profile?: DeveloperProfile;
   totalDevelopers?: number;
 }
-
-const SHADER_BACKGROUND = { light: "#fafafa", dark: "#090909" };
-const handleShaderError = (err: Error) => {
-  console.warn("WebGL shader fallback:", err);
-};
 
 export function HeroSection({
   showcasePortfolio,
@@ -90,22 +84,6 @@ export function HeroSection({
 
   return (
     <section className="relative w-full min-h-[85vh] lg:min-h-[90vh] flex flex-col justify-between overflow-hidden select-none bg-[#fafafa] text-slate-950">
-      
-      {/* Background WebGL2 OpenShaders Adykrni Shader */}
-      <div 
-        className="absolute inset-0 pointer-events-none overflow-hidden z-0"
-        aria-hidden="true"
-      >
-        <AdykrniShader
-          theme="light"
-          background={SHADER_BACKGROUND}
-          className="w-full h-full opacity-70 sm:opacity-85"
-          onError={handleShaderError}
-        />
-        {/* Subtle gradient vignette to preserve pristine editorial typography contrast */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#fafafa] via-transparent to-[#fafafa]/50 pointer-events-none" />
-      </div>
-
       {/* Top spacing to account for floating nav */}
       <div className="h-20 sm:h-24" />
 
