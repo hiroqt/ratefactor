@@ -64,3 +64,42 @@ export function createUnauthorizedError(detail = "Authentication required to per
     detail,
   };
 }
+
+export function checkAdminAccess(user: { role?: AppRole } | null | undefined): {
+  authorized: boolean;
+  error?: ProblemDetails;
+} {
+  if (!user) {
+    return {
+      authorized: false,
+      error: createUnauthorizedError("Sign in as an administrator to access this resource."),
+    };
+  }
+  if (!isAdmin(user.role)) {
+    return {
+      authorized: false,
+      error: createForbiddenError("Administrative privileges required for this action."),
+    };
+  }
+  return { authorized: true };
+}
+
+export function checkModeratorAccess(user: { role?: AppRole } | null | undefined): {
+  authorized: boolean;
+  error?: ProblemDetails;
+} {
+  if (!user) {
+    return {
+      authorized: false,
+      error: createUnauthorizedError("Sign in to access this moderation resource."),
+    };
+  }
+  if (!isModerator(user.role)) {
+    return {
+      authorized: false,
+      error: createForbiddenError("Moderator privileges required for this action."),
+    };
+  }
+  return { authorized: true };
+}
+

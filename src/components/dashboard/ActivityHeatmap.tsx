@@ -424,20 +424,67 @@ export function ActivityHeatmap({
 
   // Month positions aligned with week columns (GitHub Standard)
   const monthLabelsWithPositions = useMemo(() => {
-    const labels: { month: string; colIndex: number }[] = [];
-    let lastMonth = "";
+    if (!heatmapDays || heatmapDays.length === 0) return [];
+
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const totalWeeks = Math.ceil(heatmapDays.length / 7);
+    const rawLabels: { month: string; colIndex: number }[] = [];
+    let lastMonth = "";
 
     for (let w = 0; w < totalWeeks; w++) {
-      const day = heatmapDays[w * 7];
-      if (day) {
-        const d = new Date(day.date + "T00:00:00");
-        const m = d.toLocaleString("en-US", { month: "short" });
-        if (m !== lastMonth) {
-          labels.push({ month: m, colIndex: w });
-          lastMonth = m;
+      const weekDays = heatmapDays.slice(w * 7, (w + 1) * 7);
+      if (weekDays.length === 0) continue;
+
+      // Find if the 1st of a month falls in this week
+      const firstOfMonth = weekDays.find((d) => {
+        const parts = d.date.split("-");
+        return parts.length === 3 && parseInt(parts[2], 10) === 1;
+      });
+
+      let monthForWeek = "";
+      if (firstOfMonth) {
+        const parts = firstOfMonth.date.split("-");
+        const monthIdx = parseInt(parts[1], 10) - 1;
+        monthForWeek = monthNames[monthIdx] || "";
+      } else if (w === 0) {
+        const parts = weekDays[0].date.split("-");
+        const monthIdx = parseInt(parts[1], 10) - 1;
+        monthForWeek = monthNames[monthIdx] || "";
+      } else {
+        const parts = weekDays[0].date.split("-");
+        const monthIdx = parseInt(parts[1], 10) - 1;
+        const currentWeekMonth = monthNames[monthIdx] || "";
+        if (currentWeekMonth !== lastMonth) {
+          monthForWeek = currentWeekMonth;
         }
       }
+
+      if (monthForWeek && monthForWeek !== lastMonth) {
+        rawLabels.push({ month: monthForWeek, colIndex: w });
+        lastMonth = monthForWeek;
+      }
+    }
+
+    // Filter out overlapping labels (must have at least 2 columns / ~27px between labels)
+    const labels: { month: string; colIndex: number }[] = [];
+    for (let i = 0; i < rawLabels.length; i++) {
+      const current = rawLabels[i];
+      const next = rawLabels[i + 1];
+
+      // If first label is too close to the second label (less than 3 weeks), skip the partial initial month
+      if (i === 0 && next && next.colIndex - current.colIndex < 3) {
+        continue;
+      }
+
+      // Ensure minimum 2 columns gap between consecutive labels
+      if (labels.length > 0) {
+        const prev = labels[labels.length - 1];
+        if (current.colIndex - prev.colIndex < 2) {
+          continue;
+        }
+      }
+
+      labels.push(current);
     }
 
     return labels;
@@ -764,22 +811,25 @@ export function ActivityHeatmap({
             >
               <div className="inline-block min-w-max">
                 {/* Month Labels aligned to 53 week columns */}
-                <div className="relative h-4 text-[10px] font-normal text-[#656d76] dark:text-slate-400 mb-1 pl-8">
-                  {monthLabelsWithPositions.map((item, idx) => (
-                    <span
-                      key={`${item.month}-${idx}`}
-                      className="absolute whitespace-nowrap"
-                      style={{ left: `${32 + item.colIndex * 13.5}px` }}
-                    >
-                      {item.month}
-                    </span>
-                  ))}
+                <div className="flex items-center mb-1">
+                  <div className="w-[28px] shrink-0 sticky left-0 bg-white dark:bg-[#121215] z-10" />
+                  <div className="relative h-4 flex-1">
+                    {monthLabelsWithPositions.map((item, idx) => (
+                      <span
+                        key={`${item.month}-${item.colIndex}-${idx}`}
+                        className="absolute text-[10px] font-normal text-[#656d76] dark:text-slate-400 whitespace-nowrap leading-none top-0"
+                        style={{ left: `${item.colIndex * 13.5}px` }}
+                      >
+                        {item.month}
+                      </span>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="flex items-start gap-1.5">
+                <div className="flex items-start">
                   {/* Weekday Labels (Mon, Wed, Fri) */}
                   <div
-                    className="grid grid-flow-row text-[9px] font-normal text-[#656d76] dark:text-slate-500 select-none pr-1 sticky left-0 bg-white dark:bg-[#121215] z-10"
+                    className="w-[28px] shrink-0 grid grid-flow-row text-[9px] font-normal text-[#656d76] dark:text-slate-500 select-none pr-1.5 text-right sticky left-0 bg-white dark:bg-[#121215] z-10"
                     style={{ gridTemplateRows: "repeat(7, 10.5px)", rowGap: "3px" }}
                   >
                     <span className="h-[10.5px] leading-[10.5px]" />

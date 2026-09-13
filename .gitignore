@@ -93,3 +93,10 @@ scripts/
 .turbo/
 .cache/
 .parcel-cache/
+
+# ========================
+# Graphify
+# ========================
+graphify/
+graphify-out/
+.graphify/

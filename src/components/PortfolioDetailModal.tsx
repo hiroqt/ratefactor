@@ -532,133 +532,110 @@ export function PortfolioDetailModal({
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {/* Design & UI/UX */}
-                  <div className="p-3.5 rounded-2xl bg-slate-50/70 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/10 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-900 dark:text-white flex items-center gap-1.5">
-                        <Layers className="w-4 h-4 text-amber-600 dark:text-amber-400" /> Design &amp; UI/UX
-                      </span>
-                      <span className="text-xs font-mono font-bold text-amber-700 dark:text-amber-400 tabular-nums">
-                        {criteria.design.toFixed(1)} / 5.0
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => handleCriteriaRate("design", star)}
-                          className="p-1 hover:scale-110 transition-transform cursor-pointer"
-                          aria-label={`Rate Design ${star} stars`}
-                        >
-                          <Star
-                            className={cn(
-                              "w-4 h-4",
-                              criteria.design >= star
-                                ? "fill-amber-500 text-amber-500"
-                                : "fill-slate-100 dark:fill-zinc-800 text-slate-300 dark:text-zinc-700"
-                            )}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  {[
+                    {
+                      key: "design" as const,
+                      label: "Design & UI/UX",
+                      score: criteria.design,
+                      icon: Layers,
+                      accentBg: "bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400",
+                      accentScoreBg: "bg-amber-500/10 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
+                      barGradient: "from-amber-500 to-amber-400",
+                      starActive: "fill-amber-500 text-amber-500",
+                    },
+                    {
+                      key: "codeQuality" as const,
+                      label: "Code Architecture",
+                      score: criteria.codeQuality,
+                      icon: Cpu,
+                      accentBg: "bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400",
+                      accentScoreBg: "bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/20",
+                      barGradient: "from-indigo-500 to-indigo-400",
+                      starActive: "fill-indigo-500 text-indigo-500",
+                    },
+                    {
+                      key: "performance" as const,
+                      label: "Performance & Latency",
+                      score: criteria.performance,
+                      icon: Zap,
+                      accentBg: "bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400",
+                      accentScoreBg: "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+                      barGradient: "from-emerald-500 to-emerald-400",
+                      starActive: "fill-emerald-500 text-emerald-500",
+                    },
+                    {
+                      key: "documentation" as const,
+                      label: "Documentation",
+                      score: criteria.documentation ?? 5.0,
+                      icon: BookOpen,
+                      accentBg: "bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400",
+                      accentScoreBg: "bg-sky-500/10 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/20",
+                      barGradient: "from-sky-500 to-sky-400",
+                      starActive: "fill-sky-500 text-sky-500",
+                    },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    const currentVal = item.score;
+                    return (
+                      <div
+                        key={item.key}
+                        className="p-3.5 rounded-xl bg-slate-50/80 dark:bg-zinc-900/60 border border-slate-200/80 dark:border-white/10 space-y-2.5 transition-all hover:border-slate-300 dark:hover:border-white/20 hover:shadow-xs group"
+                      >
+                        {/* Header: Icon + Category Name + Score Pill */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <div className={cn("p-1 rounded-md shrink-0", item.accentBg)}>
+                              <Icon className="w-3.5 h-3.5" />
+                            </div>
+                            <span className="text-xs font-semibold text-slate-900 dark:text-white truncate">
+                              {item.label}
+                            </span>
+                          </div>
+                          <div className={cn("flex items-baseline gap-0.5 px-2 py-0.5 rounded-md font-mono text-xs font-bold border tabular-nums shrink-0", item.accentScoreBg)}>
+                            <span>{currentVal.toFixed(1)}</span>
+                            <span className="text-[10px] opacity-70 font-normal">/5.0</span>
+                          </div>
+                        </div>
 
-                  {/* Code Quality */}
-                  <div className="p-3.5 rounded-2xl bg-slate-50/70 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/10 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-900 dark:text-white flex items-center gap-1.5">
-                        <Cpu className="w-4 h-4 text-slate-700 dark:text-zinc-300" /> Code Architecture
-                      </span>
-                      <span className="text-xs font-mono font-bold text-slate-900 dark:text-white tabular-nums">
-                        {criteria.codeQuality.toFixed(1)} / 5.0
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => handleCriteriaRate("codeQuality", star)}
-                          className="p-1 hover:scale-110 transition-transform cursor-pointer"
-                          aria-label={`Rate Code Quality ${star} stars`}
-                        >
-                          <Star
-                            className={cn(
-                              "w-4 h-4",
-                              criteria.codeQuality >= star
-                                ? "fill-amber-500 text-amber-500"
-                                : "fill-slate-100 dark:fill-zinc-800 text-slate-300 dark:text-zinc-700"
-                            )}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                        {/* Interactive 5-Star Row */}
+                        <div className="flex items-center justify-between pt-0.5">
+                          <div className="flex items-center gap-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <button
+                                key={star}
+                                type="button"
+                                onClick={() => handleCriteriaRate(item.key, star)}
+                                className="p-0.5 hover:scale-125 transition-transform cursor-pointer focus:outline-none"
+                                aria-label={`Rate ${item.label} ${star} stars`}
+                              >
+                                <Star
+                                  className={cn(
+                                    "w-4 h-4 transition-colors",
+                                    currentVal >= star
+                                      ? item.starActive
+                                      : "fill-slate-100 dark:fill-zinc-800 text-slate-300 dark:text-zinc-700"
+                                  )}
+                                />
+                              </button>
+                            ))}
+                          </div>
 
-                  {/* Performance */}
-                  <div className="p-3.5 rounded-2xl bg-slate-50/70 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/10 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-900 dark:text-white flex items-center gap-1.5">
-                        <Zap className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Performance &amp; Latency
-                      </span>
-                      <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
-                        {criteria.performance.toFixed(1)} / 5.0
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => handleCriteriaRate("performance", star)}
-                          className="p-1 hover:scale-110 transition-transform cursor-pointer"
-                          aria-label={`Rate Performance ${star} stars`}
-                        >
-                          <Star
-                            className={cn(
-                              "w-4 h-4",
-                              criteria.performance >= star
-                                ? "fill-amber-500 text-amber-500"
-                                : "fill-slate-100 dark:fill-zinc-800 text-slate-300 dark:text-zinc-700"
-                            )}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                          {/* Micro score percentage badge */}
+                          <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 font-medium">
+                            {Math.round((currentVal / 5) * 100)}%
+                          </span>
+                        </div>
 
-                  {/* Documentation */}
-                  <div className="p-3.5 rounded-2xl bg-slate-50/70 dark:bg-zinc-900/50 border border-slate-200 dark:border-white/10 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-900 dark:text-white flex items-center gap-1.5">
-                        <BookOpen className="w-4 h-4 text-sky-600 dark:text-sky-400" /> Documentation
-                      </span>
-                      <span className="text-xs font-mono font-bold text-sky-700 dark:text-sky-400 tabular-nums">
-                        {(criteria.documentation ?? 5).toFixed(1)} / 5.0
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => handleCriteriaRate("documentation", star)}
-                          className="p-1 hover:scale-110 transition-transform cursor-pointer"
-                          aria-label={`Rate Documentation ${star} stars`}
-                        >
-                          <Star
-                            className={cn(
-                              "w-4 h-4",
-                              (criteria.documentation ?? 5) >= star
-                                ? "fill-amber-500 text-amber-500"
-                                : "fill-slate-100 dark:fill-zinc-800 text-slate-300 dark:text-zinc-700"
-                            )}
+                        {/* Micro Progress Track */}
+                        <div className="w-full h-1 rounded-full bg-slate-200/60 dark:bg-zinc-800 overflow-hidden">
+                          <div
+                            className={cn("h-full rounded-full bg-gradient-to-r transition-all duration-300", item.barGradient)}
+                            style={{ width: `${Math.min(100, Math.max(0, (currentVal / 5) * 100))}%` }}
                           />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

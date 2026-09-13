@@ -117,3 +117,6 @@ export function useToastContext() {
   }
   return context;
 }
+
+export const useToast = useToastContext;
+

@@ -459,11 +459,20 @@ CREATE OR REPLACE FUNCTION public.prevent_role_escalation()
 RETURNS TRIGGER AS $$
 DECLARE
   requester_role public.app_role;
+  current_uid UUID;
 BEGIN
   IF NEW.role <> OLD.role THEN
-    SELECT role INTO requester_role FROM public.profiles WHERE id = auth.uid();
-    IF requester_role IS DISTINCT FROM 'admin' THEN
-      RAISE EXCEPTION 'Access denied: Only platform administrators can change user roles.';
+    BEGIN
+      current_uid := auth.uid();
+    EXCEPTION WHEN OTHERS THEN
+      current_uid := NULL;
+    END;
+
+    IF current_uid IS NOT NULL THEN
+      SELECT role INTO requester_role FROM public.profiles WHERE id = current_uid;
+      IF requester_role IS DISTINCT FROM 'admin' THEN
+        RAISE EXCEPTION 'Access denied: Only platform administrators can change user roles.';
+      END IF;
     END IF;
   END IF;
   RETURN NEW;

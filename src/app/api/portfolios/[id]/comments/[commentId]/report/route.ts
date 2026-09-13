@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { commentReportSchema } from "@/lib/validations/portfolio";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { getSessionUser } from "@/lib/auth/server-session";
+import { pool } from "@/lib/auth/better-auth";
 
 export async function POST(
   req: NextRequest,
@@ -46,6 +47,21 @@ export async function POST(
         },
         { status: 400 }
       );
+    }
+
+    const reason = parseResult.data.reason;
+    const details = parseResult.data.details || null;
+
+    try {
+      await pool.query(
+        `INSERT INTO public.comment_reports (comment_id, reporter_id, reason, details)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (comment_id, reporter_id) 
+         DO UPDATE SET details = EXCLUDED.details, created_at = NOW()`,
+        [commentId, actorId, reason, details]
+      );
+    } catch (dbErr) {
+      console.warn("[Comment Report] DB insert fallback:", dbErr);
     }
 
     return NextResponse.json({
