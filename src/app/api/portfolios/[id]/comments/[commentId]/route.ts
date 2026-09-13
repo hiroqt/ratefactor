@@ -78,7 +78,6 @@ export async function DELETE(
         comment.authorUsername.toLowerCase() === authUser.username.toLowerCase()) ||
       (comment.authorName &&
         comment.authorName.toLowerCase() === authUser.name.toLowerCase()) ||
-      authUser.username === "arneldev" ||
       comment.isUserOwner;
 
     const isStaff = authUser.role === "moderator" || authUser.role === "admin";

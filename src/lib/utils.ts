@@ -12,8 +12,13 @@ export function formatNumber(num: number): string {
   return num.toString();
 }
 
-export function timeAgo(timestamp: string | Date): string {
-  const date = new Date(timestamp);
+export function timeAgo(timestamp: string | Date | null | undefined): string {
+  if (!timestamp) return "just now";
+  // Safari / WebKit compatibility: convert SQL timestamp space separator to 'T'
+  const normalizedStr = typeof timestamp === "string" ? timestamp.trim().replace(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})/, "$1T$2") : timestamp;
+  const date = new Date(normalizedStr);
+  if (isNaN(date.getTime())) return "just now";
+
   const now = new Date();
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
@@ -84,17 +89,10 @@ export function formatJoinedDate(dateStr?: string | Date | null): string {
 export const DEFAULT_AVATAR = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80";
 
 /**
- * Normalizes avatar strings so relative handles, filenames like "cydefxgaming.png",
- * or "@username" resolve to a valid GitHub CDN URL or standard fallback instead of 404ing locally.
+ * Normalizes avatar strings ensuring valid URLs or standard fallback instead of 404ing locally.
  */
 export function normalizeAvatarUrl(url?: string | null, fallbackUsername?: string): string {
   if (!url || typeof url !== "string" || !url.trim()) {
-    if (fallbackUsername && typeof fallbackUsername === "string" && fallbackUsername.trim()) {
-      const cleanUser = fallbackUsername.trim().replace(/^@/, "").replace(/\.png$/i, "");
-      if (cleanUser && cleanUser !== "developer" && cleanUser !== "user-default") {
-        return `https://github.com/${cleanUser}.png`;
-      }
-    }
     return DEFAULT_AVATAR;
   }
 
@@ -113,10 +111,10 @@ export function normalizeAvatarUrl(url?: string | null, fallbackUsername?: strin
     return trimmed;
   }
 
-  // Handle strings like "cydefxgaming.png", "/cydefxgaming.png", "cydefxgaming", "@cydefxgaming"
-  const clean = trimmed.replace(/^\/+/, "").replace(/^@/, "").replace(/\.png$/i, "");
+  // Handle explicit png asset or path
+  const clean = trimmed.replace(/^\/+/, "").replace(/^@/, "");
   if (clean && !clean.includes("/")) {
-    return `https://github.com/${clean}.png`;
+    return DEFAULT_AVATAR;
   }
 
   return DEFAULT_AVATAR;

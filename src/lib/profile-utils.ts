@@ -56,7 +56,7 @@ export function createProfileFromAuthor(
     customHireMessage:
       author.customHireMessage ||
       "Open for contract engineering and full-time architecture roles.",
-    github: `https://github.com/${author.username.replace(/^@/, "")}`,
+    github: baseProfile?.github || "",
     pinnedPortfolioIds: authorPortfolios.slice(0, 6).map((p) => p.id),
     spotlightPortfolioId: authorPortfolios[0]?.id,
     skills: allSkills.length > 0 ? allSkills : ["TypeScript", "Next.js", "React"],

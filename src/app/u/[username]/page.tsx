@@ -206,7 +206,7 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
       },
       availableForHire: true,
       customHireMessage: "Open for contract engineering and full-time architecture roles.",
-      github: `https://github.com/${rawUsername}`,
+      github: "",
       pinnedPortfolioIds: targetAuthorPortfolios.slice(0, 6).map((p) => p.id),
       spotlightPortfolioId: targetAuthorPortfolios[0]?.id,
       skills: ["TypeScript", "Next.js", "React", "Node.js", "PostgreSQL"],

@@ -35,19 +35,22 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
         ) {
           parsed.readmeMarkdown = "";
         }
-        // Purge stale accidental GitHub sync for "arnel" (Arnel Rivera) if it was inadvertently fetched from email prefix
+        // Sanitize any stale or auto-inferred GitHub handles and personal presets
         if (
           parsed.githubSync?.username === "arnel" ||
-          parsed.github === "https://github.com/arnel" ||
+          parsed.githubSync?.username === "cydefx" ||
+          parsed.githubSync?.username === "cydefxgaming" ||
+          (parsed.github && (parsed.github.includes("arnel") || parsed.github.includes("cydefx"))) ||
           parsed.name === "Arnel Rivera" ||
+          parsed.name === "Arnel Baylon" ||
           (parsed.avatar && parsed.avatar.includes("avatars.githubusercontent.com/u/10313"))
         ) {
           delete parsed.githubSync;
-          if (parsed.github === "https://github.com/arnel") {
+          if (parsed.github && (parsed.github.includes("arnel") || parsed.github.includes("cydefx"))) {
             parsed.github = "";
           }
-          if (parsed.name === "Arnel Rivera") {
-            parsed.name = "Arnel Baylon";
+          if (parsed.name === "Arnel Rivera" || parsed.name === "Arnel Baylon") {
+            parsed.name = "Developer";
           }
           if (parsed.avatar && parsed.avatar.includes("avatars.githubusercontent.com/u/10313")) {
             parsed.avatar = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80";
@@ -129,7 +132,7 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
         return updated;
       });
 
-      // Auto-sync GitHub bio, public README.md, and contributions ONLY for the verified GitHub username
+      // Sync GitHub details ONLY when the user has explicitly linked their GitHub account in settings
       const extractGithubUsername = (urlOrHandle?: string) => {
         if (!urlOrHandle) return "";
         return urlOrHandle
@@ -140,13 +143,18 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
       };
 
       const explicitGithub =
-        extractGithubUsername(developerProfile.github) ||
-        (developerProfile.githubSync?.username && developerProfile.githubSync.username !== "developer"
+        developerProfile.githubSync?.connected && developerProfile.githubSync?.username && developerProfile.githubSync.username !== "developer"
           ? developerProfile.githubSync.username.trim().replace(/^@/, "")
-          : "");
+          : extractGithubUsername(developerProfile.github);
 
-      // Case A: User has an explicit GitHub URL or handle entered
-      if (explicitGithub && explicitGithub !== "user-default" && lastSyncedHandleRef.current !== explicitGithub) {
+      // Only fetch contributions if user explicitly connected GitHub Sync and provided a valid handle
+      if (
+        developerProfile.githubSync?.connected &&
+        explicitGithub &&
+        explicitGithub !== "user-default" &&
+        explicitGithub !== "developer" &&
+        lastSyncedHandleRef.current !== explicitGithub
+      ) {
         lastSyncedHandleRef.current = explicitGithub;
         fetch(`/api/github/contributions?username=${encodeURIComponent(explicitGithub)}`)
           .then((res) => (res.ok ? res.json() : null))
@@ -155,16 +163,7 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
               setDeveloperProfile((prev) => {
                 const updated: DeveloperProfile = {
                   ...prev,
-                  name: data.profile.name || prev.name || explicitGithub,
-                  bio: data.profile.bio !== undefined && data.profile.bio !== "" ? data.profile.bio : prev.bio,
-                  readmeMarkdown: data.readmeMarkdown !== undefined && data.readmeMarkdown !== "" ? data.readmeMarkdown : prev.readmeMarkdown,
-                  avatar: data.profile.avatar || prev.avatar,
-                  company: data.profile.company || prev.company || "",
-                  location: data.profile.location || prev.location || "",
-                  website: data.profile.website || prev.website || "",
-                  twitter: data.profile.twitter || prev.twitter || "",
-                  linkedin: data.profile.linkedin || prev.linkedin || "",
-                  github: data.profile.profileUrl || `https://github.com/${explicitGithub}`,
+                  github: prev.github || `https://github.com/${explicitGithub}`,
                   githubSync: {
                     connected: true,
                     username: data.username || explicitGithub,
@@ -186,52 +185,9 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
             }
           })
           .catch(() => {});
-      } else if (
-        !explicitGithub &&
-        (currentUser.avatar?.includes("githubusercontent") || (currentUser as any).provider === "github")
-      ) {
-        // Case B: User signed in via GitHub OAuth without explicit manual handle - query verified GitHub account
-        fetch("/api/github/profile")
-          .then((res) => (res.ok ? res.json() : null))
-          .then((profileData) => {
-            if (profileData?.username && profileData.username !== "developer" && lastSyncedHandleRef.current !== profileData.username) {
-              const verifiedHandle = profileData.username;
-              lastSyncedHandleRef.current = verifiedHandle;
-              fetch(`/api/github/contributions?username=${encodeURIComponent(verifiedHandle)}`)
-                .then((res) => (res.ok ? res.json() : null))
-                .then((data) => {
-                  if (data) {
-                    setDeveloperProfile((prev) => {
-                      const updated: DeveloperProfile = {
-                        ...prev,
-                        github: profileData.profileUrl || `https://github.com/${verifiedHandle}`,
-                        githubSync: {
-                          connected: true,
-                          username: verifiedHandle,
-                          avatarUrl: profileData.avatarUrl || data.profile?.avatar,
-                          profileUrl: profileData.profileUrl || `https://github.com/${verifiedHandle}`,
-                          totalContributions: data.totalContributions,
-                          currentStreak: data.currentStreak,
-                          longestStreak: data.longestStreak,
-                          publicRepos: profileData.publicRepositoryCount || data.profile?.publicRepos,
-                          followers: profileData.followers || data.profile?.followers,
-                          lastSyncedAt: data.syncedAt || "Just now",
-                        },
-                      };
-                      try {
-                        localStorage.setItem("ratefactor_dev_profile", JSON.stringify(updated));
-                      } catch (e) {}
-                      return updated;
-                    });
-                  }
-                })
-                .catch(() => {});
-            }
-          })
-          .catch(() => {});
       }
     }
-  }, [currentUser?.username, currentUser?.name, currentUser?.avatar, currentUser?.role, developerProfile.github]);
+  }, [currentUser?.username, currentUser?.name, currentUser?.avatar, currentUser?.role, developerProfile.github, developerProfile.githubSync?.connected]);
 
 
   const updateProfile = useCallback((updated: DeveloperProfile) => {

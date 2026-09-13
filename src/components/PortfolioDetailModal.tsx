@@ -786,7 +786,6 @@ export function PortfolioDetailModal({
                           </button>
 
                           {(comment.isUserOwner || 
-                            comment.authorUsername === "arneldev" || 
                             (currentUser && (
                               currentUser.username === comment.authorUsername || 
                               currentUser.role === "moderator" || 

@@ -187,7 +187,7 @@ export function ActivityHeatmap({
             website: data.profile?.website || profile.website || "",
             twitter: data.profile?.twitter || profile.twitter || "",
             linkedin: data.profile?.linkedin || profile.linkedin || "",
-            github: profile.github || `https://github.com/${usernameToFetch}`,
+            github: profile.github || (profile.githubSync?.connected ? `https://github.com/${usernameToFetch}` : ""),
             githubSync: {
               connected: true,
               username: usernameToFetch,
@@ -198,7 +198,7 @@ export function ActivityHeatmap({
               longestStreak: data.longestStreak,
               publicRepos: data.profile?.publicRepos,
               followers: data.profile?.followers,
-              lastSyncedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              lastSyncedAt: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
             },
           };
           onUpdateProfile(updated);
@@ -368,12 +368,10 @@ export function ActivityHeatmap({
         const isDefaultName =
           !profile.name ||
           profile.name === "Developer" ||
-          profile.name === "developer" ||
-          profile.name === "Arnel Rivera";
+          profile.name === "developer";
         const isDefaultAvatar =
           !profile.avatar ||
-          profile.avatar.includes("unsplash") ||
-          profile.avatar.includes("avatars.githubusercontent.com/u/10313");
+          profile.avatar.includes("unsplash");
 
         const updated: DeveloperProfile = {
           ...profile,
@@ -400,7 +398,7 @@ export function ActivityHeatmap({
             longestStreak: data.longestStreak,
             publicRepos: data.profile?.publicRepos,
             followers: data.profile?.followers,
-            lastSyncedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            lastSyncedAt: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
           },
         };
         onUpdateProfile(updated);

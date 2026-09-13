@@ -49,7 +49,7 @@ const COMMON_SKILLS = [
 
 const PRESET_AVATARS = [
   {
-    label: "Arnel (Original)",
+    label: "Default Avatar",
     url: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
   },
   {
