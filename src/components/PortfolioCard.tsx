@@ -181,8 +181,14 @@ export function PortfolioCard({
 
           {/* Rating */}
           <div className="flex items-center gap-1 text-xs font-mono text-slate-900 dark:text-white bg-slate-50 dark:bg-white/5 px-2 py-1 rounded-md border border-slate-200 dark:border-white/10">
-            <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
-            <span className="font-semibold tabular-nums">{formatRating(portfolio.rating)}</span>
+            {portfolio.ratingCount > 0 ? (
+              <>
+                <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                <span className="font-semibold tabular-nums">{formatRating(portfolio.rating)}</span>
+              </>
+            ) : (
+              <span className="text-slate-500 dark:text-slate-400">No ratings yet</span>
+            )}
           </div>
 
           {/* Like / Reactions */}
@@ -280,9 +286,15 @@ export function PortfolioCard({
                   Verified Blueprint
                 </span>
                 <div className="flex items-center gap-1 text-xs font-mono text-slate-900 dark:text-white bg-slate-50 dark:bg-white/5 px-2 py-0.5 rounded-md border border-slate-200 dark:border-white/10">
-                  <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
-                  <span className="font-bold">{formatRating(portfolio.rating)}</span>
-                  <span className="text-slate-500 dark:text-slate-400 text-[10px]">({portfolio.ratingCount} reviews)</span>
+                  {portfolio.ratingCount > 0 ? (
+                    <>
+                      <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                      <span className="font-bold">{formatRating(portfolio.rating)}</span>
+                      <span className="text-slate-500 dark:text-slate-400 text-[10px]">({portfolio.ratingCount} reviews)</span>
+                    </>
+                  ) : (
+                    <span className="text-slate-500 dark:text-slate-400">No ratings yet</span>
+                  )}
                 </div>
               </div>
 
@@ -295,7 +307,7 @@ export function PortfolioCard({
             </div>
 
             {/* Rubric mini summary */}
-            {portfolio.ratingBreakdown && (
+            {portfolio.ratingBreakdown && portfolio.ratingCount > 0 && (
               <div className="grid grid-cols-4 gap-2 py-2.5 border-y border-slate-100 dark:border-white/10 text-center font-mono text-xs">
                 <div>
                   <div className="text-[10px] text-slate-500 dark:text-slate-400">Code</div>
@@ -311,7 +323,7 @@ export function PortfolioCard({
                 </div>
                 <div>
                   <div className="text-[10px] text-slate-500 dark:text-slate-400">Doc</div>
-                  <div className="font-bold text-sky-600 dark:text-sky-400">{(portfolio.ratingBreakdown.documentation ?? 5.0).toFixed(1)}★</div>
+                  <div className="font-bold text-sky-600 dark:text-sky-400">{portfolio.ratingBreakdown.documentation.toFixed(1)}★</div>
                 </div>
               </div>
             )}
@@ -462,9 +474,15 @@ export function PortfolioCard({
         <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100 dark:border-white/10">
           {/* Rating Badge */}
           <div className="flex items-center gap-1 text-xs font-mono text-slate-900 dark:text-white bg-slate-50 dark:bg-white/5 px-2 py-0.5 rounded-md border border-slate-200 dark:border-white/10">
-            <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
-            <span className="font-semibold tabular-nums">{formatRating(portfolio.rating)}</span>
-            <span className="text-slate-400 dark:text-slate-500 text-[10px] tabular-nums">({portfolio.ratingCount})</span>
+            {portfolio.ratingCount > 0 ? (
+              <>
+                <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                <span className="font-semibold tabular-nums">{formatRating(portfolio.rating)}</span>
+                <span className="text-slate-400 dark:text-slate-500 text-[10px] tabular-nums">({portfolio.ratingCount})</span>
+              </>
+            ) : (
+              <span className="text-slate-500 dark:text-slate-400">No ratings yet</span>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">

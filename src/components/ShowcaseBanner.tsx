@@ -339,8 +339,14 @@ export function ShowcaseBanner({
 
                   {/* Rating Badge */}
                   <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded bg-white/95 dark:bg-[#18181b]/95 border border-slate-200 dark:border-white/10 text-xs font-mono font-medium text-slate-900 dark:text-white flex items-center gap-1 backdrop-blur-xs">
-                    <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
-                    <span>{formatRating(currentShowcase.rating)}</span>
+                    {currentShowcase.ratingCount > 0 ? (
+                      <>
+                        <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                        <span>{formatRating(currentShowcase.rating)}</span>
+                      </>
+                    ) : (
+                      <span>Unrated</span>
+                    )}
                   </div>
 
                   {/* Bottom Author & CTA */}
@@ -391,7 +397,7 @@ export function ShowcaseBanner({
                 )}
 
                 {/* 3-Factor Rubric Progress Bars */}
-                {currentShowcase.ratingBreakdown && (
+                {currentShowcase.ratingBreakdown && currentShowcase.ratingCount > 0 && (
                   <div className="p-3 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
                     <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 font-semibold mb-2">
                       3-Factor Rubric Scores
@@ -401,13 +407,13 @@ export function ShowcaseBanner({
                         <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">
                           <span>Code</span>
                           <span className="font-bold text-slate-900 dark:text-white">
-                            {currentShowcase.ratingBreakdown.codeQuality?.toFixed(1) || "5.0"}★
+                            {currentShowcase.ratingBreakdown.codeQuality.toFixed(1)}★
                           </span>
                         </div>
                         <div className="h-1.5 rounded bg-slate-200 dark:bg-white/10 overflow-hidden">
-                          <div 
-                            className="h-full bg-slate-900 dark:bg-white rounded" 
-                            style={{ width: `${((currentShowcase.ratingBreakdown.codeQuality || 5) / 5) * 100}%` }}
+                          <div
+                            className="h-full bg-slate-900 dark:bg-white rounded"
+                            style={{ width: `${(currentShowcase.ratingBreakdown.codeQuality / 5) * 100}%` }}
                           />
                         </div>
                       </div>
@@ -416,13 +422,13 @@ export function ShowcaseBanner({
                         <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">
                           <span>Perf</span>
                           <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                            {currentShowcase.ratingBreakdown.performance?.toFixed(1) || "5.0"}★
+                            {currentShowcase.ratingBreakdown.performance.toFixed(1)}★
                           </span>
                         </div>
                         <div className="h-1.5 rounded bg-slate-200 dark:bg-white/10 overflow-hidden">
-                          <div 
-                            className="h-full bg-emerald-500 rounded" 
-                            style={{ width: `${((currentShowcase.ratingBreakdown.performance || 5) / 5) * 100}%` }}
+                          <div
+                            className="h-full bg-emerald-500 rounded"
+                            style={{ width: `${(currentShowcase.ratingBreakdown.performance / 5) * 100}%` }}
                           />
                         </div>
                       </div>
@@ -431,13 +437,13 @@ export function ShowcaseBanner({
                         <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">
                           <span>UX</span>
                           <span className="font-bold text-amber-600 dark:text-amber-400">
-                            {currentShowcase.ratingBreakdown.design?.toFixed(1) || "4.8"}★
+                            {currentShowcase.ratingBreakdown.design.toFixed(1)}★
                           </span>
                         </div>
                         <div className="h-1.5 rounded bg-slate-200 dark:bg-white/10 overflow-hidden">
-                          <div 
-                            className="h-full bg-amber-500 rounded" 
-                            style={{ width: `${((currentShowcase.ratingBreakdown.design || 4.8) / 5) * 100}%` }}
+                          <div
+                            className="h-full bg-amber-500 rounded"
+                            style={{ width: `${(currentShowcase.ratingBreakdown.design / 5) * 100}%` }}
                           />
                         </div>
                       </div>
@@ -603,7 +609,7 @@ export function ShowcaseBanner({
 
                       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                         <span className="text-[11px] font-mono text-amber-700 dark:text-amber-400 font-medium hidden sm:inline">
-                          ★{formatRating(item.rating)}
+                          {item.ratingCount > 0 ? `★${formatRating(item.rating)}` : "Unrated"}
                         </span>
 
                         <button

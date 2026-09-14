@@ -212,9 +212,10 @@ function ProfilePageContent() {
   }, [myPortfolios]);
 
   const avgRating = useMemo(() => {
-    if (myPortfolios.length === 0) return 5.0;
-    const sum = myPortfolios.reduce((acc, p) => acc + (p.rating || 5), 0);
-    return sum / myPortfolios.length;
+    const ratedPortfolios = myPortfolios.filter((p) => p.ratingCount > 0);
+    if (ratedPortfolios.length === 0) return null;
+    const sum = ratedPortfolios.reduce((acc, p) => acc + p.rating, 0);
+    return sum / ratedPortfolios.length;
   }, [myPortfolios]);
 
   const totalReviews = useMemo(() => {
@@ -675,8 +676,14 @@ function ProfilePageContent() {
                         Peer Approval
                       </div>
                       <div className="text-xl sm:text-2xl font-bold font-mono text-amber-800 flex items-center gap-1">
-                        <span>★ {formatRating(avgRating)}</span>
-                        <span className="text-[11px] text-slate-400 font-normal">({totalReviews})</span>
+                        {avgRating !== null ? (
+                          <>
+                            <span>★ {formatRating(avgRating)}</span>
+                            <span className="text-[11px] text-slate-400 font-normal">({totalReviews})</span>
+                          </>
+                        ) : (
+                          <span className="text-sm font-normal text-slate-400">No ratings yet</span>
+                        )}
                       </div>
                     </div>
 
@@ -799,7 +806,7 @@ function ProfilePageContent() {
 
                             <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto">
                               <div className="text-xs font-mono text-amber-800 font-semibold">
-                                ★ {formatRating(portfolio.rating)}
+                                {portfolio.ratingCount > 0 ? `★ ${formatRating(portfolio.rating)}` : "Unrated"}
                               </div>
                               {portfolio.likesCount > 0 && (
                                 <div className="text-xs font-mono text-slate-600 flex items-center gap-0.5">

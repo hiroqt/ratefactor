@@ -144,13 +144,13 @@ export async function GET(req: NextRequest) {
             imageSizeBytes: row.imageSizeBytes || 1024 * 500,
             category: row.category,
             techStack: Array.isArray(row.techStack) ? row.techStack : [],
-            rating: Number(row.rating) || 5.0,
-            ratingCount: Number(row.ratingCount) || 1,
+            rating: Number(row.rating) || 0,
+            ratingCount: Number(row.ratingCount) || 0,
             ratingBreakdown: {
-              design: Number(row.ratingDesign) || 5.0,
-              codeQuality: Number(row.ratingCodeQuality) || 5.0,
-              performance: Number(row.ratingPerformance) || 5.0,
-              documentation: Number(row.ratingDocumentation) || 5.0,
+              design: Number(row.ratingDesign) || 0,
+              codeQuality: Number(row.ratingCodeQuality) || 0,
+              performance: Number(row.ratingPerformance) || 0,
+              documentation: Number(row.ratingDocumentation) || 0,
             },
             likesCount,
             isLiked: userLikedSet.has(pid),
@@ -373,17 +373,17 @@ export async function POST(req: NextRequest) {
       },
       techStack: data.techStack,
       category: data.category,
-      rating: 5.0,
-      ratingCount: 1,
+      rating: 0,
+      ratingCount: 0,
       ratingBreakdown: {
-        design: 5.0,
-        codeQuality: 5.0,
-        performance: 5.0,
-        documentation: 5.0,
+        design: 0,
+        codeQuality: 0,
+        performance: 0,
+        documentation: 0,
       },
       requestCritique: Boolean(data.requestCritique),
-      likesCount: 1,
-      isLiked: true,
+      likesCount: 0,
+      isLiked: false,
       commentsCount: 0,
       comments: [],
       createdAt: new Date().toISOString(),
@@ -438,10 +438,9 @@ export async function POST(req: NextRequest) {
         await pool.query(
           `INSERT INTO public.portfolios (
             id, author_id, title, tagline, description, portfolio_url, github_url, demo_url,
-            thumbnail_url, image_size_bytes, category, tech_stack, rating, rating_count,
-            rating_design, rating_code_quality, rating_performance, rating_documentation,
-            likes_count, comments_count, is_showcase, status, request_critique
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::public.portfolio_category, $12, 5.0, 1, 5.0, 5.0, 5.0, 5.0, 1, 0, false, 'published', $13)
+            thumbnail_url, image_size_bytes, category, tech_stack, comments_count, is_showcase,
+            status, request_critique
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::public.portfolio_category, $12, 0, false, 'published', $13)
           ON CONFLICT (id) DO NOTHING`,
           [
             id,

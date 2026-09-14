@@ -1020,7 +1020,7 @@ export function Navbar({
 
                             <div className="flex items-center gap-2 shrink-0 ml-2">
                               <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 font-medium">
-                                ★{item.rating.toFixed(1)}
+                                {item.ratingCount > 0 ? `★${item.rating.toFixed(1)}` : "Unrated"}
                               </span>
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 text-xs text-slate-700 dark:text-slate-300 font-medium group-hover:bg-slate-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-slate-950 transition-colors">
                                 <span>Inspect</span>

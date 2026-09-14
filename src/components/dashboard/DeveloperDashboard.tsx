@@ -173,10 +173,11 @@ export function DeveloperDashboard({
   // Metrics computation
   const totalLikes = myPortfolios.reduce((acc, p) => acc + p.likesCount, 0);
   const totalComments = myPortfolios.reduce((acc, p) => acc + p.commentsCount, 0);
+  const ratedPortfolios = myPortfolios.filter((p) => p.ratingCount > 0);
   const avgRating =
-    myPortfolios.length > 0
-      ? myPortfolios.reduce((acc, p) => acc + p.rating, 0) / myPortfolios.length
-      : 0;
+    ratedPortfolios.length > 0
+      ? ratedPortfolios.reduce((acc, p) => acc + p.rating, 0) / ratedPortfolios.length
+      : null;
   const showcaseCount = myPortfolios.filter((p) => p.isShowcase).length;
 
   return (
@@ -453,7 +454,7 @@ export function DeveloperDashboard({
                 <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700">
                   <div className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">Rating Score</div>
                   <div className="text-lg font-mono font-bold text-amber-800 dark:text-amber-400 mt-0.5">
-                    {formatRating(avgRating)}★
+                    {avgRating !== null ? `${formatRating(avgRating)}★` : "No ratings yet"}
                   </div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700">
@@ -632,7 +633,9 @@ export function DeveloperDashboard({
 
                     <div className="flex items-center gap-2.5 self-end sm:self-auto flex-wrap">
                       <div className="flex items-center gap-3 font-mono text-xs text-slate-500 dark:text-zinc-400 mr-2">
-                        <span className="text-amber-800 dark:text-amber-400 font-semibold">★ {formatRating(portfolio.rating)}</span>
+                        <span className="text-amber-800 dark:text-amber-400 font-semibold">
+                          {portfolio.ratingCount > 0 ? `★ ${formatRating(portfolio.rating)}` : "Unrated"}
+                        </span>
                         {portfolio.likesCount > 0 && (
                           <span className="flex items-center gap-0.5">
                             <span className="text-xs">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>

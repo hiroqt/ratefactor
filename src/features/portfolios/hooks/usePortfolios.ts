@@ -30,6 +30,62 @@ export interface UsePortfoliosOptions {
 // Shared in-memory singleton cache across Next.js client route transitions
 let memoryPortfoliosCache: Portfolio[] | null = null;
 
+// Applies one rating submission's delta on top of a given base portfolio.
+// Pure/base-agnostic so the exact same math can be used both for the
+// immediate optimistic display update (base = whatever is currently shown,
+// which may include other still-unconfirmed requests) and, independently,
+// for computing the authoritative confirmed result on success (base = the
+// last-confirmed portfolio state) — so a failed sibling request's optimistic
+// contribution can never leak into the confirmed result.
+function applyRatingDelta(
+  base: Portfolio,
+  compositeScore: number,
+  breakdown: RatingBreakdown
+): Portfolio {
+  const hasUserRated = Boolean(base.userRating);
+  const newCount = hasUserRated ? base.ratingCount : base.ratingCount + 1;
+  const oldPoints = base.rating * base.ratingCount;
+  const prevScore = base.userRating || 0;
+  const newPoints = hasUserRated
+    ? oldPoints - prevScore + compositeScore
+    : oldPoints + compositeScore;
+  const newAvg = Number((newPoints / Math.max(1, newCount)).toFixed(2));
+  const boundedAvg = Math.min(5, Math.max(1, newAvg));
+
+  const prevUserBreakdown = base.userRatingBreakdown || {
+    codeQuality: prevScore,
+    performance: prevScore,
+    design: prevScore,
+    documentation: prevScore,
+  };
+
+  const calcNewCriterion = (communityAvg: number, newVal: number, prevVal: number) => {
+    const tot = (communityAvg || 0) * base.ratingCount;
+    const updatedTot = hasUserRated ? tot - prevVal + newVal : tot + newVal;
+    return Number((updatedTot / Math.max(1, newCount)).toFixed(2));
+  };
+
+  const updatedBreakdown: RatingBreakdown = {
+    design: calcNewCriterion(base.ratingBreakdown.design, breakdown.design, prevUserBreakdown.design),
+    codeQuality: calcNewCriterion(base.ratingBreakdown.codeQuality, breakdown.codeQuality, prevUserBreakdown.codeQuality),
+    performance: calcNewCriterion(base.ratingBreakdown.performance, breakdown.performance, prevUserBreakdown.performance),
+    documentation: calcNewCriterion(
+      base.ratingBreakdown.documentation ?? 5,
+      breakdown.documentation ?? 5,
+      prevUserBreakdown.documentation ?? 5
+    ),
+  };
+
+  return {
+    ...base,
+    rating: boundedAvg,
+    ratingCount: newCount,
+    userRating: compositeScore,
+    ratingBreakdown: updatedBreakdown,
+    userRatingBreakdown: breakdown,
+  };
+}
+
 export function usePortfolios(options?: UsePortfoliosOptions) {
   const [portfolios, setPortfolios] = useState<Portfolio[]>(() => {
     if (memoryPortfoliosCache && memoryPortfoliosCache.length > 0) {
@@ -37,6 +93,33 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
     }
     return [];
   });
+
+  // Latest-request token per portfolio: lets an in-flight rating request detect
+  // whether a newer rating request has since started for the same portfolio —
+  // so it knows whether it's still safe to touch the visible display (a stale
+  // request's outcome must never overwrite a newer request's still-pending
+  // optimistic edit; that newer request's own resolution is guaranteed —
+  // see below — to be the one that decides the final display state).
+  const ratingRequestTokens = useRef<Map<string, number>>(new Map());
+
+  // Per-portfolio last-confirmed (server-backed) rating snapshot. Only ever
+  // advances when a rating request succeeds, and is what a failed request
+  // rolls back to — never another request's still-unconfirmed optimistic
+  // snapshot.
+  const lastConfirmedPortfolios = useRef<Map<string, Portfolio>>(new Map());
+
+  // Per-portfolio promise chain: the actual network request + its resolution
+  // handling for a given portfolio are serialized to run in start order, so
+  // responses can never resolve out of order relative to when they were
+  // fired. This is what makes "last-confirmed" advancement and rollback
+  // unambiguous without tracking multiple layers of pending state — a
+  // request's outcome is only ever decided after every earlier request for
+  // the same portfolio has already been fully resolved and reconciled.
+  // Requests for different portfolios use separate chain entries and never
+  // block each other. The optimistic UI update itself still applies
+  // immediately on every call (not serialized), so rating controls stay
+  // instantly responsive.
+  const ratingRequestChains = useRef<Map<string, Promise<void>>>(new Map());
 
   // Hydration-safe initial load from localStorage and dynamic fetch from server API
   const refreshPortfolios = useCallback(async () => {
@@ -57,6 +140,22 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         );
         setPortfolios(realPortfolios);
         memoryPortfoliosCache = realPortfolios;
+
+        // Rebase the last-confirmed rollback snapshot for every portfolio this
+        // refresh brought back, so a later failed rating request rolls back to
+        // this newer authoritative server state instead of a stale snapshot
+        // from before the refresh. Server-backed aggregate fields always win;
+        // current-user rating metadata is preserved from whatever was already
+        // confirmed, since this endpoint doesn't return it.
+        realPortfolios.forEach((p: Portfolio) => {
+          const existingConfirmed = lastConfirmedPortfolios.current.get(p.id);
+          lastConfirmedPortfolios.current.set(p.id, {
+            ...p,
+            userRating: p.userRating ?? existingConfirmed?.userRating,
+            userRatingBreakdown: p.userRatingBreakdown ?? existingConfirmed?.userRatingBreakdown,
+          });
+        });
+
         try {
           localStorage.setItem("ratefactor_portfolios", JSON.stringify(realPortfolios));
         } catch {}
@@ -450,67 +549,26 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         ((breakdown.design + breakdown.codeQuality + breakdown.performance + breakdown.documentation) / 4).toFixed(2)
       );
 
+      // This request's fully-computed optimistic result, captured so a
+      // successful response can advance the last-confirmed snapshot.
+      let optimisticResult: Portfolio | undefined;
+
+      // Claim the latest-request token for this portfolio before firing the
+      // request, so a later overlapping request can supersede this one.
+      const requestToken = (ratingRequestTokens.current.get(portfolioId) || 0) + 1;
+      ratingRequestTokens.current.set(portfolioId, requestToken);
+
       setPortfolios((prev) =>
         prev.map((p) => {
           if (p.id === portfolioId) {
-            const hasUserRated = Boolean(p.userRating);
-            const newCount = hasUserRated ? p.ratingCount : p.ratingCount + 1;
-            const oldPoints = p.rating * p.ratingCount;
-            const prevScore = p.userRating || 0;
-            const newPoints = hasUserRated
-              ? oldPoints - prevScore + compositeScore
-              : oldPoints + compositeScore;
-            const newAvg = Number((newPoints / Math.max(1, newCount)).toFixed(2));
-            const boundedAvg = Math.min(5, Math.max(1, newAvg));
+            // Seed the last-confirmed baseline once, from the state before any
+            // optimistic layer was ever applied to this portfolio in this session.
+            if (!lastConfirmedPortfolios.current.has(portfolioId)) {
+              lastConfirmedPortfolios.current.set(portfolioId, p);
+            }
 
-            const prevUserBreakdown = p.userRatingBreakdown || {
-              codeQuality: prevScore,
-              performance: prevScore,
-              design: prevScore,
-              documentation: prevScore,
-            };
-
-            const calcNewCriterion = (
-              communityAvg: number,
-              newVal: number,
-              prevVal: number
-            ) => {
-              const tot = (communityAvg || 5) * p.ratingCount;
-              const updatedTot = hasUserRated ? tot - prevVal + newVal : tot + newVal;
-              return Number((updatedTot / Math.max(1, newCount)).toFixed(2));
-            };
-
-            const updatedBreakdown: RatingBreakdown = {
-              design: calcNewCriterion(
-                p.ratingBreakdown.design,
-                breakdown.design,
-                prevUserBreakdown.design
-              ),
-              codeQuality: calcNewCriterion(
-                p.ratingBreakdown.codeQuality,
-                breakdown.codeQuality,
-                prevUserBreakdown.codeQuality
-              ),
-              performance: calcNewCriterion(
-                p.ratingBreakdown.performance,
-                breakdown.performance,
-                prevUserBreakdown.performance
-              ),
-              documentation: calcNewCriterion(
-                p.ratingBreakdown.documentation ?? 5,
-                breakdown.documentation ?? 5,
-                prevUserBreakdown.documentation ?? 5
-              ),
-            };
-
-            const updated: Portfolio = {
-              ...p,
-              rating: boundedAvg,
-              ratingCount: newCount,
-              userRating: compositeScore,
-              ratingBreakdown: updatedBreakdown,
-              userRatingBreakdown: breakdown,
-            };
+            const updated = applyRatingDelta(p, compositeScore, breakdown);
+            optimisticResult = updated;
 
             if (selectedPortfolio && selectedPortfolio.id === portfolioId) {
               setSelectedPortfolio(updated);
@@ -522,20 +580,89 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         })
       );
 
-      // Persist rating via API endpoint
-      fetch(`/api/portfolios/${portfolioId}/rate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          portfolioId,
-          design: breakdown.design,
-          codeQuality: breakdown.codeQuality,
-          performance: breakdown.performance,
-          documentation: breakdown.documentation,
-        }),
-      }).catch(() => {});
+      // Persist rating via API endpoint. The actual network call + its outcome
+      // handling is serialized per portfolio (see ratingRequestChains above),
+      // so responses for the same portfolio always resolve in start order —
+      // this is what makes the reconciliation below unambiguous.
+      const submitAndReconcile = async () => {
+        try {
+          const res = await fetch(`/api/portfolios/${portfolioId}/rate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              portfolioId,
+              design: breakdown.design,
+              codeQuality: breakdown.codeQuality,
+              performance: breakdown.performance,
+              documentation: breakdown.documentation,
+            }),
+          });
 
-      options?.onToast?.(`Your rating (${compositeScore.toFixed(1)}★) has been logged.`);
+          const data = await res.json().catch(() => null);
+
+          if (!res.ok) {
+            throw new Error(data?.detail || "Failed to submit rating. Please try again.");
+          }
+          if (!data || typeof data.rating !== "number" || typeof data.ratingCount !== "number" || !data.ratingBreakdown) {
+            throw new Error("Rating response was incomplete. Please try again.");
+          }
+
+          // Reconcile directly from the server's authoritative persisted
+          // aggregate (rating/ratingCount/ratingBreakdown, read back from the
+          // database after the UPSERT) — never from client-side prediction.
+          // A client-computed delta would be wrong whenever the local base
+          // doesn't already reflect this user's existing rating row (e.g.
+          // re-rating without the current-user rating having been hydrated
+          // after a refresh), since the database UPSERTs one row per
+          // (portfolio_id, user_id) rather than adding a new one.
+          const base = lastConfirmedPortfolios.current.get(portfolioId) || optimisticResult;
+          const confirmedResult: Portfolio | undefined = base
+            ? {
+                ...base,
+                rating: data.rating,
+                ratingCount: data.ratingCount,
+                ratingBreakdown: data.ratingBreakdown,
+                userRating: data.score,
+                userRatingBreakdown: data.breakdown,
+              }
+            : undefined;
+
+          if (confirmedResult) {
+            lastConfirmedPortfolios.current.set(portfolioId, confirmedResult);
+          }
+
+          // Only push the confirmed result to the visible display if no newer
+          // rating request has since started for this portfolio — if one has,
+          // its own (guaranteed-later) resolution is what will decide the
+          // final display, so this must not overwrite its still-pending
+          // optimistic edit.
+          const isStillLatestRequest = ratingRequestTokens.current.get(portfolioId) === requestToken;
+          if (isStillLatestRequest && confirmedResult) {
+            setPortfolios((prev) => prev.map((p) => (p.id === portfolioId ? confirmedResult : p)));
+            setSelectedPortfolio((prev) => (prev && prev.id === portfolioId ? confirmedResult : prev));
+          }
+          options?.onToast?.(`Your rating (${compositeScore.toFixed(1)}★) has been logged.`);
+        } catch (err: any) {
+          // Only roll back if no newer rating request has started for this
+          // portfolio since — otherwise this failure would clobber a later,
+          // still-pending or already-successful optimistic update. Restore to
+          // the last-confirmed snapshot (not this request's own pre-update
+          // snapshot), so overlapping failures land on the actual
+          // last-confirmed server-backed state rather than another request's
+          // unconfirmed optimistic guess.
+          const isStillLatestRequest = ratingRequestTokens.current.get(portfolioId) === requestToken;
+          const confirmed = lastConfirmedPortfolios.current.get(portfolioId);
+          if (isStillLatestRequest && confirmed) {
+            setPortfolios((prev) => prev.map((p) => (p.id === portfolioId ? confirmed : p)));
+            setSelectedPortfolio((prev) => (prev && prev.id === portfolioId ? confirmed : prev));
+          }
+          options?.onToast?.(err?.message || "Failed to submit rating. Please try again.");
+        }
+      };
+
+      const previousChain = ratingRequestChains.current.get(portfolioId) || Promise.resolve();
+      const nextChain = previousChain.then(submitAndReconcile);
+      ratingRequestChains.current.set(portfolioId, nextChain);
     },
     [options, selectedPortfolio]
   );
