@@ -7,7 +7,6 @@
 export const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024; // 2,097,152 bytes
 export const MIN_DESCRIPTION_CHARACTERS = 200;
 export const MAX_DESCRIPTION_CHARACTERS = 15000;
-export const MIN_DESCRIPTION_WORDS = 200;
 export const MAX_DESCRIPTION_WORDS = 2500;
 export const MIN_COMMENT_LENGTH = 10;
 export const MAX_COMMENT_LENGTH = 1500;
