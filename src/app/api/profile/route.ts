@@ -197,13 +197,25 @@ export async function GET(req: NextRequest) {
         );
         if (res.rows && res.rows.length > 0) {
           const row = res.rows[0];
+          const isExistingUser = Boolean(
+            row.onboarded === true ||
+            (row.created_at && (Date.now() - new Date(row.created_at).getTime()) > 10 * 60 * 1000) ||
+            (row.bio && row.bio.trim().length > 0) ||
+            (row.role && row.role !== "user")
+          );
+
+          if (isExistingUser && row.onboarded === false) {
+            pool.query('UPDATE public.profiles SET onboarded = TRUE WHERE id = $1', [row.id]).catch(() => {});
+            pool.query('UPDATE public."user" SET onboarded = TRUE WHERE id = $1', [authUser.id]).catch(() => {});
+          }
+
           profile = {
             ...profile,
             name: row.name || profile.name,
             username: row.username || profile.username,
             avatar: row.avatar_url || profile.avatar,
             role: row.role || profile.role || "user",
-            onboarded: row.onboarded ?? profile.onboarded ?? false,
+            onboarded: isExistingUser ? true : (row.onboarded ?? false),
             bio: row.bio ?? profile.bio,
             skills: Array.isArray(row.skills) ? row.skills : profile.skills,
             availableForHire: row.available_for_hire ?? profile.availableForHire,

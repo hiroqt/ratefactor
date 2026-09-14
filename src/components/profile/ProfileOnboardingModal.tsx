@@ -153,12 +153,12 @@ export function ProfileOnboardingModal({
       setError("Username must be at least 3 characters.");
       return;
     }
-    if (cleanUsername.length > 10) {
-      setError("Username must not exceed 10 characters.");
+    if (cleanUsername.length > 30) {
+      setError("Username must not exceed 30 characters.");
       return;
     }
-    if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
-      setError("Username can only contain letters, numbers, and underscores.");
+    if (!/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) {
+      setError("Username can only contain letters, numbers, hyphens, and underscores.");
       return;
     }
 
@@ -208,27 +208,20 @@ export function ProfileOnboardingModal({
   const handleSkip = async () => {
     setIsSaving(true);
     try {
-      const cleanUsername = (username || profile.username || "user").replace(/^@/, "").trim().toLowerCase();
-      const payload = {
-        name: fullName.trim() || profile.name || "User",
-        username: cleanUsername,
-        role: profile.role || "User",
-        onboarded: true,
-      };
       await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ onboarded: true }),
       });
       onSaveSuccess({
         ...profile,
-        ...payload,
+        onboarded: true,
       });
-      onClose();
     } catch {
-      onClose();
+      // Gracefully ignore network failures during skip
     } finally {
       setIsSaving(false);
+      onClose();
     }
   };
 
@@ -271,11 +264,13 @@ export function ProfileOnboardingModal({
             <div>
               <div className="flex items-center gap-2">
                 <h3 id="onboarding-modal-title" className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                  Welcome to RateFactor
+                  {isNewAccount ? "Welcome to RateFactor" : "Configure Profile"}
                 </h3>
-                <span className="text-[10px] font-mono uppercase bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 font-semibold px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                  New Account
-                </span>
+                {isNewAccount && (
+                  <span className="text-[10px] font-mono uppercase bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 font-semibold px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                    New Account
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-500 dark:text-zinc-400">
                 Configure your public developer identity and professional discipline.
@@ -295,8 +290,8 @@ export function ProfileOnboardingModal({
 
         {/* Modal Scrollable Body */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1 text-left">
-          {/* Account Creation Success Banner */}
-          {(isNewAccount || profile.onboarded === false) && (
+          {/* Account Creation Success Banner - Only shown for genuinely new accounts */}
+          {isNewAccount && (
             <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 text-xs flex items-center gap-3">
               <div className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                 <Check className="w-4 h-4 stroke-[2.5]" />

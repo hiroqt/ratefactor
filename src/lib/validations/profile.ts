@@ -12,7 +12,7 @@ export const profileUpdateSchema = z.object({
     .string()
     .trim()
     .min(3, "Username must be at least 3 characters")
-    .max(10, "Username must not exceed 10 characters")
+    .max(30, "Username must not exceed 30 characters")
     .regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, underscores, and hyphens")
     .optional(),
   role: z

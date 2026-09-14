@@ -19,6 +19,7 @@ export interface AuthModalProps {
   onClose: () => void;
   onAuthSuccess?: (user: any) => void;
   intentMessage?: string;
+  callbackURL?: string;
 }
 
 export function AuthModal({
@@ -26,6 +27,7 @@ export function AuthModal({
   onClose,
   onAuthSuccess,
   intentMessage = "Sign in to like, comment, or rate developer portfolios.",
+  callbackURL,
 }: AuthModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState<"google" | "github" | null>(null);
@@ -74,9 +76,10 @@ export function AuthModal({
     setIsLoading(true);
     setLoadingProvider("google");
     try {
-      const redirectUrl = typeof window !== "undefined"
-        ? `${window.location.origin}/profile?new=true`
-        : "/profile?new=true";
+      const currentOrigin = typeof window !== "undefined" ? window.location.origin : "";
+      const currentPath = typeof window !== "undefined" ? (window.location.pathname + window.location.search) : "/";
+      const cleanPath = currentPath.replace(/[?&]new=true/g, "").replace(/[?&]onboarding=true/g, "");
+      const redirectUrl = callbackURL || (currentOrigin ? `${currentOrigin}${cleanPath || "/"}` : "/");
       await authClient.signIn.social({
         provider: "google",
         callbackURL: redirectUrl,
@@ -94,9 +97,10 @@ export function AuthModal({
     setIsLoading(true);
     setLoadingProvider("github");
     try {
-      const redirectUrl = typeof window !== "undefined"
-        ? `${window.location.origin}/profile?new=true`
-        : "/profile?new=true";
+      const currentOrigin = typeof window !== "undefined" ? window.location.origin : "";
+      const currentPath = typeof window !== "undefined" ? (window.location.pathname + window.location.search) : "/";
+      const cleanPath = currentPath.replace(/[?&]new=true/g, "").replace(/[?&]onboarding=true/g, "");
+      const redirectUrl = callbackURL || (currentOrigin ? `${currentOrigin}${cleanPath || "/"}` : "/");
       await authClient.signIn.social({
         provider: "github",
         callbackURL: redirectUrl,

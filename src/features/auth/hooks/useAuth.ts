@@ -68,6 +68,14 @@ export function useAuth(options?: UseAuthOptions) {
           return prev;
         }
 
+        const isExistingAccount = sessionCreatedAt
+          ? (Date.now() - new Date(sessionCreatedAt).getTime() > 10 * 60 * 1000)
+          : false;
+
+        const effectiveOnboarded = typeof sessionOnboarded === "boolean"
+          ? sessionOnboarded
+          : (isExistingAccount ? true : (prev?.onboarded ?? false));
+
         const u: AuthUser = {
           id: authSession.user.id,
           name: authSession.user.name || authSession.user.email?.split("@")[0] || "User",
@@ -77,7 +85,7 @@ export function useAuth(options?: UseAuthOptions) {
             "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80",
           role: sessionRole,
           username: nextUsername,
-          onboarded: typeof sessionOnboarded === "boolean" ? sessionOnboarded : prev?.onboarded ?? false,
+          onboarded: effectiveOnboarded,
           createdAt: sessionCreatedAt,
         };
         try {

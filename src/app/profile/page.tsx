@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef, Suspense } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { 
@@ -167,17 +167,59 @@ function ProfilePageContent() {
 
   const hasTriggeredWelcomeToast = useRef(false);
 
+  const handleCloseOnboarding = useCallback(() => {
+    setIsOnboardingModalOpen(false);
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.setItem("ratefactor_onboard_dismissed", "true");
+        if (currentUser?.id) {
+          sessionStorage.setItem(`ratefactor_onboard_dismissed_${currentUser.id}`, "true");
+        }
+        const url = new URL(window.location.href);
+        if (url.searchParams.has("new") || url.searchParams.has("onboarding")) {
+          url.searchParams.delete("new");
+          url.searchParams.delete("onboarding");
+          window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
+        }
+      } catch {}
+    }
+  }, [currentUser?.id]);
+
   // Check if newly created account or onboarding requested
   useEffect(() => {
-    const isNew = searchParams.get("new") === "true";
-    const isOnboardParam = searchParams.get("onboarding") === "true";
-    const needsOnboard = Boolean(currentUser && currentUser.onboarded === false);
+    if (!currentUser) return;
 
-    if (isNew || isOnboardParam || needsOnboard) {
+    const isExplicitOnboard = searchParams.get("onboarding") === "true";
+    const isNewParam = searchParams.get("new") === "true";
+
+    // Account creation recency: created within the last 10 minutes
+    const isRecentlyCreated = currentUser.createdAt
+      ? (Date.now() - new Date(currentUser.createdAt).getTime() < 10 * 60 * 1000)
+      : false;
+
+    // Check if dismissed in this browser session
+    const isDismissed = typeof window !== "undefined" && (
+      sessionStorage.getItem("ratefactor_onboard_dismissed") === "true" ||
+      Boolean(currentUser.id && sessionStorage.getItem(`ratefactor_onboard_dismissed_${currentUser.id}`) === "true")
+    );
+
+    // Genuinely new user: newly registered account created < 10 mins ago that has not yet completed onboarding
+    const isGenuinelyNewAccount = isRecentlyCreated && currentUser.onboarded === false;
+
+    // If an existing user arrived with a stale ?new=true query param, strip it cleanly
+    if (isNewParam && !isRecentlyCreated && typeof window !== "undefined") {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("new");
+        window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
+      } catch {}
+    }
+
+    if (!isDismissed && (isExplicitOnboard || isGenuinelyNewAccount)) {
       setIsOnboardingModalOpen(true);
     }
 
-    if (isNew && !hasTriggeredWelcomeToast.current) {
+    if (!isDismissed && isGenuinelyNewAccount && !hasTriggeredWelcomeToast.current) {
       hasTriggeredWelcomeToast.current = true;
       toast.success("Account created successfully! Welcome to RateFactor.");
     }
@@ -1694,18 +1736,26 @@ function ProfilePageContent() {
         onSaveProfile={handleSaveBio}
       />
 
-      {/* Profile Onboarding Modal for New Accounts */}
+      {/* Profile Onboarding / Configuration Modal */}
       <ProfileOnboardingModal
         isOpen={isOnboardingModalOpen}
-        onClose={() => setIsOnboardingModalOpen(false)}
+        onClose={handleCloseOnboarding}
         profile={developerProfile}
         onSaveSuccess={(updated) => {
           updateProfile(updated);
+          handleCloseOnboarding();
           toast.success("Profile configured successfully!");
         }}
         isGoogleUser={isGoogleUser}
         hasGithubLinked={githubConnection.status === "connected"}
-        isNewAccount={searchParams.get("new") === "true" || currentUser?.onboarded === false}
+        isNewAccount={
+          Boolean(
+            currentUser &&
+            currentUser.onboarded === false &&
+            currentUser.createdAt &&
+            (Date.now() - new Date(currentUser.createdAt).getTime() < 10 * 60 * 1000)
+          )
+        }
       />
 
       <Footer />
