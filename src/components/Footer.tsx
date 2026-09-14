@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { ArrowUpRight } from "@/components/ui/icons";
+import Link from "next/link";
+import { ArrowUpRight, Cookie } from "@/components/ui/icons";
 
 export function Footer() {
   return (
@@ -40,10 +41,31 @@ export function Footer() {
           </div>
         </div>
 
-        {/* All rights reserved below */}
-        <p className="text-xs text-muted font-mono drop-shadow-xs">
-          © 2026 RateFactor · All rights reserved
-        </p>
+        {/* All rights reserved, Privacy, Terms, and Cookies trigger */}
+        <div className="flex flex-wrap items-center justify-center gap-2.5 text-xs text-muted font-mono drop-shadow-xs">
+          <span>© 2026 RateFactor · All rights reserved</span>
+          <span className="opacity-30">·</span>
+          <Link href="/privacy" className="hover:text-foreground transition-colors cursor-pointer">
+            Privacy
+          </Link>
+          <span className="opacity-30">·</span>
+          <Link href="/terms" className="hover:text-foreground transition-colors cursor-pointer">
+            Terms
+          </Link>
+          <span className="opacity-30">·</span>
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("rf_open_cookie_preferences"));
+              }
+            }}
+            className="inline-flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
+          >
+            <Cookie className="w-3.5 h-3.5 text-amber-500" />
+            <span>Cookies</span>
+          </button>
+        </div>
       </div>
 
       {/* Giant Display Typography at Bottom */}

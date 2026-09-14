@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { getClientGuestBookmarks, setClientGuestBookmarks } from "@/lib/cookies";
 
 const STORAGE_KEY = "ratefactor_bookmarked_ids";
 
@@ -9,9 +10,17 @@ export function useBookmarks() {
 
   useEffect(() => {
     try {
+      // 1. Prioritize cookie bookmarks for SSR alignment, fallback to localStorage
+      const cookieBookmarks = getClientGuestBookmarks();
+      if (cookieBookmarks && cookieBookmarks.length > 0) {
+        setBookmarkedIds(cookieBookmarks);
+        return;
+      }
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        setBookmarkedIds(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setBookmarkedIds(parsed);
+        setClientGuestBookmarks(parsed);
       }
     } catch {
       // ignore
@@ -25,6 +34,7 @@ export function useBookmarks() {
         : [...prev, portfolioId];
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        setClientGuestBookmarks(next);
       } catch {
         // ignore
       }

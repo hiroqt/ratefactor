@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AppProviders } from "@/context";
 import { NetworkStatusBanner } from "@/components/NetworkStatusBanner";
+import { CookieConsentBanner } from "@/components/layout/CookieConsentBanner";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -60,6 +61,7 @@ export default function RootLayout({
             {children}
           </div>
           <NetworkStatusBanner />
+          <CookieConsentBanner />
         </AppProviders>
       </body>
     </html>

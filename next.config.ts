@@ -52,5 +52,8 @@ export default withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG || "yhels",
   project: process.env.SENTRY_PROJECT || "javascript-nextjs-e0",
   silent: true,
+  webpack: {
+    autoInstrumentMiddleware: false,
+  },
 });
 
