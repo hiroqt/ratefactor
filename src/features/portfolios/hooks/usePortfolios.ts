@@ -370,6 +370,21 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         return;
       }
 
+      // Self-engagement prevention: block before any optimistic mutation so
+      // the like count never flickers. The server independently enforces the
+      // same rule (see /api/portfolios/[id]/like) — this is a UX nicety, not
+      // the source of truth.
+      const targetPortfolio = portfolios.find((p) => p.id === portfolioId);
+      const isOwnPortfolio = Boolean(
+        options.currentUser.username &&
+        targetPortfolio?.author?.username &&
+        options.currentUser.username.toLowerCase() === targetPortfolio.author.username.toLowerCase()
+      );
+      if (isOwnPortfolio) {
+        options?.onToast?.("You cannot like or react to your own portfolio.");
+        return;
+      }
+
       // Rate limit check: Min 1.2s cooldown between toggles on the same portfolio
       const now = Date.now();
       const lastAction = lastActionTimestamps.current.get(portfolioId) || 0;
@@ -448,7 +463,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         })
         .catch(() => {});
     },
-    [options, selectedPortfolio]
+    [options, portfolios, selectedPortfolio]
   );
 
   // Emoji reaction with rate limit & toggling
@@ -456,6 +471,22 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
     (portfolioId: string, emojiName: string) => {
       if (!options?.currentUser) {
         options?.onRequireAuth?.("Sign in with Google or GitHub to react to developer portfolios.");
+        return;
+      }
+
+      // Self-engagement prevention: block before any optimistic mutation so
+      // the reaction/like count never flickers. The server independently
+      // enforces the same rule (see /api/portfolios/[id]/like, which the
+      // reaction flow also submits to) — this is a UX nicety, not the source
+      // of truth.
+      const targetPortfolio = portfolios.find((p) => p.id === portfolioId);
+      const isOwnPortfolio = Boolean(
+        options.currentUser.username &&
+        targetPortfolio?.author?.username &&
+        options.currentUser.username.toLowerCase() === targetPortfolio.author.username.toLowerCase()
+      );
+      if (isOwnPortfolio) {
+        options?.onToast?.("You cannot like or react to your own portfolio.");
         return;
       }
 
@@ -545,7 +576,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
 
       trackEvent("portfolio_reaction", { portfolioId, reaction: emojiName });
     },
-    [options, selectedPortfolio]
+    [options, portfolios, selectedPortfolio]
   );
 
   // Rate portfolio

@@ -156,6 +156,13 @@ export function PortfolioDetailModal({
       onRequireAuth?.("Sign in with Google or GitHub to heart and like portfolios.");
       return;
     }
+    if (isOwnPortfolio) {
+      // Do not touch local like state for an owner's own portfolio — forward
+      // to onLikeToggle so the shared handler's server-backed ownership check
+      // (and its toast) is the single source of truth for this rejection.
+      onLikeToggle(portfolio.id, !isLiked);
+      return;
+    }
     const nextState = !isLiked;
     setIsLiked(nextState);
     const nextCount = nextState ? likesCount + 1 : Math.max(0, likesCount - 1);
@@ -170,6 +177,17 @@ export function PortfolioDetailModal({
   const handleReact = (emojiName: string) => {
     if (!currentUser) {
       onRequireAuth?.("Sign in with Google or GitHub to react to developer portfolios.");
+      return;
+    }
+    if (isOwnPortfolio) {
+      // Do not touch local reaction/like state for an owner's own portfolio —
+      // forward to onReact/onLikeToggle so the shared handler's server-backed
+      // ownership check (and its toast) is the single source of truth.
+      if (onReact) {
+        onReact(portfolio.id, emojiName);
+      } else {
+        onLikeToggle(portfolio.id, true);
+      }
       return;
     }
     if (onReact) {
@@ -415,14 +433,23 @@ export function PortfolioDetailModal({
                     <button
                       key={emoji}
                       type="button"
+                      disabled={isOwnPortfolio}
+                      aria-disabled={isOwnPortfolio}
                       onClick={() => handleReact(emoji)}
                       className={cn(
-                        "flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-mono transition-all cursor-pointer",
+                        "flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-mono transition-all",
+                        isOwnPortfolio
+                          ? "opacity-50 cursor-not-allowed"
+                          : "cursor-pointer",
                         portfolio.userReaction === emoji
                           ? "bg-slate-900 dark:bg-white border-slate-900 dark:border-white text-white dark:text-zinc-900 shadow-xs"
                           : "bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-700"
                       )}
-                      title={`Reacted ${getEmojiDisplay(emoji)} (${count})`}
+                      title={
+                        isOwnPortfolio
+                          ? "You can't react to your own portfolio."
+                          : `Reacted ${getEmojiDisplay(emoji)} (${count})`
+                      }
                     >
                       <span className="text-sm">{getEmojiDisplay(emoji)}</span>
                       <span className="tabular-nums font-semibold">{count}</span>
@@ -430,30 +457,52 @@ export function PortfolioDetailModal({
                   ))}
 
               {/* Main Reaction Trigger */}
-              <EmojiReaction
-                size="md"
-                align="right"
-                asChild
-                onReact={handleReact}
-              >
+              {isOwnPortfolio ? (
+                // Static, visibly disabled control for the owner: no EmojiReaction
+                // wrapper at all, so the picker can never open (a disabled child
+                // inside EmojiReaction's asChild Slot still receives its
+                // open-on-pointerdown handler).
                 <button
                   type="button"
-                  className={cn(
-                    "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-xs font-medium transition-all cursor-pointer",
-                    isLiked
-                      ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 shadow-xs font-semibold"
-                      : "bg-slate-50 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-700"
-                  )}
-                  aria-label="React to architecture"
+                  disabled
+                  aria-disabled="true"
+                  title="You can't react to your own portfolio."
+                  aria-label="You can't react to your own portfolio."
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-xs font-medium bg-slate-50 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-slate-400 dark:text-zinc-500 opacity-60 cursor-not-allowed"
                 >
                   <span className="text-sm">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>
                   {likesCount > 0 ? (
                     <span className="font-mono tabular-nums font-semibold">{formatNumber(likesCount)}</span>
                   ) : (
-                    <span className="font-medium text-slate-600 dark:text-zinc-400">React</span>
+                    <span className="font-medium">React</span>
                   )}
                 </button>
-              </EmojiReaction>
+              ) : (
+                <EmojiReaction
+                  size="md"
+                  align="right"
+                  asChild
+                  onReact={handleReact}
+                >
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-xs font-medium transition-all cursor-pointer",
+                      isLiked
+                        ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 shadow-xs font-semibold"
+                        : "bg-slate-50 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-700"
+                    )}
+                    aria-label="React to architecture"
+                  >
+                    <span className="text-sm">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>
+                    {likesCount > 0 ? (
+                      <span className="font-mono tabular-nums font-semibold">{formatNumber(likesCount)}</span>
+                    ) : (
+                      <span className="font-medium text-slate-600 dark:text-zinc-400">React</span>
+                    )}
+                  </button>
+                </EmojiReaction>
+              )}
             </div>
           </div>
 

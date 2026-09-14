@@ -21,6 +21,7 @@ export interface PortfolioCardProps {
   onSelect: (portfolio: Portfolio) => void;
   onLikeToggle?: (id: string, liked: boolean) => void;
   onReact?: (id: string, emojiName: string) => void;
+  currentUser?: any;
   viewMode?: "grid" | "list" | "mosaic";
   index?: number;
 }
@@ -47,6 +48,7 @@ export function PortfolioCard({
   onSelect,
   onLikeToggle,
   onReact,
+  currentUser,
   viewMode = "mosaic",
   index = 0,
 }: PortfolioCardProps) {
@@ -59,8 +61,21 @@ export function PortfolioCard({
     setLikesCount(portfolio.likesCount);
   }, [portfolio.isLiked, portfolio.likesCount]);
 
+  const isOwnPortfolio = Boolean(
+    currentUser?.username &&
+    portfolio.author?.username &&
+    currentUser.username.toLowerCase() === portfolio.author.username.toLowerCase()
+  );
+
   const handleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isOwnPortfolio) {
+      // Do not touch local like state for an owner's own portfolio — forward
+      // to onLikeToggle so the shared handler's server-backed ownership check
+      // (and its toast) is the single source of truth for this rejection.
+      onLikeToggle?.(portfolio.id, !isLiked);
+      return;
+    }
     const nextState = !isLiked;
     setIsLiked(nextState);
     const nextCount = nextState ? likesCount + 1 : Math.max(0, likesCount - 1);
@@ -72,6 +87,17 @@ export function PortfolioCard({
   };
 
   const handleReact = (emojiName: string) => {
+    if (isOwnPortfolio) {
+      // Do not touch local reaction/like state for an owner's own portfolio —
+      // forward to onReact/onLikeToggle so the shared handler's server-backed
+      // ownership check (and its toast) is the single source of truth.
+      if (onReact) {
+        onReact(portfolio.id, emojiName);
+      } else {
+        onLikeToggle?.(portfolio.id, true);
+      }
+      return;
+    }
     if (onReact) {
       onReact(portfolio.id, emojiName);
     } else {
@@ -193,26 +219,40 @@ export function PortfolioCard({
 
           {/* Like / Reactions */}
           <div onClick={(e) => e.stopPropagation()} className="relative inline-flex items-center">
-            <EmojiReaction
-              size="sm"
-              align="right"
-              asChild
-              onReact={handleReact}
-            >
+            {isOwnPortfolio ? (
               <button
                 type="button"
-                className={cn(
-                  "flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors cursor-pointer font-mono",
-                  isLiked
-                    ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-300 font-semibold shadow-xs"
-                    : "bg-white dark:bg-[#18181b] border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white"
-                )}
-                aria-label="React to architecture"
+                disabled
+                aria-disabled="true"
+                title="You can't react to your own portfolio."
+                aria-label="You can't react to your own portfolio."
+                className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border font-mono bg-white dark:bg-[#18181b] border-slate-200 dark:border-white/10 text-slate-400 dark:text-slate-500 opacity-60 cursor-not-allowed"
               >
                 <span className="text-sm">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>
                 {likesCount > 0 && <span className="tabular-nums font-semibold">{likesCount}</span>}
               </button>
-            </EmojiReaction>
+            ) : (
+              <EmojiReaction
+                size="sm"
+                align="right"
+                asChild
+                onReact={handleReact}
+              >
+                <button
+                  type="button"
+                  className={cn(
+                    "flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors cursor-pointer font-mono",
+                    isLiked
+                      ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-300 font-semibold shadow-xs"
+                      : "bg-white dark:bg-[#18181b] border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white"
+                  )}
+                  aria-label="React to architecture"
+                >
+                  <span className="text-sm">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>
+                  {likesCount > 0 && <span className="tabular-nums font-semibold">{likesCount}</span>}
+                </button>
+              </EmojiReaction>
+            )}
           </div>
 
           {/* Comments */}
@@ -340,26 +380,40 @@ export function PortfolioCard({
 
               <div className="flex items-center gap-2">
                 <div onClick={(e) => e.stopPropagation()} className="relative inline-flex items-center">
-                  <EmojiReaction
-                    size="sm"
-                    align="right"
-                    asChild
-                    onReact={handleReact}
-                  >
+                  {isOwnPortfolio ? (
                     <button
                       type="button"
-                      className={cn(
-                        "flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors cursor-pointer font-mono",
-                        isLiked
-                          ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-300 font-semibold shadow-xs"
-                          : "bg-white dark:bg-[#18181b] border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/10"
-                      )}
-                      aria-label="React to architecture"
+                      disabled
+                      aria-disabled="true"
+                      title="You can't react to your own portfolio."
+                      aria-label="You can't react to your own portfolio."
+                      className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border font-mono bg-white dark:bg-[#18181b] border-slate-200 dark:border-white/10 text-slate-400 dark:text-slate-500 opacity-60 cursor-not-allowed"
                     >
                       <span className="text-sm">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>
                       {likesCount > 0 && <span className="tabular-nums font-semibold">{likesCount}</span>}
                     </button>
-                  </EmojiReaction>
+                  ) : (
+                    <EmojiReaction
+                      size="sm"
+                      align="right"
+                      asChild
+                      onReact={handleReact}
+                    >
+                      <button
+                        type="button"
+                        className={cn(
+                          "flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors cursor-pointer font-mono",
+                          isLiked
+                            ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-300 font-semibold shadow-xs"
+                            : "bg-white dark:bg-[#18181b] border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/10"
+                        )}
+                        aria-label="React to architecture"
+                      >
+                        <span className="text-sm">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>
+                        {likesCount > 0 && <span className="tabular-nums font-semibold">{likesCount}</span>}
+                      </button>
+                    </EmojiReaction>
+                  )}
                 </div>
 
                 <span className="p-1.5 rounded-md bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-medium hover:bg-black dark:hover:bg-slate-100 transition-colors">
@@ -488,26 +542,40 @@ export function PortfolioCard({
           <div className="flex items-center gap-1.5">
             {/* Likes / Reactions */}
             <div onClick={(e) => e.stopPropagation()} className="relative inline-flex items-center">
-              <EmojiReaction
-                size="sm"
-                align="right"
-                asChild
-                onReact={handleReact}
-              >
+              {isOwnPortfolio ? (
                 <button
                   type="button"
-                  className={cn(
-                    "flex items-center gap-1 text-xs px-2 py-0.5 rounded-md border transition-colors cursor-pointer font-mono",
-                    isLiked
-                      ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-300 font-semibold shadow-xs"
-                      : "bg-white dark:bg-[#18181b] border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/10"
-                  )}
-                  aria-label="React to architecture"
+                  disabled
+                  aria-disabled="true"
+                  title="You can't react to your own portfolio."
+                  aria-label="You can't react to your own portfolio."
+                  className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-md border font-mono bg-white dark:bg-[#18181b] border-slate-200 dark:border-white/10 text-slate-400 dark:text-slate-500 opacity-60 cursor-not-allowed"
                 >
                   <span className="text-sm">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>
                   {likesCount > 0 && <span className="text-[11px] tabular-nums font-semibold">{formatNumber(likesCount)}</span>}
                 </button>
-              </EmojiReaction>
+              ) : (
+                <EmojiReaction
+                  size="sm"
+                  align="right"
+                  asChild
+                  onReact={handleReact}
+                >
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex items-center gap-1 text-xs px-2 py-0.5 rounded-md border transition-colors cursor-pointer font-mono",
+                      isLiked
+                        ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-300 font-semibold shadow-xs"
+                        : "bg-white dark:bg-[#18181b] border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/10"
+                    )}
+                    aria-label="React to architecture"
+                  >
+                    <span className="text-sm">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>
+                    {likesCount > 0 && <span className="text-[11px] tabular-nums font-semibold">{formatNumber(likesCount)}</span>}
+                  </button>
+                </EmojiReaction>
+              )}
             </div>
 
             {/* Comments */}

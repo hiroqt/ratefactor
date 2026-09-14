@@ -19,6 +19,7 @@ export interface AppCardProps {
   onSelect: (portfolio: Portfolio) => void;
   onLikeToggle?: (id: string, liked: boolean) => void;
   onReact?: (id: string, emojiName: string) => void;
+  currentUser?: any;
   className?: string;
   index?: number;
 }
@@ -45,6 +46,7 @@ export function AppCard({
   onSelect,
   onLikeToggle,
   onReact,
+  currentUser,
   className,
   index = 0,
 }: AppCardProps) {
@@ -57,8 +59,21 @@ export function AppCard({
     setLikesCount(portfolio.likesCount);
   }, [portfolio.isLiked, portfolio.likesCount]);
 
+  const isOwnPortfolio = Boolean(
+    currentUser?.username &&
+    portfolio.author?.username &&
+    currentUser.username.toLowerCase() === portfolio.author.username.toLowerCase()
+  );
+
   const handleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isOwnPortfolio) {
+      // Do not touch local like state for an owner's own portfolio — forward
+      // to onLikeToggle so the shared handler's server-backed ownership check
+      // (and its toast) is the single source of truth for this rejection.
+      onLikeToggle?.(portfolio.id, !isLiked);
+      return;
+    }
     const nextState = !isLiked;
     setIsLiked(nextState);
     const nextCount = nextState ? likesCount + 1 : Math.max(0, likesCount - 1);
@@ -70,6 +85,17 @@ export function AppCard({
   };
 
   const handleReact = (emojiName: string) => {
+    if (isOwnPortfolio) {
+      // Do not touch local reaction/like state for an owner's own portfolio —
+      // forward to onReact/onLikeToggle so the shared handler's server-backed
+      // ownership check (and its toast) is the single source of truth.
+      if (onReact) {
+        onReact(portfolio.id, emojiName);
+      } else {
+        onLikeToggle?.(portfolio.id, true);
+      }
+      return;
+    }
     if (onReact) {
       onReact(portfolio.id, emojiName);
     } else {
@@ -207,26 +233,40 @@ export function AppCard({
 
             {/* Reactions / Likes */}
             <div onClick={(e) => e.stopPropagation()} className="relative inline-flex items-center">
-              <EmojiReaction
-                size="sm"
-                align="right"
-                asChild
-                onReact={handleReact}
-              >
+              {isOwnPortfolio ? (
                 <button
                   type="button"
-                  className={cn(
-                    "flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer font-mono",
-                    isLiked
-                      ? "bg-amber-50 border-amber-300 text-amber-900 font-semibold shadow-xs"
-                      : "bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                  )}
-                  aria-label="React to portfolio"
+                  disabled
+                  aria-disabled="true"
+                  title="You can't react to your own portfolio."
+                  aria-label="You can't react to your own portfolio."
+                  className="flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border font-mono bg-white border-slate-200 text-slate-400 opacity-60 cursor-not-allowed"
                 >
                   <span className="text-xs">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>
                   {likesCount > 0 && <span className="tabular-nums font-semibold">{likesCount}</span>}
                 </button>
-              </EmojiReaction>
+              ) : (
+                <EmojiReaction
+                  size="sm"
+                  align="right"
+                  asChild
+                  onReact={handleReact}
+                >
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer font-mono",
+                      isLiked
+                        ? "bg-amber-50 border-amber-300 text-amber-900 font-semibold shadow-xs"
+                        : "bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                    )}
+                    aria-label="React to portfolio"
+                  >
+                    <span className="text-xs">{getEmojiDisplay(portfolio.userReaction || "star-struck")}</span>
+                    {likesCount > 0 && <span className="tabular-nums font-semibold">{likesCount}</span>}
+                  </button>
+                </EmojiReaction>
+              )}
             </div>
 
             {/* Comments Count */}

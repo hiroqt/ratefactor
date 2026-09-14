@@ -256,6 +256,7 @@ export default function Home() {
               onSelectPortfolio={(p) => setSelectedPortfolio(p)}
               onLikeToggle={handleLikeToggle}
               onReact={handleReact}
+              currentUser={currentUser}
               onOpenSubmitModal={() => {
                 if (!currentUser) {
                   requireAuth("Sign in with Google or GitHub to submit an app.");

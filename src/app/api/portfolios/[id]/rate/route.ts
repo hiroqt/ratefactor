@@ -1,28 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { ratingSubmissionSchema } from "@/lib/validations/portfolio";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { getSessionUser } from "@/lib/auth/server-session";
 import { getCanonicalEmailHash } from "@/lib/auth/email";
 import { pool } from "@/lib/auth/better-auth";
 import { getDynamicPortfolios } from "@/lib/dynamic-portfolios";
+import { resolveCanonicalProfileId } from "@/lib/auth/profile-id";
 
 // In-memory rating storage keyed by canonical mailbox hash to prevent multi-account Sybil manipulation
 const userRatings = new Map<string, any>(); // key: `${mailboxHash}:${portfolioId}`
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-// Mirrors the deterministic Better Auth -> profile id mapping applied by the
-// handle_better_auth_user_sync() trigger in
-// supabase/migrations/20260912000000_better_auth.sql: a UUID Better Auth id
-// passes through unchanged; any other id maps to md5('ratefactor:' || id)::uuid.
-// This lets ownership be resolved by direct id comparison instead of an
-// unsafe OR-username lookup (usernames can be collision-adjusted).
-function resolveCanonicalProfileId(betterAuthUserId: string): string {
-  if (UUID_RE.test(betterAuthUserId)) return betterAuthUserId.toLowerCase();
-  const hex = crypto.createHash("md5").update(`ratefactor:${betterAuthUserId}`).digest("hex");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
 
 export async function POST(
   req: NextRequest,
