@@ -27,6 +27,7 @@ export interface DiscoverAppsProps {
   onSelectPortfolio: (portfolio: Portfolio) => void;
   onLikeToggle?: (id: string, liked: boolean) => void;
   onReact?: (id: string, emojiName: string) => void;
+  currentUser?: any;
   onOpenSubmitModal?: () => void;
   initialCategory?: PortfolioCategory;
   searchQuery?: string;
@@ -54,6 +55,7 @@ export function DiscoverApps({
   onSelectPortfolio,
   onLikeToggle,
   onReact,
+  currentUser,
   onOpenSubmitModal,
   initialCategory = "All",
   searchQuery: externalSearchQuery,
@@ -444,6 +446,7 @@ export function DiscoverApps({
                   onSelect={onSelectPortfolio}
                   onLikeToggle={onLikeToggle}
                   onReact={onReact}
+                  currentUser={currentUser}
                 />
               ))}
             </div>
@@ -489,6 +492,7 @@ export function DiscoverApps({
                       onSelect={onSelectPortfolio}
                       onLikeToggle={onLikeToggle}
                       onReact={onReact}
+                      currentUser={currentUser}
                     />
                   ))}
                 </div>
@@ -509,6 +513,7 @@ export function DiscoverApps({
                 onSelect={onSelectPortfolio}
                 onLikeToggle={onLikeToggle}
                 onReact={onReact}
+                currentUser={currentUser}
               />
             ))}
           </div>
