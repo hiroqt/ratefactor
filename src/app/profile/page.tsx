@@ -141,6 +141,7 @@ function ProfilePageContent() {
   // 1. Unified Authentication State
   const {
     currentUser,
+    setCurrentUser,
     isLoading: isAuthLoading,
     isAuthModalOpen,
     setIsAuthModalOpen,
@@ -319,10 +320,46 @@ function ProfilePageContent() {
     toast.success(`Status updated to "${newStatus.emoji} ${newStatus.message}"`);
   };
 
-  const handleSaveBio = (updated: DeveloperProfile) => {
+  const handleSaveBio = async (updated: DeveloperProfile) => {
     updateProfile(updated);
+    if (setCurrentUser) {
+      setCurrentUser((prev) => prev ? {
+        ...prev,
+        name: updated.name || prev.name,
+        username: updated.username || prev.username,
+        avatar: updated.avatar || prev.avatar,
+        role: updated.role || prev.role,
+      } : null);
+    }
     setIsBioModalOpen(false);
     toast.success("Profile details and bio saved successfully.");
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: updated.name,
+          username: updated.username,
+          avatar: updated.avatar,
+          role: updated.role,
+          bio: updated.bio,
+          skills: updated.skills,
+          availableForHire: updated.availableForHire,
+          customHireMessage: updated.customHireMessage,
+          company: updated.company,
+          location: updated.location,
+          website: updated.website,
+          github: updated.github,
+          twitter: updated.twitter,
+          linkedin: updated.linkedin,
+          onboarded: true,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.profile) {
+        updateProfile(data.profile);
+      }
+    } catch {}
   };
 
   // Engineering metrics
@@ -459,14 +496,31 @@ function ProfilePageContent() {
         toast.error(data.detail || data.message || "Failed to update profile.");
         return;
       }
-      if (data.profile) {
-        updateProfile(data.profile);
-      } else {
-        updateProfile(updated);
+      const savedProf = data.profile || updated;
+      updateProfile(savedProf);
+      if (setCurrentUser) {
+        setCurrentUser((prev) => prev ? {
+          ...prev,
+          name: savedProf.name || prev.name,
+          username: savedProf.username || prev.username,
+          avatar: savedProf.avatar || prev.avatar,
+          role: savedProf.role || prev.role,
+          onboarded: true,
+        } : null);
       }
       toast.success("Developer profile updated successfully!");
     } catch {
       updateProfile(updated);
+      if (setCurrentUser) {
+        setCurrentUser((prev) => prev ? {
+          ...prev,
+          name: updated.name || prev.name,
+          username: updated.username || prev.username,
+          avatar: updated.avatar || prev.avatar,
+          role: updated.role || prev.role,
+          onboarded: true,
+        } : null);
+      }
       toast.success("Developer profile updated locally.");
     }
   };
@@ -1753,6 +1807,16 @@ function ProfilePageContent() {
         profile={developerProfile}
         onSaveSuccess={(updated) => {
           updateProfile(updated);
+          if (setCurrentUser) {
+            setCurrentUser((prev) => prev ? {
+              ...prev,
+              name: updated.name || prev.name,
+              username: updated.username || prev.username,
+              avatar: updated.avatar || prev.avatar,
+              role: updated.role || prev.role,
+              onboarded: true,
+            } : null);
+          }
           handleCloseOnboarding();
           toast.success("Profile configured successfully!");
         }}

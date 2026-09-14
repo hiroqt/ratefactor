@@ -106,6 +106,24 @@ export function Navbar({
     username: normalizeUsername(session.user.email || session.user.name),
   } : null);
 
+  const displayName =
+    (profile?.name && profile.name !== "Developer" && profile.name !== "Guest Developer" ? profile.name : null) ||
+    effectiveUser?.name ||
+    effectiveUser?.username ||
+    "Developer";
+
+  const displayUsername =
+    (profile?.username && profile.username !== "developer" && profile.username !== "guest" ? profile.username : null) ||
+    effectiveUser?.username ||
+    "developer";
+
+  const displayAvatar =
+    (profile?.avatar ? profile.avatar : null) ||
+    effectiveUser?.avatar ||
+    "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80";
+
+  const displayRole = profile?.role || effectiveUser?.role || "developer";
+
   const handleSignOut = async () => {
     try {
       await authClient.signOut();
@@ -554,8 +572,8 @@ export function Navbar({
                   <div className="relative shrink-0">
                     <div className="w-7 h-7 rounded-full overflow-hidden ring-1 ring-slate-300 dark:ring-white/20 flex-shrink-0">
                       <img
-                        src={getOptimizedImageUrl(effectiveUser.avatar || profile?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80", 56, 75)}
-                        alt={effectiveUser.name || "Developer"}
+                        src={getOptimizedImageUrl(displayAvatar, 56, 75)}
+                        alt={displayName}
                         loading="lazy"
                         decoding="async"
                         className="w-full h-full object-cover"
@@ -568,7 +586,7 @@ export function Navbar({
                     <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-white dark:border-[#121215] bg-emerald-500" />
                   </div>
                   <span className="hidden lg:inline-block text-xs font-semibold text-slate-900 dark:text-white truncate max-w-[120px] whitespace-nowrap">
-                    {effectiveUser.name || effectiveUser.username || "Developer"}
+                    {displayName}
                   </span>
                   <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 dark:text-slate-300 transition-transform duration-200", isProfileDropdownOpen && "rotate-180 text-slate-700 dark:text-white")} />
                 </button>
@@ -587,8 +605,8 @@ export function Navbar({
                       <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full overflow-hidden ring-1 ring-slate-200 dark:ring-white/20 shrink-0">
                           <img
-                            src={getOptimizedImageUrl(effectiveUser.avatar || profile?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80", 72, 75)}
-                            alt={effectiveUser.name || "Developer"}
+                            src={getOptimizedImageUrl(displayAvatar, 72, 75)}
+                            alt={displayName}
                             loading="lazy"
                             decoding="async"
                             className="w-full h-full object-cover"
@@ -600,10 +618,10 @@ export function Navbar({
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                            {effectiveUser.name || "Developer"}
+                            {displayName}
                           </div>
                           <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 truncate">
-                            @{effectiveUser.username || "developer"}
+                            @{displayUsername}
                           </div>
                         </div>
                       </div>
@@ -777,8 +795,8 @@ export function Navbar({
                   >
                     <div className="relative shrink-0">
                       <img
-                        src={getOptimizedImageUrl(effectiveUser.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80", 64, 75)}
-                        alt={effectiveUser.name || "Developer"}
+                        src={getOptimizedImageUrl(displayAvatar, 64, 75)}
+                        alt={displayName}
                         loading="lazy"
                         decoding="async"
                         className="w-8 h-8 rounded-full object-cover ring-1 ring-slate-200 dark:ring-white/20"
@@ -791,10 +809,10 @@ export function Navbar({
                     </div>
                     <div className="min-w-0 flex items-center gap-2">
                       <span className="text-xs font-bold text-slate-900 dark:text-white truncate whitespace-nowrap">
-                        {effectiveUser.name || effectiveUser.username || "Developer"}
+                        {displayName}
                       </span>
                       <span className="text-[9px] font-mono uppercase bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded font-semibold whitespace-nowrap">
-                        {effectiveUser.role || "developer"}
+                        {displayRole}
                       </span>
                     </div>
                   </div>

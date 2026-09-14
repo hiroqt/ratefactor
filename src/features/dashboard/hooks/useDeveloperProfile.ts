@@ -13,10 +13,22 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
     if (memoryProfileCache) {
       return memoryProfileCache;
     }
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("ratefactor_dev_profile");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === "object" && parsed.name) {
+            memoryProfileCache = parsed;
+            return parsed;
+          }
+        }
+      } catch {}
+    }
     return INITIAL_DEVELOPER_PROFILE;
   });
 
-  // Load from localStorage on mount and sanitize any legacy placeholder strings
+  // Load from localStorage on mount and clean any legacy placeholder strings
   useEffect(() => {
     try {
       const saved = localStorage.getItem("ratefactor_dev_profile");
@@ -31,37 +43,15 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
         }
         if (
           parsed.readmeMarkdown &&
-          (parsed.readmeMarkdown.includes("Welcome to My Profile") ||
-            parsed.readmeMarkdown.includes("Arnel Rivera"))
+          parsed.readmeMarkdown.includes("Welcome to My Profile")
         ) {
           parsed.readmeMarkdown = "";
         }
-        // Sanitize any stale or auto-inferred GitHub handles and personal presets
-        if (
-          parsed.githubSync?.username === "arnel" ||
-          parsed.githubSync?.username === "cydefx" ||
-          parsed.githubSync?.username === "cydefxgaming" ||
-          (parsed.github && (parsed.github.includes("arnel") || parsed.github.includes("cydefx"))) ||
-          parsed.name === "Arnel Rivera" ||
-          parsed.name === "Arnel Baylon" ||
-          (parsed.avatar && parsed.avatar.includes("avatars.githubusercontent.com/u/10313"))
-        ) {
-          delete parsed.githubSync;
-          if (parsed.github && (parsed.github.includes("arnel") || parsed.github.includes("cydefx"))) {
-            parsed.github = "";
-          }
-          if (parsed.name === "Arnel Rivera" || parsed.name === "Arnel Baylon") {
-            parsed.name = "Developer";
-          }
-          if (parsed.avatar && parsed.avatar.includes("avatars.githubusercontent.com/u/10313")) {
-            parsed.avatar = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80";
-          }
-          try {
-            localStorage.setItem("ratefactor_dev_profile", JSON.stringify(parsed));
-          } catch (e) {}
-        }
         memoryProfileCache = parsed;
-        setDeveloperProfile(parsed);
+        setDeveloperProfile((prev) => ({
+          ...prev,
+          ...parsed,
+        }));
       }
     } catch (e) {
       // ignore
@@ -103,10 +93,15 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
       const targetHandle = (currentUser.username || "").trim().replace(/^@/, "");
 
       setDeveloperProfile((prev) => {
-        const nextName = currentUser.name || prev.name;
-        const nextUsername = targetHandle || prev.username;
-        const nextAvatar = currentUser.avatar || prev.avatar;
-        const nextRole = currentUser.role || prev.role;
+        // Only adopt currentUser values if the current profile has default/placeholder values
+        const isPlaceholderName = !prev.name || prev.name === "Guest Developer" || prev.name === "Developer";
+        const isPlaceholderUsername = !prev.username || prev.username === "developer" || prev.username === "guest";
+        const isPlaceholderAvatar = !prev.avatar;
+
+        const nextName = isPlaceholderName ? (currentUser.name || prev.name) : prev.name;
+        const nextUsername = isPlaceholderUsername ? (targetHandle || prev.username) : prev.username;
+        const nextAvatar = isPlaceholderAvatar ? (currentUser.avatar || prev.avatar) : prev.avatar;
+        const nextRole = (prev.role && prev.role !== "user") ? prev.role : (currentUser.role || prev.role);
         const nextJoinedDate = (currentUser.createdAt && currentUser.createdAt !== "2026")
           ? currentUser.createdAt
           : (prev.joinedDate && prev.joinedDate !== "2026" ? prev.joinedDate : undefined);
@@ -136,15 +131,10 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
         }
         return updated;
       });
-
-      // GitHub connection/sync itself is no longer driven from here: it's
-      // resolved authoritatively from Better Auth's linked-account state
-      // (see useGithubConnection), not from this profile's cached
-      // githubSync.connected flag, which is a display cache only.
     }
   }, [currentUser?.username, currentUser?.name, currentUser?.avatar, currentUser?.role, currentUser?.createdAt]);
 
-  // Fetch authoritative profile from API if user is authenticated to sync database joinedDate
+  // Fetch authoritative profile from API if user is authenticated to sync database joinedDate & configured profile
   useEffect(() => {
     if (!currentUser?.id) return;
     let isCancelled = false;
@@ -165,10 +155,24 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
               const merged: DeveloperProfile = {
                 ...prev,
                 ...p,
+                name: p.name || prev.name,
+                username: p.username || prev.username,
+                avatar: p.avatar || prev.avatar,
+                role: p.role || prev.role,
                 joinedDate: authoritativeJoinedDate || prev.joinedDate,
               };
+              memoryProfileCache = merged;
               try {
                 localStorage.setItem("ratefactor_dev_profile", JSON.stringify(merged));
+                const rawAuth = localStorage.getItem("ratefactor_auth_user");
+                if (rawAuth) {
+                  const parsedAuth = JSON.parse(rawAuth);
+                  if (merged.name) parsedAuth.name = merged.name;
+                  if (merged.username) parsedAuth.username = merged.username;
+                  if (merged.avatar) parsedAuth.avatar = merged.avatar;
+                  if (merged.role) parsedAuth.role = merged.role;
+                  localStorage.setItem("ratefactor_auth_user", JSON.stringify(parsedAuth));
+                }
               } catch {}
               return merged;
             });
@@ -186,8 +190,18 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
 
   const updateProfile = useCallback((updated: DeveloperProfile) => {
     setDeveloperProfile(updated);
+    memoryProfileCache = updated;
     try {
       localStorage.setItem("ratefactor_dev_profile", JSON.stringify(updated));
+      const rawAuth = localStorage.getItem("ratefactor_auth_user");
+      if (rawAuth) {
+        const parsedAuth = JSON.parse(rawAuth);
+        if (updated.name) parsedAuth.name = updated.name;
+        if (updated.username) parsedAuth.username = updated.username;
+        if (updated.avatar) parsedAuth.avatar = updated.avatar;
+        if (updated.role) parsedAuth.role = updated.role;
+        localStorage.setItem("ratefactor_auth_user", JSON.stringify(parsedAuth));
+      }
     } catch (e) {
       // ignore
     }

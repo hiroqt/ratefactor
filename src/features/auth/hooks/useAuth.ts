@@ -54,20 +54,6 @@ export function useAuth(options?: UseAuthOptions) {
           ? new Date((authSession.user as any).createdAt).toISOString()
           : prev?.createdAt;
 
-        if (
-          prev &&
-          prev.id === authSession.user.id &&
-          prev.name === (authSession.user.name || authSession.user.email?.split("@")[0] || "User") &&
-          prev.email === authSession.user.email &&
-          prev.username === nextUsername &&
-          prev.avatar === (authSession.user.image || prev.avatar) &&
-          prev.role === sessionRole &&
-          prev.onboarded === sessionOnboarded &&
-          prev.createdAt === sessionCreatedAt
-        ) {
-          return prev;
-        }
-
         const isExistingAccount = sessionCreatedAt
           ? (Date.now() - new Date(sessionCreatedAt).getTime() > 10 * 60 * 1000)
           : false;
@@ -76,15 +62,39 @@ export function useAuth(options?: UseAuthOptions) {
           ? sessionOnboarded
           : (isExistingAccount ? true : (prev?.onboarded ?? false));
 
+        const effectiveName = (prev?.name && prev.name !== "User" && prev.name !== "Guest Developer" && prev.name !== "Developer")
+          ? prev.name
+          : (authSession.user.name || authSession.user.email?.split("@")[0] || "User");
+
+        const effectiveUsername = (prev?.username && prev.username !== "developer" && prev.username !== "guest")
+          ? prev.username
+          : nextUsername;
+
+        const effectiveAvatar = (prev?.avatar && !prev.avatar.includes("images.unsplash.com/photo-1472099645785"))
+          ? prev.avatar
+          : (authSession.user.image || prev?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80");
+
+        if (
+          prev &&
+          prev.id === authSession.user.id &&
+          prev.name === effectiveName &&
+          prev.email === authSession.user.email &&
+          prev.username === effectiveUsername &&
+          prev.avatar === effectiveAvatar &&
+          prev.role === sessionRole &&
+          prev.onboarded === effectiveOnboarded &&
+          prev.createdAt === sessionCreatedAt
+        ) {
+          return prev;
+        }
+
         const u: AuthUser = {
           id: authSession.user.id,
-          name: authSession.user.name || authSession.user.email?.split("@")[0] || "User",
+          name: effectiveName,
           email: authSession.user.email,
-          avatar:
-            authSession.user.image ||
-            "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80",
+          avatar: effectiveAvatar,
           role: sessionRole,
-          username: nextUsername,
+          username: effectiveUsername,
           onboarded: effectiveOnboarded,
           createdAt: sessionCreatedAt,
         };

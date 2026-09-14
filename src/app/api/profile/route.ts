@@ -134,7 +134,7 @@ export async function GET(req: NextRequest) {
              p.company, p.location, p.website, p.github, p.twitter, p.linkedin,
              COALESCE(p.created_at, u."createdAt") as created_at
            FROM profiles p
-           LEFT JOIN public."user" u ON (p.id::text = u.id OR LOWER(p.username) = LOWER(REGEXP_REPLACE(u.name, '[^a-zA-Z0-9_-]', '', 'g')))
+           LEFT JOIN public."user" u ON (p.id = md5('ratefactor:' || u.id)::uuid OR p.id::text = u.id OR LOWER(p.username) = LOWER(REGEXP_REPLACE(u.name, '[^a-zA-Z0-9_-]', '', 'g')))
            WHERE LOWER(p.username) = LOWER($1)
            LIMIT 1`,
           [requestedUsername]
@@ -161,6 +161,7 @@ export async function GET(req: NextRequest) {
             linkedin: row.linkedin ?? profile.linkedin,
             joinedDate: row.created_at ? new Date(row.created_at).toISOString() : profile.joinedDate,
           };
+          userProfiles.set(requestedUsername.toLowerCase(), profile);
         } else {
           // Direct fallback to Better Auth user table
           const uRes = await pool.query(
@@ -180,18 +181,21 @@ export async function GET(req: NextRequest) {
               role: uRow.role || profile.role,
               joinedDate: uRow.created_at ? new Date(uRow.created_at).toISOString() : profile.joinedDate,
             };
+            userProfiles.set(requestedUsername.toLowerCase(), profile);
           }
         }
       } else if (authUser?.id) {
         const res = await pool.query(
           `SELECT 
-             p.id, p.full_name as name, p.username, p.avatar_url, p.role, p.onboarded, 
+             p.id, COALESCE(NULLIF(p.full_name, ''), u.name) as name, p.username, COALESCE(NULLIF(p.avatar_url, ''), u.image) as avatar_url, p.role, p.onboarded, 
              p.bio, p.skills, p.available_for_hire, p.custom_hire_message, 
              p.company, p.location, p.website, p.github, p.twitter, p.linkedin,
              COALESCE(p.created_at, u."createdAt") as created_at
            FROM profiles p
-           LEFT JOIN public."user" u ON (p.id::text = u.id OR LOWER(p.username) = LOWER(REGEXP_REPLACE(u.name, '[^a-zA-Z0-9_-]', '', 'g')))
-           WHERE p.id::text = $1 OR LOWER(p.username) = LOWER($2)
+           LEFT JOIN public."user" u ON (p.id = md5('ratefactor:' || u.id)::uuid OR p.id::text = u.id OR LOWER(p.username) = LOWER(REGEXP_REPLACE(u.name, '[^a-zA-Z0-9_-]', '', 'g')))
+           WHERE p.id = md5('ratefactor:' || $1)::uuid 
+              OR p.id::text = $1 
+              OR ($2 != '' AND LOWER(p.username) = LOWER($2))
            LIMIT 1`,
           [authUser.id, authUser.username || ""]
         );
@@ -211,6 +215,7 @@ export async function GET(req: NextRequest) {
 
           profile = {
             ...profile,
+            id: row.id || profile.id,
             name: row.name || profile.name,
             username: row.username || profile.username,
             avatar: row.avatar_url || profile.avatar,
@@ -230,11 +235,40 @@ export async function GET(req: NextRequest) {
               ? new Date(row.created_at).toISOString()
               : (authUser.createdAt || profile.joinedDate),
           };
-        } else if (authUser.createdAt) {
-          profile = {
-            ...profile,
-            joinedDate: new Date(authUser.createdAt).toISOString(),
-          };
+          userProfiles.set(authUser.id, profile);
+          if (profile.username) {
+            userProfiles.set(profile.username.toLowerCase(), profile);
+          }
+        } else {
+          // Direct fallback to Better Auth user table
+          const uRes = await pool.query(
+            `SELECT id, name, email, image as avatar_url, role, "createdAt" as created_at, onboarded 
+             FROM public."user" 
+             WHERE id = $1 
+             LIMIT 1`,
+            [authUser.id]
+          );
+          if (uRes.rows && uRes.rows.length > 0) {
+            const uRow = uRes.rows[0];
+            profile = {
+              ...profile,
+              id: uRow.id || profile.id,
+              name: uRow.name || profile.name,
+              avatar: uRow.avatar_url || profile.avatar,
+              role: uRow.role || profile.role || "user",
+              onboarded: uRow.onboarded ?? profile.onboarded ?? true,
+              joinedDate: uRow.created_at ? new Date(uRow.created_at).toISOString() : (authUser.createdAt || profile.joinedDate),
+            };
+            userProfiles.set(authUser.id, profile);
+            if (profile.username) {
+              userProfiles.set(profile.username.toLowerCase(), profile);
+            }
+          } else if (authUser.createdAt) {
+            profile = {
+              ...profile,
+              joinedDate: new Date(authUser.createdAt).toISOString(),
+            };
+          }
         }
       }
     } catch {
@@ -260,7 +294,9 @@ export async function GET(req: NextRequest) {
              p.request_critique as "requestCritique", p.created_at as "createdAt"
            FROM public.portfolios p
            JOIN public.profiles pr ON p.author_id = pr.id
-           WHERE pr.id::text = $1 OR LOWER(pr.username) = LOWER($2)
+           WHERE pr.id = md5('ratefactor:' || $1)::uuid 
+              OR pr.id::text = $1 
+              OR LOWER(pr.username) = LOWER($2)
            ORDER BY p.created_at DESC`,
           [profile.id, targetUser]
         );
@@ -524,7 +560,9 @@ export async function PATCH(req: NextRequest) {
     if (updated.username) {
       userProfiles.set(updated.username.toLowerCase().replace(/^@/, ""), updated);
     }
-    userProfiles.set("default", updated);
+    if (authUser.username) {
+      userProfiles.set(authUser.username.toLowerCase().replace(/^@/, ""), updated);
+    }
 
     // PostgreSQL database persistence
     try {
@@ -700,10 +738,12 @@ export async function PATCH(req: NextRequest) {
              p.comments_count as "commentsCount", p.is_showcase as "isShowcase",
              p.showcase_type as "showcaseType", p.showcase_reason as "showcaseReason",
              p.request_critique as "requestCritique", p.created_at as "createdAt"
-           FROM public.portfolios p
-           JOIN public.profiles pr ON p.author_id = pr.id
-           WHERE pr.id::text = $1 OR LOWER(pr.username) = LOWER($2)
-           ORDER BY p.created_at DESC`,
+            FROM public.portfolios p
+            JOIN public.profiles pr ON p.author_id = pr.id
+            WHERE pr.id = md5('ratefactor:' || $1)::uuid 
+               OR pr.id::text = $1 
+               OR LOWER(pr.username) = LOWER($2)
+            ORDER BY p.created_at DESC`,
           [updated.id, targetUser]
         );
         if (pfRes.rows && pfRes.rows.length > 0) {
