@@ -286,7 +286,9 @@ export default function Home() {
                   router.push("/apps");
                 }}
                 profile={developerProfile}
+                currentUser={currentUser}
                 totalDevelopers={totalDevelopers}
+                onVisitUser={setVisitedUser}
               />
             )}
 

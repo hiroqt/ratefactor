@@ -55,3 +55,13 @@ export interface ShowcaseAccolade {
   iconName: "trophy" | "flame";
 }
 
+export interface DeveloperSummary {
+  id: string;
+  username: string;
+  name: string;
+  avatar: string;
+  role: string;
+  isVerified?: boolean;
+}
+
+

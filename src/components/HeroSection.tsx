@@ -2,12 +2,17 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Users } from "@/components/ui/icons";
+import { ArrowRight } from "@/components/ui/icons";
 import { Portfolio } from "@/types/portfolio";
-import { DeveloperProfile } from "@/types/profile";
-import { cn } from "@/lib/utils";
-import { AnimatedCounter } from "@/components/ui/animated-counter";
+import { DeveloperProfile, DeveloperSummary } from "@/types/profile";
+import { normalizeAvatarUrl, getOptimizedImageUrl } from "@/lib/utils";
 import { performanceEngine } from "@/lib/performance";
+import { AuthUser } from "@/features/auth/hooks/useAuth";
+
+function getInitialsAvatar(nameOrUsername?: string) {
+  const letters = (nameOrUsername || "DEV").trim().slice(0, 2).toUpperCase();
+  return `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><circle cx='40' cy='40' r='40' fill='%231e293b'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='26' font-weight='bold' fill='%2394a3b8'>${encodeURIComponent(letters)}</text></svg>`;
+}
 
 interface HeroSectionProps {
   showcasePortfolio?: Portfolio | null;
@@ -15,7 +20,9 @@ interface HeroSectionProps {
   onSubmitClick: () => void;
   onExploreClick: () => void;
   profile?: DeveloperProfile;
+  currentUser?: AuthUser | null;
   totalDevelopers?: number;
+  onVisitUser?: (user: DeveloperProfile) => void;
 }
 
 export function HeroSection({
@@ -24,10 +31,11 @@ export function HeroSection({
   onSubmitClick,
   onExploreClick,
   profile,
+  currentUser,
   totalDevelopers,
+  onVisitUser,
 }: HeroSectionProps) {
   const [activeKeywordIndex, setActiveKeywordIndex] = useState(0);
-  const [animatedCount, setAnimatedCount] = useState(0);
 
   // Grounded in RateFactor ARD & PRD specifications (Sections 1, 4.1, 4.3, 6)
   const keywords = [
@@ -69,15 +77,99 @@ export function HeroSection({
     };
   }, [keywords.length]);
 
-  const devCount = totalDevelopers ?? 0;
+  const [developers, setDevelopers] = useState<DeveloperSummary[]>([]);
+  const [realTotalCount, setRealTotalCount] = useState<number>(totalDevelopers ?? 0);
 
-  // On opening/mount, start counting smoothly from 0 to real developer count
+  // Fetch real registered developer profiles from backend API (queries PostgreSQL public.profiles)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setAnimatedCount(devCount);
-    }, 150);
-    return () => clearTimeout(timer);
-  }, [devCount]);
+    let isMounted = true;
+    async function loadDevelopers() {
+      try {
+        const res = await fetch("/api/developers?limit=10", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (isMounted && data?.developers && Array.isArray(data.developers)) {
+          setDevelopers(data.developers);
+          if (typeof data.totalCount === "number" && data.totalCount > 0) {
+            setRealTotalCount(data.totalCount);
+          }
+        }
+      } catch {
+        // Keep real state
+      }
+    }
+    loadDevelopers();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Compute displayed 4 avatars with the real existing user included
+  const displayedDevelopers = React.useMemo(() => {
+    const list: DeveloperSummary[] = [];
+    const seenUsernames = new Set<string>();
+
+    // 1. If currentUser or active profile exists, place existing user in the front
+    if (currentUser?.username) {
+      const uname = currentUser.username.toLowerCase();
+      seenUsernames.add(uname);
+      list.push({
+        id: currentUser.id || "current-user",
+        username: currentUser.username,
+        name: currentUser.name || "Developer",
+        avatar: currentUser.avatar || profile?.avatar || "",
+        role: currentUser.role || "developer",
+      });
+    } else if (profile?.username && profile.username !== "developer") {
+      const uname = profile.username.toLowerCase();
+      seenUsernames.add(uname);
+      list.push({
+        id: profile.id || "profile-user",
+        username: profile.username,
+        name: profile.name || "Developer",
+        avatar: profile.avatar || "",
+        role: profile.role || "developer",
+      });
+    }
+
+    // 2. Fill remaining slots from real developers queried from database
+    for (const dev of developers) {
+      if (list.length >= 4) break;
+      const uname = dev.username.toLowerCase();
+      if (!seenUsernames.has(uname)) {
+        seenUsernames.add(uname);
+        list.push(dev);
+      }
+    }
+
+    return list.slice(0, 4);
+  }, [developers, currentUser, profile]);
+
+  const statCount = Math.max(realTotalCount, totalDevelopers ?? 0, displayedDevelopers.length);
+
+  const handleAvatarClick = (dev: DeveloperSummary) => {
+    if (onVisitUser) {
+      onVisitUser({
+        id: dev.id,
+        name: dev.name,
+        username: dev.username,
+        avatar: dev.avatar,
+        role: dev.role,
+        bio: "",
+        status: {
+          emoji: "🚀",
+          message: "Showcasing on RateFactor",
+          statusType: "available",
+        },
+        skills: [],
+        pinnedPortfolioIds: [],
+        joinedDate: "2026",
+        isVerified: dev.isVerified,
+      });
+    } else {
+      onExploreClick();
+    }
+  };
 
   const handleToggleKeyword = () => {
     setActiveKeywordIndex((prev) => (prev + 1) % keywords.length);
@@ -96,6 +188,64 @@ export function HeroSection({
           
           {/* Left Column (7 cols): Massive Editorial Typography */}
           <div className="lg:col-span-7 flex flex-col justify-end min-w-0 pr-0 lg:pr-4 xl:pr-6">
+            {/* Top of the headline on the left: Real Developers Social Proof Widget */}
+            {displayedDevelopers.length > 0 && (
+              <div className="mb-4 sm:mb-6 flex items-center justify-start">
+                <div className="inline-flex items-center gap-3.5 sm:gap-4 py-0.5">
+                  {/* Overlapping Avatar Stack */}
+                  <div className="flex items-center -space-x-2.5 sm:-space-x-3 shrink-0">
+                    {displayedDevelopers.map((dev, idx) => {
+                      const fallbackSvg = getInitialsAvatar(dev.name || dev.username);
+                      const avatarSrc = dev.avatar
+                        ? getOptimizedImageUrl(normalizeAvatarUrl(dev.avatar, dev.username), 80, 80)
+                        : fallbackSvg;
+
+                      return (
+                        <div
+                          key={dev.id || dev.username || idx}
+                          onClick={() => handleAvatarClick(dev)}
+                          title={`@${dev.username} (${dev.name})`}
+                          className="relative rounded-full transition-transform duration-200 hover:scale-115 hover:z-50 cursor-pointer shadow-xs group/avatar"
+                          style={{ zIndex: 10 + idx }}
+                        >
+                          <img
+                            src={avatarSrc}
+                            alt={dev.name || dev.username}
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              if (target.src !== fallbackSvg) {
+                                target.src = fallbackSvg;
+                              }
+                            }}
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-[#1c1c21] dark:border-[#222228] ring-1 ring-black/40 bg-[#161619]"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Stat Text: Unique Developers & Explore Navigation */}
+                  <div className="flex flex-col text-left justify-center">
+                    <div className="text-sm sm:text-base leading-tight tracking-tight font-sans">
+                      <strong className="font-bold text-foreground">
+                        {statCount > 0 ? statCount.toLocaleString() : displayedDevelopers.length}
+                      </strong>{" "}
+                      <span className="text-slate-600 dark:text-zinc-400 font-normal">
+                        unique developers
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onExploreClick}
+                      className="text-xs sm:text-[13px] text-slate-500 dark:text-zinc-400 hover:text-foreground transition-colors text-left font-normal cursor-pointer leading-tight mt-0.5 tracking-tight"
+                    >
+                      Explore the component library
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <h1 className="text-3xl min-[360px]:text-4xl xs:text-5xl sm:text-6xl md:text-7xl lg:text-[2.75rem] xl:text-[3.5rem] 2xl:text-[4.25rem] font-black uppercase tracking-[-0.04em] leading-[0.92] text-foreground font-sans drop-shadow-xs dark:drop-shadow-[0_2px_14px_rgba(0,0,0,0.85)]">
               <span className="block break-normal">SHOWCASING</span>
               <span className="block break-normal">
@@ -127,7 +277,7 @@ export function HeroSection({
             </h1>
           </div>
 
-          {/* Right Column (5 cols): ARD/PRD Core Value, Total Developers & Dual Action CTAs */}
+          {/* Right Column (5 cols): ARD/PRD Core Value & Dual Action CTAs */}
           <div className="lg:col-span-5 flex flex-col items-start lg:items-end justify-end pt-8 sm:pt-10 lg:pt-0 min-w-0 pl-0 lg:pl-2 xl:pl-4">
             <div className="max-w-[480px] lg:max-w-[520px] space-y-4 sm:space-y-5 lg:space-y-6 w-full">
               {/* Daily Showcase Teaser Link (if available) */}
@@ -146,23 +296,6 @@ export function HeroSection({
                   </button>
                 </div>
               )}
-
-              {/* Total Developers Live Counter Badge */}
-              <div className="flex items-center">
-                <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-surface/85 border border-border shadow-2xs backdrop-blur-xs">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                  </span>
-                  <div className="flex items-center gap-1.5 text-xs text-muted">
-                    <Users className="w-3.5 h-3.5 text-muted" />
-                    <span className="font-medium text-muted">Total Developers:</span>
-                    <span className="font-bold text-foreground font-mono tracking-tight text-xs inline-flex items-center">
-                      <AnimatedCounter value={animatedCount} duration={1.2} />
-                    </span>
-                  </div>
-                </div>
-              </div>
 
               {/* Subtitle Paragraph (Natural text with dark mode contrast & drop shadow) */}
               <p className="text-base sm:text-lg lg:text-[17px] xl:text-[19px] text-slate-700 dark:text-zinc-200 leading-relaxed font-normal tracking-[-0.01em] dark:drop-shadow-[0_1px_8px_rgba(0,0,0,0.9)]">

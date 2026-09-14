@@ -37,6 +37,12 @@ export const metadata: Metadata = {
     "TypeScript",
   ],
   authors: [{ name: "RateFactor Community" }],
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+  },
 };
 
 export const viewport = {
