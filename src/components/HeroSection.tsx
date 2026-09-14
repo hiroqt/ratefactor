@@ -98,19 +98,52 @@ export function HeroSection({
         // Keep real state
       }
     }
+
     loadDevelopers();
+
+    // Auto-update when new users join or create account:
+    // 1. Periodic poll (every 15 seconds) when tab is active
+    const pollInterval = setInterval(() => {
+      if (!document.hidden) {
+        loadDevelopers();
+      }
+    }, 15000);
+
+    // 2. Refetch when window regains focus
+    const onFocus = () => {
+      loadDevelopers();
+    };
+    window.addEventListener("focus", onFocus);
+
+    // 3. Immediate refetch when a user registers or logs in
+    const onUserRegistered = () => {
+      loadDevelopers();
+    };
+    window.addEventListener("ratefactor:user-registered", onUserRegistered);
+    window.addEventListener("ratefactor:user-changed", onUserRegistered);
+
     return () => {
       isMounted = false;
+      clearInterval(pollInterval);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("ratefactor:user-registered", onUserRegistered);
+      window.removeEventListener("ratefactor:user-changed", onUserRegistered);
     };
   }, []);
 
-  // Compute displayed 4 avatars with the real existing user included
+  // Compute displayed 4 avatars strictly ordered with newest users first:
+  // Shows only 4 profiles; when a new user joins, they are appended at the first position
+  // and the oldest (last) profile is removed.
   const displayedDevelopers = React.useMemo(() => {
     const list: DeveloperSummary[] = [];
     const seenUsernames = new Set<string>();
 
-    // 1. If currentUser or active profile exists, place existing user in the front
-    if (currentUser?.username) {
+    // 1. If currentUser is newly registered in this session and not yet present in API developers,
+    // prepend currentUser immediately to index 0
+    if (
+      currentUser?.username &&
+      !developers.some((d) => d.username.toLowerCase() === currentUser.username.toLowerCase())
+    ) {
       const uname = currentUser.username.toLowerCase();
       seenUsernames.add(uname);
       list.push({
@@ -120,19 +153,9 @@ export function HeroSection({
         avatar: currentUser.avatar || profile?.avatar || "",
         role: currentUser.role || "developer",
       });
-    } else if (profile?.username && profile.username !== "developer") {
-      const uname = profile.username.toLowerCase();
-      seenUsernames.add(uname);
-      list.push({
-        id: profile.id || "profile-user",
-        username: profile.username,
-        name: profile.name || "Developer",
-        avatar: profile.avatar || "",
-        role: profile.role || "developer",
-      });
     }
 
-    // 2. Fill remaining slots from real developers queried from database
+    // 2. Append developers from database (which are sorted strictly by created_at DESC)
     for (const dev of developers) {
       if (list.length >= 4) break;
       const uname = dev.username.toLowerCase();
@@ -142,6 +165,7 @@ export function HeroSection({
       }
     }
 
+    // Enforce exactly at most 4 profiles: removes the 4th/last when a new one is added to the first
     return list.slice(0, 4);
   }, [developers, currentUser, profile]);
 
@@ -192,36 +216,43 @@ export function HeroSection({
             {displayedDevelopers.length > 0 && (
               <div className="mb-4 sm:mb-6 flex items-center justify-start">
                 <div className="inline-flex items-center gap-3.5 sm:gap-4 py-0.5">
-                  {/* Overlapping Avatar Stack */}
+                  {/* Overlapping Avatar Stack with smooth layout transitions */}
                   <div className="flex items-center -space-x-2.5 sm:-space-x-3 shrink-0">
-                    {displayedDevelopers.map((dev, idx) => {
-                      const fallbackSvg = getInitialsAvatar(dev.name || dev.username);
-                      const avatarSrc = dev.avatar
-                        ? getOptimizedImageUrl(normalizeAvatarUrl(dev.avatar, dev.username), 80, 80)
-                        : fallbackSvg;
+                    <AnimatePresence initial={false} mode="popLayout">
+                      {displayedDevelopers.map((dev, idx) => {
+                        const fallbackSvg = getInitialsAvatar(dev.name || dev.username);
+                        const avatarSrc = dev.avatar
+                          ? getOptimizedImageUrl(normalizeAvatarUrl(dev.avatar, dev.username), 80, 80)
+                          : fallbackSvg;
 
-                      return (
-                        <div
-                          key={dev.id || dev.username || idx}
-                          onClick={() => handleAvatarClick(dev)}
-                          title={`@${dev.username} (${dev.name})`}
-                          className="relative rounded-full transition-transform duration-200 hover:scale-115 hover:z-50 cursor-pointer shadow-xs group/avatar"
-                          style={{ zIndex: 10 + idx }}
-                        >
-                          <img
-                            src={avatarSrc}
-                            alt={dev.name || dev.username}
-                            onError={(e) => {
-                              const target = e.currentTarget;
-                              if (target.src !== fallbackSvg) {
-                                target.src = fallbackSvg;
-                              }
-                            }}
-                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-[#1c1c21] dark:border-[#222228] ring-1 ring-black/40 bg-[#161619]"
-                          />
-                        </div>
-                      );
-                    })}
+                        return (
+                          <motion.div
+                            key={dev.id || dev.username}
+                            layout
+                            initial={{ opacity: 0, scale: 0.65, x: -16 }}
+                            animate={{ opacity: 1, scale: 1, x: 0 }}
+                            exit={{ opacity: 0, scale: 0.65, x: 16 }}
+                            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                            onClick={() => handleAvatarClick(dev)}
+                            title={`@${dev.username} (${dev.name})`}
+                            className="relative rounded-full transition-transform duration-200 hover:scale-115 hover:z-50 cursor-pointer shadow-xs group/avatar"
+                            style={{ zIndex: 20 - idx }}
+                          >
+                            <img
+                              src={avatarSrc}
+                              alt={dev.name || dev.username}
+                              onError={(e) => {
+                                const target = e.currentTarget;
+                                if (target.src !== fallbackSvg) {
+                                  target.src = fallbackSvg;
+                                }
+                              }}
+                              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-[#1c1c21] dark:border-[#222228] ring-1 ring-black/40 bg-[#161619]"
+                            />
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
                   </div>
 
                   {/* Stat Text: Unique Developers & Explore Navigation */}

@@ -40,13 +40,7 @@ export async function GET(req: NextRequest) {
       }
 
       baseSql += `
-        ORDER BY 
-          CASE 
-            WHEN avatar_url LIKE '%avatars.githubusercontent.com%' THEN 0
-            WHEN avatar_url IS NOT NULL AND avatar_url != '' AND avatar_url NOT LIKE '%photo-1472099645785%' THEN 1
-            ELSE 2 
-          END,
-          created_at DESC
+        ORDER BY created_at DESC, id DESC
         LIMIT $${queryParams.length + 1}
       `;
       queryParams.push(limit);

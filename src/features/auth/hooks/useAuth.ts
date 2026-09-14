@@ -95,6 +95,9 @@ export function useAuth(options?: UseAuthOptions) {
       } catch (e) {
         // ignore
       }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("ratefactor:user-registered", { detail: u }));
+      }
       if (options?.onAuthSuccess) {
         options.onAuthSuccess(u);
       }
