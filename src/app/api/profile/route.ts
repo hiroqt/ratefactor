@@ -402,15 +402,70 @@ export async function PATCH(req: NextRequest) {
 
     const data = parseResult.data;
     const targetKey = authUser.id;
-    const current =
+    let current =
       userProfiles.get(targetKey) || userProfiles.get("default") || { ...INITIAL_DEVELOPER_PROFILE };
 
-    // Check if new username is already taken by another account
+    // 1. Fetch current profile from PostgreSQL so we have the authentic database record
+    let profileRow: any = null;
+    try {
+      const pRes = await pool.query(
+        `SELECT id, username, full_name as name, avatar_url as avatar, role, onboarded, 
+                bio, skills, available_for_hire, custom_hire_message, company, location, 
+                website, github, twitter, linkedin, created_at
+         FROM public.profiles
+         WHERE id = md5('ratefactor:' || $1)::uuid
+            OR id::text = $1
+            OR LOWER(username) = LOWER($2)
+         LIMIT 1`,
+        [authUser.id, authUser.username || ""]
+      );
+      if (pRes.rows && pRes.rows.length > 0) {
+        profileRow = pRes.rows[0];
+        current = {
+          ...current,
+          id: authUser.id,
+          name: profileRow.name || current.name,
+          username: profileRow.username || current.username,
+          avatar: profileRow.avatar || current.avatar,
+          role: profileRow.role || current.role,
+          onboarded: profileRow.onboarded ?? current.onboarded,
+          bio: profileRow.bio ?? current.bio,
+          skills: Array.isArray(profileRow.skills) ? profileRow.skills : current.skills,
+          availableForHire: profileRow.available_for_hire ?? current.availableForHire,
+          customHireMessage: profileRow.custom_hire_message ?? current.customHireMessage,
+          company: profileRow.company ?? current.company,
+          location: profileRow.location ?? current.location,
+          website: profileRow.website ?? current.website,
+          github: profileRow.github ?? current.github,
+          twitter: profileRow.twitter ?? current.twitter,
+          linkedin: profileRow.linkedin ?? current.linkedin,
+          joinedDate: profileRow.created_at ? new Date(profileRow.created_at).toISOString() : current.joinedDate,
+        };
+      }
+    } catch {}
+
+    const currentUsername = (profileRow?.username || authUser.username || current.username || "").toLowerCase().trim();
     const cleanUsername = data.username ? data.username.toLowerCase().replace(/^@/, "").trim() : undefined;
-    if (cleanUsername && cleanUsername !== (current.username || "").toLowerCase()) {
+
+    // A username conflict check is ONLY needed if:
+    // 1. The user explicitly requested a non-empty username, AND
+    // 2. That requested username is DIFFERENT from the user's current username in DB/session.
+    // If the user is only updating their name, bio, etc., and keeping their existing username,
+    // they OWN that username and it must never be flagged as "already taken"!
+    const isUsernameChanging = Boolean(
+      cleanUsername &&
+      currentUsername &&
+      cleanUsername !== currentUsername
+    );
+
+    if (isUsernameChanging && cleanUsername) {
       try {
         const conflictRes = await pool.query(
-          `SELECT id FROM public.profiles WHERE LOWER(username) = LOWER($1) AND id::text != $2 LIMIT 1`,
+          `SELECT id, username FROM public.profiles 
+           WHERE LOWER(username) = LOWER($1) 
+             AND id != md5('ratefactor:' || $2)::uuid 
+             AND id::text != $2 
+           LIMIT 1`,
           [cleanUsername, authUser.id]
         );
         if (conflictRes.rows && conflictRes.rows.length > 0) {
@@ -434,7 +489,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const safeName = data.name !== undefined
-      ? ((data.name && data.name.trim()) ? data.name.trim() : (cleanUsername || current.name || "User"))
+      ? (data.name && data.name.trim() ? data.name.trim() : (cleanUsername || current.name || "User"))
       : current.name;
 
     const updated: DeveloperProfile = {
@@ -471,7 +526,7 @@ export async function PATCH(req: NextRequest) {
     }
     userProfiles.set("default", updated);
 
-    // Optional PostgreSQL database persistence
+    // PostgreSQL database persistence
     try {
       const setClauses: string[] = ["updated_at = NOW()"];
       const values: any[] = [];
@@ -539,9 +594,64 @@ export async function PATCH(req: NextRequest) {
       }
 
       if (setClauses.length > 1) {
+        const authIdParam = paramIdx++;
         values.push(authUser.id);
-        const query = `UPDATE public.profiles SET ${setClauses.join(", ")} WHERE id::text = $${paramIdx} OR LOWER(username) = LOWER($${paramIdx})`;
-        await pool.query(query, values);
+        const curUserParam = paramIdx++;
+        values.push(currentUsername || "");
+
+        const updateQuery = `UPDATE public.profiles SET ${setClauses.join(", ")} 
+          WHERE id = md5('ratefactor:' || $${authIdParam})::uuid 
+             OR id::text = $${authIdParam} 
+             OR ($${curUserParam} != '' AND LOWER(username) = LOWER($${curUserParam}))`;
+        const updateResult = await pool.query(updateQuery, values);
+
+        if (!updateResult.rowCount || updateResult.rowCount === 0) {
+          const insertId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(authUser.id)
+            ? authUser.id
+            : null;
+          await pool.query(
+            `INSERT INTO public.profiles (
+              id, username, full_name, avatar_url, role, onboarded, bio, skills, available_for_hire, custom_hire_message, company, location, website, github, twitter, linkedin
+            ) VALUES (
+              COALESCE($1::uuid, md5('ratefactor:' || $2)::uuid),
+              $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+            ) ON CONFLICT (id) DO UPDATE SET
+              full_name = EXCLUDED.full_name,
+              username = EXCLUDED.username,
+              role = EXCLUDED.role,
+              avatar_url = EXCLUDED.avatar_url,
+              onboarded = EXCLUDED.onboarded,
+              bio = EXCLUDED.bio,
+              skills = EXCLUDED.skills,
+              available_for_hire = EXCLUDED.available_for_hire,
+              custom_hire_message = EXCLUDED.custom_hire_message,
+              company = EXCLUDED.company,
+              location = EXCLUDED.location,
+              website = EXCLUDED.website,
+              github = EXCLUDED.github,
+              twitter = EXCLUDED.twitter,
+              linkedin = EXCLUDED.linkedin`,
+            [
+              insertId,
+              authUser.id,
+              cleanUsername || current.username || `user_${authUser.id.slice(0, 6)}`,
+              safeName,
+              updated.avatar || "",
+              updated.role || "user",
+              updated.onboarded ?? true,
+              updated.bio || "",
+              updated.skills || [],
+              updated.availableForHire ?? true,
+              updated.customHireMessage || null,
+              updated.company || "",
+              updated.location || "",
+              updated.website || "",
+              updated.github || "",
+              updated.twitter || "",
+              updated.linkedin || "",
+            ]
+          );
+        }
       }
 
       // Sync changes to Better Auth public."user" table

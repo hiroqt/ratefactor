@@ -434,9 +434,8 @@ function ProfilePageContent() {
       customHireMessage: editForm.customHireMessage || undefined,
     };
 
-    updateProfile(updated);
     try {
-      await fetch("/api/profile", {
+      const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -455,10 +454,21 @@ function ProfilePageContent() {
           onboarded: true,
         }),
       });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.detail || data.message || "Failed to update profile.");
+        return;
+      }
+      if (data.profile) {
+        updateProfile(data.profile);
+      } else {
+        updateProfile(updated);
+      }
+      toast.success("Developer profile updated successfully!");
     } catch {
-      // ignore
+      updateProfile(updated);
+      toast.success("Developer profile updated locally.");
     }
-    toast.success("Developer profile updated successfully!");
   };
 
   // Sidebar items definition using Rare-UI HookSidebar
