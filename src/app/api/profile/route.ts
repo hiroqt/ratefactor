@@ -481,58 +481,16 @@ export async function PATCH(req: NextRequest) {
     } catch {}
 
     const currentUsername = (profileRow?.username || authUser.username || current.username || "").toLowerCase().trim();
-    const cleanUsername = data.username ? data.username.toLowerCase().replace(/^@/, "").trim() : undefined;
-
-    // A username conflict check is ONLY needed if:
-    // 1. The user explicitly requested a non-empty username, AND
-    // 2. That requested username is DIFFERENT from the user's current username in DB/session.
-    // If the user is only updating their name, bio, etc., and keeping their existing username,
-    // they OWN that username and it must never be flagged as "already taken"!
-    const isUsernameChanging = Boolean(
-      cleanUsername &&
-      currentUsername &&
-      cleanUsername !== currentUsername
-    );
-
-    if (isUsernameChanging && cleanUsername) {
-      try {
-        const conflictRes = await pool.query(
-          `SELECT id, username FROM public.profiles 
-           WHERE LOWER(username) = LOWER($1) 
-             AND id != md5('ratefactor:' || $2)::uuid 
-             AND id::text != $2 
-           LIMIT 1`,
-          [cleanUsername, authUser.id]
-        );
-        if (conflictRes.rows && conflictRes.rows.length > 0) {
-          return NextResponse.json(
-            {
-              type: "https://ratefactor.dev/errors/username-taken",
-              title: "Username Taken",
-              status: 409,
-              detail: `The username @${cleanUsername} is already taken. Please choose another username.`,
-              invalidParams: [{ name: "username", reason: "Username already taken" }],
-            },
-            {
-              status: 409,
-              headers: { "Content-Type": "application/problem+json" },
-            }
-          );
-        }
-      } catch {
-        // Fallback if DB offline
-      }
-    }
 
     const safeName = data.name !== undefined
-      ? (data.name && data.name.trim() ? data.name.trim() : (cleanUsername || current.name || "User"))
+      ? (data.name && data.name.trim() ? data.name.trim() : (current.name || "User"))
       : current.name;
 
     const updated: DeveloperProfile = {
       ...current,
       id: authUser.id,
       name: safeName,
-      username: cleanUsername !== undefined ? cleanUsername : current.username,
+      username: profileRow?.username || current.username || authUser.username,
       role: data.role !== undefined ? data.role : (current.role || "user"),
       avatar: data.avatar !== undefined ? data.avatar : current.avatar,
       onboarded: data.onboarded !== undefined ? data.onboarded : (current.onboarded ?? true),
@@ -573,10 +531,6 @@ export async function PATCH(req: NextRequest) {
       if (data.name !== undefined) {
         setClauses.push(`full_name = $${paramIdx++}`);
         values.push(safeName);
-      }
-      if (cleanUsername !== undefined) {
-        setClauses.push(`username = $${paramIdx++}`);
-        values.push(cleanUsername);
       }
       if (data.role !== undefined) {
         setClauses.push(`role = $${paramIdx++}`);
@@ -655,7 +609,6 @@ export async function PATCH(req: NextRequest) {
               $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
             ) ON CONFLICT (id) DO UPDATE SET
               full_name = EXCLUDED.full_name,
-              username = EXCLUDED.username,
               role = EXCLUDED.role,
               avatar_url = EXCLUDED.avatar_url,
               onboarded = EXCLUDED.onboarded,
@@ -672,7 +625,7 @@ export async function PATCH(req: NextRequest) {
             [
               insertId,
               authUser.id,
-              cleanUsername || current.username || `user_${authUser.id.slice(0, 6)}`,
+              currentUsername || current.username || authUser.username || `user_${authUser.id.slice(0, 6)}`,
               safeName,
               updated.avatar || "",
               updated.role || "user",

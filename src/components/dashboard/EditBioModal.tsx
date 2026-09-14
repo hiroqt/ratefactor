@@ -167,7 +167,7 @@ export function EditBioModal({
     onSaveProfile({
       ...profile,
       name: name.trim() || profile.name,
-      username: username.trim().replace(/^@/, "") || profile.username,
+      username: profile.username,
       avatar: avatar.trim() || profile.avatar,
       role: role.trim() || profile.role,
       pronouns: pronouns.trim(),
@@ -344,17 +344,20 @@ export function EditBioModal({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-900 dark:text-white mb-1">
-                    Handle / Username
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-900 dark:text-white">
+                      Handle / Username
+                    </label>
+                    <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-400 bg-slate-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">Permanent</span>
+                  </div>
                   <div className="relative">
                     <span className="absolute left-3 top-2 text-xs font-mono text-slate-400 dark:text-slate-500">@</span>
                     <input
                       type="text"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value.replace(/^@/, ""))}
-                      required
-                      className="w-full bg-white dark:bg-[#18181b] border border-slate-200 dark:border-white/10 rounded-xl pl-7 pr-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-slate-900 dark:focus:border-cyan-400"
+                      value={profile.username || username}
+                      readOnly
+                      disabled
+                      className="w-full bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl pl-7 pr-3 py-2 text-xs text-slate-500 dark:text-slate-400 font-mono cursor-not-allowed select-none"
                     />
                   </div>
                 </div>

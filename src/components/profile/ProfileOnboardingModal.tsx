@@ -148,28 +148,13 @@ export function ProfileOnboardingModal({
     setError(null);
 
     const trimmedName = fullName.trim();
-    const cleanUsername = username.replace(/^@/, "").trim().toLowerCase();
-    if (!cleanUsername || cleanUsername.length < 3) {
-      setError("Username must be at least 3 characters.");
-      return;
-    }
-    if (cleanUsername.length > 30) {
-      setError("Username must not exceed 30 characters.");
-      return;
-    }
-    if (!/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) {
-      setError("Username can only contain letters, numbers, hyphens, and underscores.");
-      return;
-    }
-
-    const finalName = trimmedName || profile.name || cleanUsername || "User";
+    const finalName = trimmedName || profile.name || profile.username || "User";
     const finalRole = isCustomRole ? (customRoleInput.trim() || "User") : selectedRole;
 
     setIsSaving(true);
     try {
       const payload = {
         name: finalName,
-        username: cleanUsername,
         role: finalRole,
         avatar: avatarUrl,
         bio: bio.trim(),
@@ -387,17 +372,16 @@ export function ProfileOnboardingModal({
               <div>
                 <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center justify-between">
                   <span>Username / Handle</span>
-                  <span className="text-[11px] text-slate-400 font-mono">3–10 chars</span>
+                  <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-400 bg-slate-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">Permanent</span>
                 </label>
                 <div className="relative mt-1">
                   <span className="absolute left-3.5 top-2.5 text-xs text-slate-400 font-mono">@</span>
                   <input
                     type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 10))}
-                    placeholder="alexchen"
-                    maxLength={10}
-                    className="w-full pl-8 pr-3.5 py-2 rounded-xl bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white"
+                    value={profile.username || username}
+                    readOnly
+                    disabled
+                    className="w-full pl-8 pr-3.5 py-2 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-sm font-mono text-slate-500 dark:text-zinc-400 cursor-not-allowed select-none"
                   />
                 </div>
               </div>

@@ -339,7 +339,6 @@ function ProfilePageContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: updated.name,
-          username: updated.username,
           avatar: updated.avatar,
           role: updated.role,
           bio: updated.bio,
@@ -452,7 +451,7 @@ function ProfilePageContent() {
     const updated: DeveloperProfile = {
       ...developerProfile,
       name: editForm.name,
-      username: editForm.username.replace(/^@/, ""),
+      username: developerProfile.username,
       avatar: editForm.avatar,
       role: editForm.role,
       bio: editForm.bio,
@@ -477,7 +476,6 @@ function ProfilePageContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: updated.name,
-          username: updated.username,
           role: updated.role,
           avatar: updated.avatar,
           bio: updated.bio,
@@ -1373,17 +1371,16 @@ function ProfilePageContent() {
                             <label className="text-xs font-semibold text-slate-700">
                               Username
                             </label>
-                            <span className="text-[11px] text-slate-400 font-mono">3–10 chars</span>
+                            <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">Permanent</span>
                           </div>
                           <div className="relative">
                             <span className="absolute left-3.5 top-2.5 text-xs text-slate-400 font-mono">@</span>
                             <input
                               type="text"
-                              value={editForm.username}
-                              onChange={(e) => setEditForm({ ...editForm, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 10) })}
-                              maxLength={10}
-                              required
-                              className="w-full pl-8 pr-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900"
+                              value={developerProfile.username || editForm.username}
+                              readOnly
+                              disabled
+                              className="w-full pl-8 pr-3.5 py-2 rounded-xl bg-slate-100 border border-slate-200 text-xs sm:text-sm text-slate-500 font-mono cursor-not-allowed select-none"
                             />
                           </div>
                         </div>
