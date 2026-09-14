@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/server-session";
 import { getGithubAccessToken, fetchGithubProfile, getCachedGithubProfile, saveGithubProfile } from "@/lib/github";
+import { resolveCanonicalProfileId } from "@/lib/auth/profile-id";
 
 export async function GET(req: NextRequest) {
   try {
@@ -8,31 +9,41 @@ export async function GET(req: NextRequest) {
     const queryUsername = searchParams.get("username")?.trim().replace(/^@/, "");
     const user = await getSessionUser(req);
 
-    const userId = user?.id;
-    const targetUsername = queryUsername || user?.username;
+    // The Better Auth session id (used only to look up the linked GitHub
+    // OAuth token) and the canonical public.profiles UUID (used for all
+    // persistence/cache reads) are deliberately kept separate — see
+    // src/lib/auth/profile-id.ts.
+    const betterAuthUserId = user?.id;
+    const canonicalProfileId = betterAuthUserId ? resolveCanonicalProfileId(betterAuthUserId) : undefined;
 
-    if (!targetUsername && !userId) {
+    if (!queryUsername && !betterAuthUserId) {
       return NextResponse.json(
         { error: "Username parameter or authenticated session is required" },
         { status: 400 }
       );
     }
 
-    // 1. Check cache first if userId is present
-    if (userId) {
-      const cached = await getCachedGithubProfile(userId);
-      if (cached && !queryUsername) {
+    const isSelfLookup = !queryUsername && Boolean(betterAuthUserId);
+
+    // 1. Check cache first for the caller's own linked profile
+    if (isSelfLookup && canonicalProfileId) {
+      const cached = await getCachedGithubProfile(canonicalProfileId);
+      if (cached) {
         return NextResponse.json(cached, { status: 200 });
       }
     }
 
-    // 2. Fetch fresh profile
-    const token = userId ? await getGithubAccessToken(userId) : null;
-    const profile = await fetchGithubProfile(token, queryUsername || (token ? undefined : targetUsername));
+    // 2. Fetch fresh profile. A self lookup (no explicit username) with a
+    // linked token resolves the actual authenticated GitHub identity via the
+    // GitHub /user endpoint — it never assumes the RateFactor username is
+    // also the GitHub login.
+    const token = betterAuthUserId ? await getGithubAccessToken(betterAuthUserId) : null;
+    const profile = await fetchGithubProfile(token, queryUsername || undefined);
 
-    // Only persist to the user's profile if fetching self
-    if (userId && (!queryUsername || queryUsername.toLowerCase() === user?.username?.toLowerCase())) {
-      await saveGithubProfile(userId, profile).catch(() => {});
+    // Only persist when this is genuinely the caller's own linked account
+    // (self lookup with a valid token) — never for a public username lookup.
+    if (isSelfLookup && token && canonicalProfileId) {
+      await saveGithubProfile(canonicalProfileId, profile).catch(() => {});
     }
 
     return NextResponse.json(profile, { status: 200 });

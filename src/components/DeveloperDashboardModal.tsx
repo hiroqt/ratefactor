@@ -8,6 +8,7 @@ import { Portfolio } from "@/types/portfolio";
 import { DeveloperProfile } from "@/types/profile";
 import { INITIAL_DEVELOPER_PROFILE } from "@/data/mockProfile";
 import { DeveloperDashboard } from "./dashboard/DeveloperDashboard";
+import { AuthUser } from "@/features/auth/hooks/useAuth";
 
 interface DeveloperDashboardModalProps {
   isOpen: boolean;
@@ -19,6 +20,8 @@ interface DeveloperDashboardModalProps {
   onDeletePortfolio: (id: string) => void;
   onOpenSubmitModal: () => void;
   onRequireAuth?: (intent: string) => void;
+  /** Passed through to DeveloperDashboard/ActivityHeatmap for authoritative GitHub link status. */
+  currentUser?: AuthUser | null;
 }
 
 export function DeveloperDashboardModal({
@@ -31,6 +34,7 @@ export function DeveloperDashboardModal({
   onDeletePortfolio,
   onOpenSubmitModal,
   onRequireAuth,
+  currentUser,
 }: DeveloperDashboardModalProps) {
   const [internalProfile, setInternalProfile] = useState<DeveloperProfile>(
     propProfile ?? INITIAL_DEVELOPER_PROFILE
@@ -129,6 +133,7 @@ export function DeveloperDashboardModal({
             }}
             onRequireAuth={onRequireAuth}
             onClose={onClose}
+            currentUser={currentUser}
           />
         </div>
 

@@ -2,6 +2,14 @@ import { pool } from "@/lib/auth/better-auth";
 
 let tablesInitialized = false;
 
+function logDbError(context: string, err: any) {
+  const code = typeof err?.code === "string" ? err.code : "unknown";
+  const message = typeof err?.message === "string"
+    ? err.message.replace(/postgres(?:ql)?:\/\/\S+/gi, "[redacted]")
+    : "Database query failed";
+  console.warn(`[github db] ${context} (${code}): ${message}`);
+}
+
 /**
  * Initializes GitHub cache tables if they don't already exist.
  * Runs idempotently in the background.
@@ -114,12 +122,14 @@ export async function safeDbQuery<T = any>(
         try {
           const res = await pool.query(queryText, params);
           return res as any;
-        } catch {
+        } catch (retryErr) {
+          logDbError("query retry failed", retryErr);
           return null;
         }
       }
       return null;
     }
+    logDbError("query failed", err);
     return null;
   }
 }

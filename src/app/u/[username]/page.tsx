@@ -1077,7 +1077,7 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
                   </section>
 
                   {/* 2. GitHub-Style Activity / Contribution Heatmap */}
-                  <ActivityHeatmap profile={targetProfile} readOnly={!isOwner} />
+                  <ActivityHeatmap profile={targetProfile} readOnly={!isOwner} currentUser={currentUser} />
 
                   {/* 3. GitHub Profile README.md Card (if present) */}
                   {targetProfile.readmeMarkdown && targetProfile.readmeMarkdown.trim() && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { DeveloperProfile, UserStatus } from "@/types/profile";
 import { INITIAL_DEVELOPER_PROFILE } from "@/data/mockProfile";
 import { AuthUser } from "@/features/auth/hooks/useAuth";
@@ -15,8 +15,6 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
     }
     return INITIAL_DEVELOPER_PROFILE;
   });
-
-  const lastSyncedHandleRef = useRef<string | null>(null);
 
   // Load from localStorage on mount and sanitize any legacy placeholder strings
   useEffect(() => {
@@ -77,7 +75,6 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
   useEffect(() => {
     if (currentUser === null) {
       memoryProfileCache = null;
-      lastSyncedHandleRef.current = null;
       try {
         localStorage.removeItem("ratefactor_dev_profile");
       } catch {}
@@ -132,62 +129,12 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
         return updated;
       });
 
-      // Sync GitHub details ONLY when the user has explicitly linked their GitHub account in settings
-      const extractGithubUsername = (urlOrHandle?: string) => {
-        if (!urlOrHandle) return "";
-        return urlOrHandle
-          .replace(/^https?:\/\/github\.com\//i, "")
-          .replace(/\/$/, "")
-          .replace(/^@/, "")
-          .trim();
-      };
-
-      const explicitGithub =
-        developerProfile.githubSync?.connected && developerProfile.githubSync?.username && developerProfile.githubSync.username !== "developer"
-          ? developerProfile.githubSync.username.trim().replace(/^@/, "")
-          : extractGithubUsername(developerProfile.github);
-
-      // Only fetch contributions if user explicitly connected GitHub Sync and provided a valid handle
-      if (
-        developerProfile.githubSync?.connected &&
-        explicitGithub &&
-        explicitGithub !== "user-default" &&
-        explicitGithub !== "developer" &&
-        lastSyncedHandleRef.current !== explicitGithub
-      ) {
-        lastSyncedHandleRef.current = explicitGithub;
-        fetch(`/api/github/contributions?username=${encodeURIComponent(explicitGithub)}`)
-          .then((res) => (res.ok ? res.json() : null))
-          .then((data) => {
-            if (data?.profile) {
-              setDeveloperProfile((prev) => {
-                const updated: DeveloperProfile = {
-                  ...prev,
-                  github: prev.github || `https://github.com/${explicitGithub}`,
-                  githubSync: {
-                    connected: true,
-                    username: data.username || explicitGithub,
-                    avatarUrl: data.profile.avatar,
-                    profileUrl: data.profile.profileUrl || `https://github.com/${explicitGithub}`,
-                    totalContributions: data.totalContributions,
-                    currentStreak: data.currentStreak,
-                    longestStreak: data.longestStreak,
-                    publicRepos: data.profile.publicRepos,
-                    followers: data.profile.followers,
-                    lastSyncedAt: data.syncedAt || "Just now",
-                  },
-                };
-                try {
-                  localStorage.setItem("ratefactor_dev_profile", JSON.stringify(updated));
-                } catch (e) {}
-                return updated;
-              });
-            }
-          })
-          .catch(() => {});
-      }
+      // GitHub connection/sync itself is no longer driven from here: it's
+      // resolved authoritatively from Better Auth's linked-account state
+      // (see useGithubConnection), not from this profile's cached
+      // githubSync.connected flag, which is a display cache only.
     }
-  }, [currentUser?.username, currentUser?.name, currentUser?.avatar, currentUser?.role, developerProfile.github, developerProfile.githubSync?.connected]);
+  }, [currentUser?.username, currentUser?.name, currentUser?.avatar, currentUser?.role]);
 
 
   const updateProfile = useCallback((updated: DeveloperProfile) => {

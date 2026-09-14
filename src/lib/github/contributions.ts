@@ -111,9 +111,12 @@ export async function fetchGithubContributions(
   bypassCache = false
 ): Promise<GithubContributionsData> {
   const targetUsername = (fallbackUsername || "").trim().replace(/^@/, "");
-  const cacheKey = `contributions:${(targetUsername || "viewer").toLowerCase()}`;
+  // Authenticated self lookups (no target username) bypass the in-memory
+  // cache entirely — see the matching comment in profile.ts for why a
+  // shared "viewer" slot would leak between users.
+  const cacheKey = targetUsername ? `contributions:${targetUsername.toLowerCase()}` : null;
 
-  if (!bypassCache) {
+  if (!bypassCache && cacheKey) {
     const cached = githubCache.get<GithubContributionsData>(cacheKey);
     if (cached) {
       return cached;
@@ -124,47 +127,52 @@ export async function fetchGithubContributions(
   let totalContributions = 0;
 
   // 1. GraphQL API Query
-  const graphqlQuery = `
-    query($login: String) {
-      user(login: $login) {
-        contributionsCollection {
-          contributionCalendar {
-            totalContributions
-            weeks {
-              contributionDays {
-                contributionCount
-                date
-                contributionLevel
+  const graphqlQuery = targetUsername
+    ? `
+      query($login: String!) {
+        user(login: $login) {
+          contributionsCollection {
+            contributionCalendar {
+              totalContributions
+              weeks {
+                contributionDays {
+                  contributionCount
+                  date
+                  contributionLevel
+                }
               }
             }
           }
         }
       }
-      viewer {
-        login
-        contributionsCollection {
-          contributionCalendar {
-            totalContributions
-            weeks {
-              contributionDays {
-                contributionCount
-                date
-                contributionLevel
+    `
+    : `
+      query {
+        viewer {
+          login
+          contributionsCollection {
+            contributionCalendar {
+              totalContributions
+              weeks {
+                contributionDays {
+                  contributionCount
+                  date
+                  contributionLevel
+                }
               }
             }
           }
         }
       }
-    }
-  `;
+    `;
 
   if (token) {
     try {
       const variables = targetUsername ? { login: targetUsername } : {};
       const data: any = await githubGraphQL(token, graphqlQuery, variables);
-      const calendar =
-        data?.user?.contributionsCollection?.contributionCalendar ||
-        data?.viewer?.contributionsCollection?.contributionCalendar;
+      const calendar = targetUsername
+        ? data?.user?.contributionsCollection?.contributionCalendar
+        : data?.viewer?.contributionsCollection?.contributionCalendar;
 
       if (calendar && Array.isArray(calendar.weeks)) {
         totalContributions = calendar.totalContributions || 0;
@@ -205,6 +213,16 @@ export async function fetchGithubContributions(
     } catch {
       // Fallback
     }
+  }
+
+  // An authenticated self lookup (no target username) has no scraping
+  // fallback available — a failed/empty GraphQL result here means the fetch
+  // genuinely failed, not that the viewer has zero contributions (a real
+  // zero-contribution year still returns a populated `weeks` calendar).
+  // Propagate the failure instead of silently falling through to a
+  // fabricated all-zero heatmap.
+  if (!targetUsername && token && days.length === 0) {
+    throw new Error("Failed to fetch authenticated GitHub contributions.");
   }
 
   // 2. Fallback to GitHub SVG/HTML scraping endpoint if GraphQL failed
@@ -272,23 +290,31 @@ export async function fetchGithubContributions(
     lastSyncedAt: new Date().toISOString(),
   };
 
-  githubCache.set(cacheKey, result, CACHE_TTL.CONTRIBUTIONS);
+  if (cacheKey) githubCache.set(cacheKey, result, CACHE_TTL.CONTRIBUTIONS);
   return result;
 }
 
 /**
- * Saves and caches contributions in PostgreSQL with error suppression.
+ * Saves and caches contributions in PostgreSQL safely.
+ * `userId` must be the canonical public.profiles UUID (see
+ * resolveCanonicalProfileId in src/lib/auth/profile-id.ts), not the Better
+ * Auth TEXT user id.
+ *
+ * Returns whether the summary row and every daily row were successfully
+ * written, so callers can distinguish a real persistence failure from
+ * success instead of assuming success just because fresh data was fetched.
  */
 export async function saveGithubContributions(
   userId: string,
   data: GithubContributionsData
-): Promise<void> {
-  if (!userId || data.days.length === 0) return;
+): Promise<boolean> {
+  if (!userId || data.days.length === 0) return false;
 
   const currentYear = new Date().getFullYear();
+  let allSucceeded = true;
 
   // 1. Save summary
-  await safeDbQuery(
+  const summaryRes = await safeDbQuery(
     `INSERT INTO public.github_contribution_summaries (
       user_id, year, total_contributions, current_streak, longest_streak, last_synced_at, updated_at
     ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
@@ -306,10 +332,11 @@ export async function saveGithubContributions(
       data.longestStreak,
     ]
   );
+  if (summaryRes === null) allSucceeded = false;
 
   // 2. Batch upsert daily counts
   for (const d of data.days) {
-    await safeDbQuery(
+    const dayRes = await safeDbQuery(
       `INSERT INTO public.github_contributions (user_id, date, contribution_count, updated_at)
        VALUES ($1, $2, $3, NOW())
        ON CONFLICT (user_id, date) DO UPDATE SET
@@ -317,7 +344,10 @@ export async function saveGithubContributions(
          updated_at = NOW()`,
       [userId, d.date, d.count]
     );
+    if (dayRes === null) allSucceeded = false;
   }
+
+  return allSucceeded;
 }
 
 /**

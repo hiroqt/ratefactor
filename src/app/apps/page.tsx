@@ -218,6 +218,7 @@ export default function AppsPage() {
           setIsSubmitModalOpen(true);
         }}
         onRequireAuth={requireAuth}
+        currentUser={currentUser}
       />
 
       <AuthModal
