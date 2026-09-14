@@ -67,7 +67,10 @@ BEGIN
 
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public';
+
+REVOKE EXECUTE ON FUNCTION public.sync_ratings() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.sync_ratings() TO postgres, service_role;
 
 -- 3. Reconcile existing rows: public.ratings and public.likes are the source of truth.
 -- Any portfolio previously seeded with the fabricated 5.0/1-review/1-like baseline
@@ -138,7 +141,10 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public';
+
+REVOKE EXECUTE ON FUNCTION public.prevent_self_rating() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.prevent_self_rating() TO postgres, service_role;
 
 DROP TRIGGER IF EXISTS tr_prevent_self_rating ON public.ratings;
 CREATE TRIGGER tr_prevent_self_rating

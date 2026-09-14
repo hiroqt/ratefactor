@@ -395,7 +395,7 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
         onSelectPortfolioById={handleSelectPortfolioById}
         onOpenSubmitModal={() => {
           if (!currentUser) {
-            requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
+            requireAuth("Sign in with Google or GitHub to submit a developer portfolio.");
             return;
           }
           setIsSubmitModalOpen(true);
@@ -410,7 +410,7 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
         portfolios={portfolios}
         onVisitUser={setVisitedUser}
         onOpenAuthModal={() =>
-          requireAuth("Sign in with GitHub or Email to access developer features.")
+          requireAuth("Sign in with Google or GitHub to access developer features.")
         }
         onSignOut={handleSignOut}
       />

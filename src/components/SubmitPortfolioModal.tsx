@@ -267,7 +267,7 @@ export function SubmitPortfolioModal({
 
     if (!currentUser) {
       setError("You must be signed in with an active account to submit a developer portfolio.");
-      onRequireAuth?.("Sign in with GitHub or Email to submit a developer portfolio.");
+      onRequireAuth?.("Sign in with Google or GitHub to submit a developer portfolio.");
       return;
     }
 

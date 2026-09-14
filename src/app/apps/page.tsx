@@ -118,7 +118,7 @@ export default function AppsPage() {
         onSelectPortfolioById={handleSelectPortfolioById}
         onOpenSubmitModal={() => {
           if (!currentUser) {
-            requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
+            requireAuth("Sign in with Google or GitHub to submit a developer portfolio.");
             return;
           }
           setIsSubmitModalOpen(true);
@@ -135,7 +135,7 @@ export default function AppsPage() {
         portfolios={portfolios}
         onVisitUser={setVisitedUser}
         onOpenAuthModal={() =>
-          requireAuth("Sign in with GitHub or Email to access your developer portfolio.")
+          requireAuth("Sign in with Google or GitHub to access your developer portfolio.")
         }
         onSignOut={handleSignOut}
       />
@@ -149,7 +149,7 @@ export default function AppsPage() {
           onReact={handleReact}
           onOpenSubmitModal={() => {
             if (!currentUser) {
-              requireAuth("Sign in with GitHub or Email to submit an app.");
+              requireAuth("Sign in with Google or GitHub to submit an app.");
               return;
             }
             setIsSubmitModalOpen(true);
@@ -211,7 +211,7 @@ export default function AppsPage() {
         onDeletePortfolio={handleDeletePortfolio}
         onOpenSubmitModal={() => {
           if (!currentUser) {
-            requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
+            requireAuth("Sign in with Google or GitHub to submit a developer portfolio.");
             return;
           }
           setIsSubmitModalOpen(true);

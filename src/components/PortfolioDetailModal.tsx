@@ -6,6 +6,7 @@ import {
   X, 
   ExternalLink, 
   Github, 
+  Google, 
   Star, 
   Heart, 
   MessageSquare, 
@@ -152,7 +153,7 @@ export function PortfolioDetailModal({
 
   const handleLike = () => {
     if (!currentUser) {
-      onRequireAuth?.("Sign in with GitHub or Email to heart and like portfolios.");
+      onRequireAuth?.("Sign in with Google or GitHub to heart and like portfolios.");
       return;
     }
     const nextState = !isLiked;
@@ -168,7 +169,7 @@ export function PortfolioDetailModal({
 
   const handleReact = (emojiName: string) => {
     if (!currentUser) {
-      onRequireAuth?.("Sign in with GitHub or Email to react to developer portfolios.");
+      onRequireAuth?.("Sign in with Google or GitHub to react to developer portfolios.");
       return;
     }
     if (onReact) {
@@ -191,7 +192,7 @@ export function PortfolioDetailModal({
     setCommentError(null);
 
     if (!currentUser) {
-      onRequireAuth?.("Sign in with GitHub or Email to submit critique and join the discussion.");
+      onRequireAuth?.("Sign in with Google or GitHub to submit critique and join the discussion.");
       return;
     }
 
@@ -230,7 +231,7 @@ export function PortfolioDetailModal({
 
   const handleCriteriaRate = (key: keyof RatingBreakdown, value: number) => {
     if (!currentUser) {
-      onRequireAuth?.("Sign in with GitHub or Email to rate developer portfolios.");
+      onRequireAuth?.("Sign in with Google or GitHub to rate developer portfolios.");
       return;
     }
     if (isOwnPortfolio) return;
@@ -710,15 +711,26 @@ export function PortfolioDetailModal({
                 )}
 
                 {!currentUser && (
-                  <div className="p-3 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-300 text-xs flex items-center justify-between">
-                    <span>You are browsing as a guest. Sign in with GitHub or Email to post peer critiques and rating breakdown.</span>
-                    <button
-                      type="button"
-                      onClick={() => onRequireAuth?.("Sign in with GitHub or Email to join developer discussions.")}
-                      className="px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-medium text-[11px] shrink-0"
-                    >
-                      Sign In
-                    </button>
+                  <div className="p-3 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-300 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                    <span>You are browsing as a guest. Sign in to post peer critiques and rating breakdown.</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => onRequireAuth?.("Sign in with Google to join developer discussions.")}
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 font-medium text-[11px] inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                      >
+                        <Google className="w-3 h-3" />
+                        <span>Continue with Google</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onRequireAuth?.("Sign in with GitHub to join developer discussions.")}
+                        className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-black text-white font-medium text-[11px] inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                      >
+                        <Github className="w-3 h-3" />
+                        <span>Continue with GitHub</span>
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -759,7 +771,7 @@ export function PortfolioDetailModal({
                     placeholder={
                       currentUser
                         ? "Leave technical critique, query architectural choices, or compliment craft (min 10 characters)..."
-                        : "Sign in with GitHub or Email to post comments and join technical critique..."
+                        : "Sign in with Google or GitHub to post comments and join technical critique..."
                     }
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}

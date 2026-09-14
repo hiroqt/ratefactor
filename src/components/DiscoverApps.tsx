@@ -401,16 +401,33 @@ export function DiscoverApps({
 
         {totalApps === 0 ? (
           <EmptyState
-            title="No portfolios match your criteria"
-            description="Try choosing a different domain category, clearing your search query, or submit the first portfolio in this domain!"
-            action={{
-              label: "Reset Filters",
-              onClick: () => {
-                setActiveCategory("All");
-                setSearchQuery("");
-                setCurrentPage(1);
-              },
-            }}
+            title={
+              portfolios.length === 0
+                ? "No developer portfolios submitted yet"
+                : "No portfolios match your criteria"
+            }
+            description={
+              portfolios.length === 0
+                ? "Be the first developer to showcase your codebase! Submit your portfolio to receive community ratings and peer critiques."
+                : "Try choosing a different domain category, clearing your search query, or submit the first portfolio in this domain!"
+            }
+            action={
+              portfolios.length === 0
+                ? onOpenSubmitModal
+                  ? {
+                      label: "Submit Portfolio",
+                      onClick: onOpenSubmitModal,
+                    }
+                  : undefined
+                : {
+                    label: "Reset Filters",
+                    onClick: () => {
+                      setActiveCategory("All");
+                      setSearchQuery("");
+                      setCurrentPage(1);
+                    },
+                  }
+            }
             className="my-8"
           />
         ) : viewMode === "grid3" ? (

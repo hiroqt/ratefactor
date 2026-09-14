@@ -19,7 +19,9 @@ import {
   PlusCircle,
   Bookmark,
   ChevronDown,
-  ShieldCheck
+  ShieldCheck,
+  Google,
+  Github
 } from "@/components/ui/icons";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
@@ -776,16 +778,30 @@ export function Navbar({
                   </button>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    onOpenAuthModal?.();
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white font-medium text-xs shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
-                >
-                  <span>Sign In with GitHub / Email</span>
-                </button>
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      onOpenAuthModal?.();
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-900 font-semibold text-xs border border-slate-200 shadow-2xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Google className="w-3.5 h-3.5 shrink-0" />
+                    <span>Continue with Google</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      onOpenAuthModal?.();
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white font-semibold text-xs shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Github className="w-3.5 h-3.5 shrink-0" />
+                    <span>Continue with GitHub</span>
+                  </button>
+                </div>
               )}
 
               {/* Navigation Links */}

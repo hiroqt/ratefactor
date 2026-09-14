@@ -428,7 +428,7 @@ BEGIN
 
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public';
 
 DROP TRIGGER IF EXISTS tr_sync_ratings ON public.ratings;
 CREATE TRIGGER tr_sync_ratings
@@ -458,7 +458,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public';
 
 DROP TRIGGER IF EXISTS tr_prevent_self_rating ON public.ratings;
 CREATE TRIGGER tr_prevent_self_rating

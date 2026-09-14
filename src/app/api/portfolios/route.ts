@@ -125,7 +125,7 @@ export async function GET(req: NextRequest) {
         } catch {}
       }
 
-      if (dbRes.rows && dbRes.rows.length > 0) {
+      if (dbRes.rows) {
         const dbPortfolios: Portfolio[] = dbRes.rows.map((row) => {
           const pid = row.id;
           const comments = dbCommentsMap.get(pid) || portfolioComments.get(pid) || [];
@@ -172,15 +172,7 @@ export async function GET(req: NextRequest) {
           };
         });
 
-        // Merge DB rows into dynamicPortfolios without duplicates
-        const map = new Map<string, Portfolio>();
-        dbPortfolios.forEach((p) => map.set(p.id, p));
-        dynamicPortfolios.forEach((p) => {
-          if (!map.has(p.id)) {
-            map.set(p.id, p);
-          }
-        });
-        dynamicPortfolios = Array.from(map.values());
+        dynamicPortfolios = dbPortfolios;
         setDynamicPortfolios(dynamicPortfolios);
       }
     } catch {

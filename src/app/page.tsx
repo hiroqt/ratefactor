@@ -8,7 +8,7 @@ import { HeroSection } from "@/components/HeroSection";
 import { ShowcaseBanner } from "@/components/ShowcaseBanner";
 import { usePortfolios } from "@/features/portfolios/hooks/usePortfolios";
 import { useDeveloperProfile } from "@/features/dashboard/hooks/useDeveloperProfile";
-import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useAuth, AuthModal } from "@/features/auth";
 import { useNotifications } from "@/features/notifications";
 import { useToast } from "@/hooks/useToast";
 import { Portfolio, PortfolioCategory } from "@/types/portfolio";
@@ -33,10 +33,6 @@ const DeveloperDashboardModal = dynamic(
 );
 const DeveloperDashboard = dynamic(
   () => import("@/components/dashboard/DeveloperDashboard").then((m) => m.DeveloperDashboard),
-  { ssr: false }
-);
-const AuthModal = dynamic(
-  () => import("@/components/AuthModal").then((m) => m.AuthModal),
   { ssr: false }
 );
 const PublicProfileModal = dynamic(
@@ -186,7 +182,7 @@ export default function Home() {
         onSelectPortfolioById={handleSelectPortfolioById}
         onOpenSubmitModal={() => {
           if (!currentUser) {
-            requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
+            requireAuth("Sign in with Google or GitHub to submit a developer portfolio.");
             return;
           }
           setIsSubmitModalOpen(true);
@@ -208,7 +204,7 @@ export default function Home() {
         portfolios={portfolios}
         onVisitUser={setVisitedUser}
         onOpenAuthModal={() =>
-          requireAuth("Sign in with GitHub or Email to access your developer portfolio.")
+          requireAuth("Sign in with Google or GitHub to access your developer portfolio.")
         }
         onSignOut={handleSignOut}
       />
@@ -243,7 +239,7 @@ export default function Home() {
                 onDeletePortfolio={handleDeletePortfolio}
                 onOpenSubmitModal={() => {
                   if (!currentUser) {
-                    requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
+                    requireAuth("Sign in with Google or GitHub to submit a developer portfolio.");
                     return;
                   }
                   setIsSubmitModalOpen(true);
@@ -262,7 +258,7 @@ export default function Home() {
               onReact={handleReact}
               onOpenSubmitModal={() => {
                 if (!currentUser) {
-                  requireAuth("Sign in with GitHub or Email to submit an app.");
+                  requireAuth("Sign in with Google or GitHub to submit an app.");
                   return;
                 }
                 setIsSubmitModalOpen(true);
@@ -279,7 +275,7 @@ export default function Home() {
                 onInspectShowcase={(p) => setSelectedPortfolio(p)}
                 onSubmitClick={() => {
                   if (!currentUser) {
-                    requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
+                    requireAuth("Sign in with Google or GitHub to submit a developer portfolio.");
                     return;
                   }
                   setIsSubmitModalOpen(true);
@@ -372,7 +368,7 @@ export default function Home() {
           onDeletePortfolio={handleDeletePortfolio}
           onOpenSubmitModal={() => {
             if (!currentUser) {
-              requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
+              requireAuth("Sign in with Google or GitHub to submit a developer portfolio.");
               return;
             }
             setIsSubmitModalOpen(true);
@@ -381,7 +377,7 @@ export default function Home() {
         />
       )}
 
-      {/* RBAC Multi-Factor Authentication & OTP Modal */}
+      {/* OAuth Authentication Modal (Google & GitHub) */}
       {isAuthModalOpen && (
         <AuthModal
           isOpen={isAuthModalOpen}

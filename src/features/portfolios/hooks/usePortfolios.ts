@@ -134,6 +134,12 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
             p &&
             p.id &&
             !p.id.startsWith("app-") &&
+            !p.id.startsWith("perf-systems-engine-") &&
+            !p.id.startsWith("nexus-hyper-scale-engine-") &&
+            !p.id.startsWith("quantum-state-manager-") &&
+            !p.id.startsWith("kube-vector-stream-") &&
+            !p.id.startsWith("pixel-forge-studio-") &&
+            !p.id.startsWith("aura-mesh-engine-") &&
             p.id !== "hyperion-lsm" &&
             p.id !== "kubelens-tui" &&
             p.id !== "zenith-state"
@@ -175,6 +181,12 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
               p &&
               p.id &&
               !p.id.startsWith("app-") &&
+              !p.id.startsWith("perf-systems-engine-") &&
+              !p.id.startsWith("nexus-hyper-scale-engine-") &&
+              !p.id.startsWith("quantum-state-manager-") &&
+              !p.id.startsWith("kube-vector-stream-") &&
+              !p.id.startsWith("pixel-forge-studio-") &&
+              !p.id.startsWith("aura-mesh-engine-") &&
               p.id !== "hyperion-lsm" &&
               p.id !== "kubelens-tui" &&
               p.id !== "zenith-state"
@@ -354,7 +366,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
   const handleLikeToggle = useCallback(
     (portfolioId: string, isLiked?: boolean) => {
       if (!options?.currentUser) {
-        options?.onRequireAuth?.("Sign in with GitHub or Email to heart and like portfolios.");
+        options?.onRequireAuth?.("Sign in with Google or GitHub to heart and like portfolios.");
         return;
       }
 
@@ -443,7 +455,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
   const handleReact = useCallback(
     (portfolioId: string, emojiName: string) => {
       if (!options?.currentUser) {
-        options?.onRequireAuth?.("Sign in with GitHub or Email to react to developer portfolios.");
+        options?.onRequireAuth?.("Sign in with Google or GitHub to react to developer portfolios.");
         return;
       }
 
@@ -540,7 +552,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
   const handleRatePortfolio = useCallback(
     (portfolioId: string, ratingScore: number, breakdown: RatingBreakdown) => {
       if (!options?.currentUser) {
-        options?.onRequireAuth?.("Sign in with GitHub or Email to rate developer portfolios.");
+        options?.onRequireAuth?.("Sign in with Google or GitHub to rate developer portfolios.");
         return;
       }
 
@@ -671,7 +683,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
   const handleAddComment = useCallback(
     (portfolioId: string, content: string, critiqueTag?: CritiqueTag | null) => {
       if (!options?.currentUser) {
-        options?.onRequireAuth?.("Sign in with GitHub or Email to post comments.");
+        options?.onRequireAuth?.("Sign in with Google or GitHub to post comments.");
         return;
       }
 

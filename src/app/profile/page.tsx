@@ -21,6 +21,7 @@ import {
   Trash2, 
   Globe, 
   Github, 
+  Google, 
   Twitter, 
   Linkedin, 
   FileText, 
@@ -416,7 +417,7 @@ function ProfilePageContent() {
         }}
         onOpenSubmitModal={() => {
           if (!currentUser) {
-            requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
+            requireAuth("Sign in with Google or GitHub to submit a developer portfolio.");
             return;
           }
           setIsSubmitModalOpen(true);
@@ -434,7 +435,7 @@ function ProfilePageContent() {
         portfolios={portfolios}
         onVisitUser={setVisitedUser}
         onOpenAuthModal={() =>
-          requireAuth("Sign in with GitHub or Email to access your developer portfolio.")
+          requireAuth("Sign in with Google or GitHub to access your developer portfolio.")
         }
         onSignOut={handleSignOut}
       />
@@ -739,7 +740,7 @@ function ProfilePageContent() {
                         type="button"
                         onClick={() => {
                           if (!currentUser) {
-                            requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
+                            requireAuth("Sign in with Google or GitHub to submit a developer portfolio.");
                             return;
                           }
                           setIsSubmitModalOpen(true);
@@ -762,7 +763,7 @@ function ProfilePageContent() {
                           type="button"
                           onClick={() => {
                             if (!currentUser) {
-                              requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
+                              requireAuth("Sign in with Google or GitHub to submit a developer portfolio.");
                               return;
                             }
                             setIsSubmitModalOpen(true);
@@ -865,7 +866,7 @@ function ProfilePageContent() {
                       onSelectPortfolio={(p) => setSelectedPortfolio(p)}
                       onOpenSubmitModal={() => {
                         if (!currentUser) {
-                          requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
+                          requireAuth("Sign in with Google or GitHub to submit a developer portfolio.");
                           return;
                         }
                         setIsSubmitModalOpen(true);
@@ -932,7 +933,7 @@ function ProfilePageContent() {
                     onDeletePortfolio={handleDeletePortfolio}
                     onOpenSubmitModal={() => {
                       if (!currentUser) {
-                        requireAuth("Sign in with GitHub or Email to submit a developer portfolio.");
+                        requireAuth("Sign in with Google or GitHub to submit a developer portfolio.");
                         return;
                       }
                       setIsSubmitModalOpen(true);
@@ -1055,14 +1056,24 @@ function ProfilePageContent() {
                       <p className="text-xs text-slate-500 max-w-sm mx-auto">
                         You must be signed in to configure your developer identity, skills, and README story.
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => requireAuth("Sign in with GitHub or Email to configure your developer identity.")}
-                        className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        <Github className="w-3.5 h-3.5" />
-                        <span>Sign In to Configure</span>
-                      </button>
+                      <div className="flex items-center justify-center gap-2.5 flex-wrap pt-1">
+                        <button
+                          type="button"
+                          onClick={() => requireAuth("Sign in with Google to configure your developer identity.")}
+                          className="px-4 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 hover:border-slate-300 text-xs font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <Google className="w-3.5 h-3.5" />
+                          <span>Continue with Google</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => requireAuth("Sign in with GitHub to configure your developer identity.")}
+                          className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <Github className="w-3.5 h-3.5" />
+                          <span>Continue with GitHub</span>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <form onSubmit={handleSaveEditProfile} className="space-y-5">
@@ -1276,14 +1287,24 @@ function ProfilePageContent() {
                       <p className="text-xs text-slate-500 max-w-sm mx-auto">
                         You are currently browsing as a guest. Sign in to view session credentials and security settings.
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => requireAuth("Sign in with GitHub or Email to manage your account session.")}
-                        className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        <Github className="w-3.5 h-3.5" />
-                        <span>Sign In to RateFactor</span>
-                      </button>
+                      <div className="flex items-center justify-center gap-2.5 flex-wrap pt-1">
+                        <button
+                          type="button"
+                          onClick={() => requireAuth("Sign in with Google to manage your account session.")}
+                          className="px-4 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 hover:border-slate-300 text-xs font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <Google className="w-3.5 h-3.5" />
+                          <span>Continue with Google</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => requireAuth("Sign in with GitHub to manage your account session.")}
+                          className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <Github className="w-3.5 h-3.5" />
+                          <span>Continue with GitHub</span>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-4">

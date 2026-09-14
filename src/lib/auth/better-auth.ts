@@ -82,6 +82,10 @@ export const auth = betterAuth({
       clientId: process.env.GITHUB_CLIENT_ID || "github-client-id-placeholder",
       clientSecret: process.env.GITHUB_CLIENT_SECRET || "github-client-secret-placeholder",
     },
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID || "google-client-id-placeholder",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "google-client-secret-placeholder",
+    },
   },
   plugins: [
     dash(apiKey ? { apiKey } : {}),
