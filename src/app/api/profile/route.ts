@@ -132,6 +132,8 @@ export async function GET(req: NextRequest) {
              p.id, p.full_name as name, p.username, p.avatar_url, p.role, p.onboarded, 
              p.bio, p.skills, p.available_for_hire, p.custom_hire_message, 
              p.company, p.location, p.website, p.github, p.twitter, p.linkedin,
+             p.pinned_portfolio_ids as "pinnedPortfolioIds", p.spotlight_portfolio_id as "spotlightPortfolioId",
+             p.status, p.readme_markdown as "readmeMarkdown",
              COALESCE(p.created_at, u."createdAt") as created_at
            FROM profiles p
            LEFT JOIN public."user" u ON (p.id = md5('ratefactor:' || u.id)::uuid OR p.id::text = u.id OR LOWER(p.username) = LOWER(REGEXP_REPLACE(u.name, '[^a-zA-Z0-9_-]', '', 'g')))
@@ -159,6 +161,10 @@ export async function GET(req: NextRequest) {
             github: row.github ?? profile.github,
             twitter: row.twitter ?? profile.twitter,
             linkedin: row.linkedin ?? profile.linkedin,
+            pinnedPortfolioIds: Array.isArray(row.pinnedPortfolioIds) ? row.pinnedPortfolioIds : (profile.pinnedPortfolioIds || []),
+            spotlightPortfolioId: row.spotlightPortfolioId || profile.spotlightPortfolioId,
+            status: row.status || profile.status,
+            readmeMarkdown: row.readmeMarkdown !== undefined ? row.readmeMarkdown : profile.readmeMarkdown,
             joinedDate: row.created_at ? new Date(row.created_at).toISOString() : profile.joinedDate,
           };
           userProfiles.set(requestedUsername.toLowerCase(), profile);
@@ -190,6 +196,8 @@ export async function GET(req: NextRequest) {
              p.id, COALESCE(NULLIF(p.full_name, ''), u.name) as name, p.username, COALESCE(NULLIF(p.avatar_url, ''), u.image) as avatar_url, p.role, p.onboarded, 
              p.bio, p.skills, p.available_for_hire, p.custom_hire_message, 
              p.company, p.location, p.website, p.github, p.twitter, p.linkedin,
+             p.pinned_portfolio_ids as "pinnedPortfolioIds", p.spotlight_portfolio_id as "spotlightPortfolioId",
+             p.status, p.readme_markdown as "readmeMarkdown",
              COALESCE(p.created_at, u."createdAt") as created_at
            FROM profiles p
            LEFT JOIN public."user" u ON (p.id = md5('ratefactor:' || u.id)::uuid OR p.id::text = u.id OR LOWER(p.username) = LOWER(REGEXP_REPLACE(u.name, '[^a-zA-Z0-9_-]', '', 'g')))
@@ -231,6 +239,10 @@ export async function GET(req: NextRequest) {
             github: row.github ?? profile.github,
             twitter: row.twitter ?? profile.twitter,
             linkedin: row.linkedin ?? profile.linkedin,
+            pinnedPortfolioIds: Array.isArray(row.pinnedPortfolioIds) ? row.pinnedPortfolioIds : (profile.pinnedPortfolioIds || []),
+            spotlightPortfolioId: row.spotlightPortfolioId || profile.spotlightPortfolioId,
+            status: row.status || profile.status,
+            readmeMarkdown: row.readmeMarkdown !== undefined ? row.readmeMarkdown : profile.readmeMarkdown,
             joinedDate: row.created_at
               ? new Date(row.created_at).toISOString()
               : (authUser.createdAt || profile.joinedDate),
@@ -447,7 +459,9 @@ export async function PATCH(req: NextRequest) {
       const pRes = await pool.query(
         `SELECT id, username, full_name as name, avatar_url as avatar, role, onboarded, 
                 bio, skills, available_for_hire, custom_hire_message, company, location, 
-                website, github, twitter, linkedin, created_at
+                website, github, twitter, linkedin,
+                pinned_portfolio_ids as "pinnedPortfolioIds", spotlight_portfolio_id as "spotlightPortfolioId",
+                status, readme_markdown as "readmeMarkdown", created_at
          FROM public.profiles
          WHERE id = md5('ratefactor:' || $1)::uuid
             OR id::text = $1
@@ -475,6 +489,10 @@ export async function PATCH(req: NextRequest) {
           github: profileRow.github ?? current.github,
           twitter: profileRow.twitter ?? current.twitter,
           linkedin: profileRow.linkedin ?? current.linkedin,
+          pinnedPortfolioIds: Array.isArray(profileRow.pinnedPortfolioIds) ? profileRow.pinnedPortfolioIds : current.pinnedPortfolioIds,
+          spotlightPortfolioId: profileRow.spotlightPortfolioId || current.spotlightPortfolioId,
+          status: profileRow.status || current.status,
+          readmeMarkdown: profileRow.readmeMarkdown !== undefined ? profileRow.readmeMarkdown : current.readmeMarkdown,
           joinedDate: profileRow.created_at ? new Date(profileRow.created_at).toISOString() : current.joinedDate,
         };
       }
@@ -508,6 +526,10 @@ export async function PATCH(req: NextRequest) {
       github: data.github !== undefined ? (data.github ?? "") : current.github,
       twitter: data.twitter !== undefined ? (data.twitter ?? "") : current.twitter,
       linkedin: data.linkedin !== undefined ? (data.linkedin ?? "") : current.linkedin,
+      pinnedPortfolioIds: data.pinnedPortfolioIds !== undefined ? data.pinnedPortfolioIds : current.pinnedPortfolioIds,
+      spotlightPortfolioId: data.spotlightPortfolioId !== undefined ? (data.spotlightPortfolioId || undefined) : current.spotlightPortfolioId,
+      status: data.status !== undefined ? data.status : current.status,
+      readmeMarkdown: data.readmeMarkdown !== undefined ? (data.readmeMarkdown ?? "") : current.readmeMarkdown,
       joinedDate:
         current.joinedDate && current.joinedDate !== "2026"
           ? current.joinedDate
@@ -584,6 +606,22 @@ export async function PATCH(req: NextRequest) {
         setClauses.push(`linkedin = $${paramIdx++}`);
         values.push(data.linkedin);
       }
+      if (data.pinnedPortfolioIds !== undefined) {
+        setClauses.push(`pinned_portfolio_ids = $${paramIdx++}`);
+        values.push(data.pinnedPortfolioIds);
+      }
+      if (data.spotlightPortfolioId !== undefined) {
+        setClauses.push(`spotlight_portfolio_id = $${paramIdx++}`);
+        values.push(data.spotlightPortfolioId || null);
+      }
+      if (data.status !== undefined) {
+        setClauses.push(`status = $${paramIdx++}`);
+        values.push(JSON.stringify(data.status));
+      }
+      if (data.readmeMarkdown !== undefined) {
+        setClauses.push(`readme_markdown = $${paramIdx++}`);
+        values.push(data.readmeMarkdown ?? "");
+      }
 
       if (setClauses.length > 1) {
         const authIdParam = paramIdx++;
@@ -603,10 +641,10 @@ export async function PATCH(req: NextRequest) {
             : null;
           await pool.query(
             `INSERT INTO public.profiles (
-              id, username, full_name, avatar_url, role, onboarded, bio, skills, available_for_hire, custom_hire_message, company, location, website, github, twitter, linkedin
+              id, username, full_name, avatar_url, role, onboarded, bio, skills, available_for_hire, custom_hire_message, company, location, website, github, twitter, linkedin, pinned_portfolio_ids, spotlight_portfolio_id, status, readme_markdown
             ) VALUES (
               COALESCE($1::uuid, md5('ratefactor:' || $2)::uuid),
-              $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+              $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
             ) ON CONFLICT (id) DO UPDATE SET
               full_name = EXCLUDED.full_name,
               role = EXCLUDED.role,
@@ -621,7 +659,11 @@ export async function PATCH(req: NextRequest) {
               website = EXCLUDED.website,
               github = EXCLUDED.github,
               twitter = EXCLUDED.twitter,
-              linkedin = EXCLUDED.linkedin`,
+              linkedin = EXCLUDED.linkedin,
+              pinned_portfolio_ids = EXCLUDED.pinned_portfolio_ids,
+              spotlight_portfolio_id = EXCLUDED.spotlight_portfolio_id,
+              status = EXCLUDED.status,
+              readme_markdown = EXCLUDED.readme_markdown`,
             [
               insertId,
               authUser.id,
@@ -640,6 +682,10 @@ export async function PATCH(req: NextRequest) {
               updated.github || "",
               updated.twitter || "",
               updated.linkedin || "",
+              updated.pinnedPortfolioIds || [],
+              updated.spotlightPortfolioId || null,
+              JSON.stringify(updated.status || {}),
+              updated.readmeMarkdown || "",
             ]
           );
         }

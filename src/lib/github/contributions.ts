@@ -334,18 +334,18 @@ export async function saveGithubContributions(
   );
   if (summaryRes === null) allSucceeded = false;
 
-  // 2. Batch upsert daily counts
-  for (const d of data.days) {
-    const dayRes = await safeDbQuery(
-      `INSERT INTO public.github_contributions (user_id, date, contribution_count, updated_at)
-       VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (user_id, date) DO UPDATE SET
-         contribution_count = EXCLUDED.contribution_count,
-         updated_at = NOW()`,
-      [userId, d.date, d.count]
-    );
-    if (dayRes === null) allSucceeded = false;
-  }
+  // 2. High-performance single batch upsert for daily counts using unnest
+  const dates = data.days.map((d) => d.date);
+  const counts = data.days.map((d) => d.count);
+  const batchRes = await safeDbQuery(
+    `INSERT INTO public.github_contributions (user_id, date, contribution_count, updated_at)
+     SELECT $1, unnest($2::date[]), unnest($3::int[]), NOW()
+     ON CONFLICT (user_id, date) DO UPDATE SET
+       contribution_count = EXCLUDED.contribution_count,
+       updated_at = NOW()`,
+    [userId, dates, counts]
+  );
+  if (batchRes === null) allSucceeded = false;
 
   return allSucceeded;
 }

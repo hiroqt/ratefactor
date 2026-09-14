@@ -1,8 +1,8 @@
 import { getGithubAccessToken } from "./client";
-import { fetchGithubProfile, saveGithubProfile, GithubProfileData } from "./profile";
-import { fetchGithubRepositories, saveGithubRepositories, GithubRepoData } from "./repositories";
-import { fetchGithubContributions, saveGithubContributions, GithubContributionsData } from "./contributions";
-import { fetchGithubReadme, saveGithubReadme, GithubReadmeData } from "./readme";
+import { fetchGithubProfile, saveGithubProfile, getCachedGithubProfile, GithubProfileData } from "./profile";
+import { fetchGithubRepositories, saveGithubRepositories, getCachedGithubRepositories, GithubRepoData } from "./repositories";
+import { fetchGithubContributions, saveGithubContributions, getCachedGithubContributions, GithubContributionsData } from "./contributions";
+import { fetchGithubReadme, saveGithubReadme, getCachedGithubReadme, GithubReadmeData } from "./readme";
 import { githubCache } from "./cache";
 import { resolveCanonicalProfileId } from "@/lib/auth/profile-id";
 
@@ -20,31 +20,51 @@ export interface GithubSyncResult {
 
 /**
  * Orchestrates full GitHub synchronization for the authenticated RateFactor
- * user's OWN linked GitHub account, bypassing cached entries to fetch the
- * freshest data. `betterAuthUserId` must be the actual signed-in session's
- * Better Auth user id — it is used to look up the linked GitHub OAuth token
- * (public."account", keyed by the Better Auth TEXT id) and, separately, is
- * mapped via resolveCanonicalProfileId() to the public.profiles UUID that
- * every github_* cache table's user_id column actually references. These two
- * ids must never be swapped.
- *
- * `overrideUsername` is for the anonymous/public-lookup path only (no
- * betterAuthUserId, no persistence) — never trust it as the identity of an
- * authenticated caller's own linked account.
+ * user's OWN linked GitHub account. When `force === false`, returns cached
+ * data from PostgreSQL/memory immediately if available.
+ * `betterAuthUserId` must be the actual signed-in session's Better Auth user id.
  */
 export async function syncGithubUser(
   betterAuthUserId: string | null,
-  overrideUsername?: string
+  overrideUsername?: string,
+  force = true
 ): Promise<GithubSyncResult> {
   const token = betterAuthUserId ? await getGithubAccessToken(betterAuthUserId).catch(() => null) : null;
 
-  // An authenticated caller with no resolvable token has no linked GitHub
-  // account to sync — this must fail immediately rather than falling
-  // through into the public/fallback fetch logic below (which would
-  // fabricate and potentially persist placeholder profile data, an empty
-  // repository list, and zero contributions under this user's real id).
   if (betterAuthUserId && !token) {
     throw new Error("No linked GitHub account was found for your session. Connect GitHub first.");
+  }
+
+  // Fast-path for page reload / hydration: return cached data immediately if available
+  if (betterAuthUserId && !force) {
+    const canonicalProfileId = resolveCanonicalProfileId(betterAuthUserId);
+    const [cachedProfile, cachedContributions, cachedRepos] = await Promise.all([
+      getCachedGithubProfile(canonicalProfileId).catch(() => null),
+      getCachedGithubContributions(canonicalProfileId).catch(() => null),
+      getCachedGithubRepositories(canonicalProfileId).catch(() => []),
+    ]);
+
+    if (cachedProfile && cachedContributions && cachedContributions.days && cachedContributions.days.length > 0) {
+      const readmeFullName = cachedProfile.username ? `${cachedProfile.username}/${cachedProfile.username}` : "";
+      const cachedReadme = readmeFullName
+        ? await getCachedGithubReadme(canonicalProfileId, readmeFullName).catch(() => null)
+        : null;
+
+      const syncedAt = cachedProfile.lastSyncedAt
+        ? new Date(cachedProfile.lastSyncedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+      return {
+        success: true,
+        username: cachedProfile.username || "developer",
+        profile: cachedProfile,
+        repositories: cachedRepos || [],
+        contributions: cachedContributions,
+        profileReadme: cachedReadme || undefined,
+        syncedAt,
+        persisted: true,
+      };
+    }
   }
 
   // Only an unauthenticated/public lookup may specify a username directly;

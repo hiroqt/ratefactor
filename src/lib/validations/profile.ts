@@ -128,6 +128,32 @@ export const profileUpdateSchema = z.object({
     .optional()
     .nullable()
     .or(z.literal("")),
+  pinnedPortfolioIds: z
+    .array(z.string().trim())
+    .max(6, "Cannot pin more than 6 portfolios")
+    .optional(),
+  spotlightPortfolioId: z
+    .string()
+    .trim()
+    .max(100)
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  status: z
+    .object({
+      emoji: z.string().default("⚡"),
+      message: z.string().max(100).default(""),
+      isBusy: z.boolean().optional(),
+      statusType: z.enum(["available", "busy", "focusing", "offline"]).optional(),
+      updatedAt: z.string().optional(),
+    })
+    .optional(),
+  readmeMarkdown: z
+    .string()
+    .max(10000, "README markdown must not exceed 10000 characters")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
 });
 
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;

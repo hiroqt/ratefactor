@@ -152,6 +152,10 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
                   ? p.joinedDate
                   : (currentUser.createdAt || (prev.joinedDate !== "2026" ? prev.joinedDate : undefined));
 
+              const serverPins = Array.isArray(p.pinnedPortfolioIds) ? p.pinnedPortfolioIds : [];
+              const authoritativePins = serverPins.length > 0 ? serverPins : (prev.pinnedPortfolioIds || []);
+              const authoritativeSpotlight = p.spotlightPortfolioId || prev.spotlightPortfolioId;
+
               const merged: DeveloperProfile = {
                 ...prev,
                 ...p,
@@ -160,6 +164,10 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
                 avatar: p.avatar || prev.avatar,
                 role: p.role || prev.role,
                 joinedDate: authoritativeJoinedDate || prev.joinedDate,
+                pinnedPortfolioIds: authoritativePins,
+                spotlightPortfolioId: authoritativeSpotlight,
+                status: p.status || prev.status,
+                readmeMarkdown: p.readmeMarkdown !== undefined ? p.readmeMarkdown : prev.readmeMarkdown,
               };
               memoryProfileCache = merged;
               try {
@@ -205,7 +213,35 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
     } catch (e) {
       // ignore
     }
-  }, []);
+
+    if (currentUser?.id) {
+      fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: updated.name,
+          avatar: updated.avatar,
+          role: updated.role,
+          bio: updated.bio,
+          skills: updated.skills,
+          availableForHire: updated.availableForHire,
+          customHireMessage: updated.customHireMessage,
+          company: updated.company,
+          location: updated.location,
+          website: updated.website,
+          github: updated.github,
+          twitter: updated.twitter,
+          linkedin: updated.linkedin,
+          pinnedPortfolioIds: updated.pinnedPortfolioIds,
+          spotlightPortfolioId: updated.spotlightPortfolioId || null,
+          status: updated.status,
+          readmeMarkdown: updated.readmeMarkdown,
+        }),
+      }).catch((err) => {
+        console.warn("[useDeveloperProfile] Failed to persist profile update to API:", err);
+      });
+    }
+  }, [currentUser?.id]);
 
   const updateStatus = useCallback((status: UserStatus) => {
     setDeveloperProfile((prev) => {
@@ -217,7 +253,17 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
       }
       return updated;
     });
-  }, []);
+
+    if (currentUser?.id) {
+      fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      }).catch((err) => {
+        console.warn("[useDeveloperProfile] Failed to persist status update to API:", err);
+      });
+    }
+  }, [currentUser?.id]);
 
   const updateBio = useCallback((bio: string, readmeMarkdown?: string) => {
     setDeveloperProfile((prev) => {
@@ -233,9 +279,23 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
       }
       return updated;
     });
-  }, []);
+
+    if (currentUser?.id) {
+      fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bio,
+          ...(readmeMarkdown !== undefined ? { readmeMarkdown } : {}),
+        }),
+      }).catch((err) => {
+        console.warn("[useDeveloperProfile] Failed to persist bio update to API:", err);
+      });
+    }
+  }, [currentUser?.id]);
 
   const updatePins = useCallback((pinnedPortfolioIds: string[], spotlightPortfolioId?: string) => {
+    const validSpotlight = spotlightPortfolioId || pinnedPortfolioIds[0] || null;
     setDeveloperProfile((prev) => {
       const updated = {
         ...prev,
@@ -249,7 +309,20 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
       }
       return updated;
     });
-  }, []);
+
+    if (currentUser?.id) {
+      fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pinnedPortfolioIds,
+          spotlightPortfolioId: validSpotlight,
+        }),
+      }).catch((err) => {
+        console.warn("[useDeveloperProfile] Failed to persist pinned portfolios to API:", err);
+      });
+    }
+  }, [currentUser?.id]);
 
   return {
     developerProfile,

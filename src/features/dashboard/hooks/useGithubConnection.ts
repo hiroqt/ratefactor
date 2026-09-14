@@ -33,36 +33,57 @@ export type GithubConnectionStatus = "loading" | "connected" | "disconnected";
  * username. Those remain display/cache values only, populated here once the
  * authoritative check has actually confirmed a real linked account.
  */
+// Shared in-memory cache across route transitions
+const memoryGithubCache: Record<string, GithubConnectionData> = {};
+
+function getLocalGithubData(userId?: string | null): GithubConnectionData | null {
+  if (!userId || typeof window === "undefined") return null;
+  if (memoryGithubCache[userId]) return memoryGithubCache[userId];
+  try {
+    const raw = localStorage.getItem(`ratefactor_github_data_${userId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && parsed.username) {
+        memoryGithubCache[userId] = parsed;
+        return parsed;
+      }
+    }
+  } catch {}
+  return null;
+}
+
 export function useGithubConnection(currentUser?: AuthUser | null) {
-  const [status, setStatus] = useState<GithubConnectionStatus>(currentUser ? "loading" : "disconnected");
-  const [data, setData] = useState<GithubConnectionData | null>(null);
+  const [data, setData] = useState<GithubConnectionData | null>(() => getLocalGithubData(currentUser?.id));
+  const [status, setStatus] = useState<GithubConnectionStatus>(() => {
+    if (!currentUser) return "disconnected";
+    const cached = getLocalGithubData(currentUser.id);
+    if (cached) return "connected";
+    return "loading";
+  });
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [otherLinkedAccountsCount, setOtherLinkedAccountsCount] = useState(0);
-  // Bumped on every user-identity change. An in-flight request captures the
-  // generation it started with and discards its result if the generation has
-  // since moved on — this is what actually prevents a stale response (from a
-  // prior user, or from a React Strict Mode double-invoked effect) from
-  // overwriting current state, and it works without relying on effect
-  // cleanup timing the way a ref-based "already checked" guard would: that
-  // pattern breaks under Strict Mode's mount→cleanup→remount because the
-  // remount sees the guard already set and returns early, leaving status
-  // stuck on "loading" forever.
   const generationRef = useRef(0);
 
   const loadFresh = useCallback(async (force: boolean) => {
     const generation = generationRef.current;
-    setIsSyncing(true);
+    if (force) {
+      setIsSyncing(true);
+    }
     setSyncError(null);
     try {
-      const res = await fetch("/api/github/sync", { method: "POST" });
+      const res = await fetch(`/api/github/sync${force ? "?force=true" : ""}`, {
+        method: force ? "POST" : "GET",
+        headers: { "Content-Type": "application/json" },
+        ...(force ? { body: JSON.stringify({ force: true }) } : {}),
+      });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
         throw new Error(json?.error || "Could not refresh GitHub data.");
       }
       if (generation !== generationRef.current) return;
-      setData({
+      const nextData: GithubConnectionData = {
         username: json.username,
         avatarUrl: json.profile?.avatarUrl,
         profileUrl: json.profile?.profileUrl,
@@ -79,24 +100,25 @@ export function useGithubConnection(currentUser?: AuthUser | null) {
         website: json.profile?.website,
         twitter: json.profile?.twitter,
         linkedin: json.profile?.linkedin,
-      });
+      };
+      setData(nextData);
       setStatus("connected");
-      // A successful sync can still have partially failed to persist (e.g.
-      // one table write failed) — the fetch/refresh itself succeeded so this
-      // isn't a connection or fetch failure, but it's worth surfacing.
+      if (currentUser?.id) {
+        memoryGithubCache[currentUser.id] = nextData;
+        try {
+          localStorage.setItem(`ratefactor_github_data_${currentUser.id}`, JSON.stringify(nextData));
+        } catch {}
+      }
       if (json.persisted === false && json.error) {
         setSyncError(json.error);
       }
     } catch (err: any) {
       if (generation !== generationRef.current) return;
-      // A refresh/sync failure while GitHub is genuinely linked must not
-      // flip the UI to "disconnected" — connection truth and sync freshness
-      // are separate states. Keep showing whatever data we already have.
       setSyncError("Couldn't refresh GitHub right now. Showing previously synced data.");
     } finally {
       if (generation === generationRef.current) setIsSyncing(false);
     }
-  }, []);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     const generation = ++generationRef.current;
@@ -109,7 +131,13 @@ export function useGithubConnection(currentUser?: AuthUser | null) {
       return;
     }
 
-    setStatus("loading");
+    const cached = getLocalGithubData(currentUser.id);
+    if (cached) {
+      setData(cached);
+      setStatus("connected");
+    } else {
+      setStatus("loading");
+    }
     setSyncError(null);
 
     (async () => {
@@ -125,6 +153,12 @@ export function useGithubConnection(currentUser?: AuthUser | null) {
           setData(null);
           setAccountId(null);
           setOtherLinkedAccountsCount(accounts.length);
+          if (currentUser.id) {
+            delete memoryGithubCache[currentUser.id];
+            try {
+              localStorage.removeItem(`ratefactor_github_data_${currentUser.id}`);
+            } catch {}
+          }
           return;
         }
 
@@ -134,19 +168,16 @@ export function useGithubConnection(currentUser?: AuthUser | null) {
         await loadFresh(false);
       } catch {
         if (generation === generationRef.current) {
-          // Better Auth's account list itself is unreachable — we cannot
-          // authoritatively confirm a link either way. Do not claim
-          // "connected" without evidence.
-          setStatus("disconnected");
+          // If we have cached data, keep it connected rather than flipping to disconnected on transient auth error
+          if (!cached) {
+            setStatus("disconnected");
+          }
         }
       }
     })();
   }, [currentUser?.id, loadFresh]);
 
   const connect = useCallback(async () => {
-    // The user reaching this control is already authenticated (Google,
-    // GitHub, or email) — linkSocial attaches GitHub to that existing
-    // session instead of starting a brand new sign-in.
     await authClient.linkSocial({
       provider: "github",
       callbackURL: typeof window !== "undefined" ? window.location.href : "/",
@@ -157,31 +188,28 @@ export function useGithubConnection(currentUser?: AuthUser | null) {
 
   const disconnect = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
     if (!accountId) return { ok: false, error: "No linked GitHub account to disconnect." };
-    // Capture the generation before the async unlink call. If the session
-    // switches (logout/login as another user) while this request is still
-    // in flight, generationRef will have moved on by the time it resolves —
-    // that stale result must not clear or alter the NEW user's connection
-    // state, even though the unlink itself genuinely succeeded for the
-    // user who requested it.
     const generation = generationRef.current;
     try {
       const result = await authClient.unlinkAccount({ accountId });
       if (result.error) {
-        // Better Auth itself refuses to unlink a user's last remaining
-        // account (FAILED_TO_UNLINK_LAST_ACCOUNT) — surface that message
-        // as-is rather than letting the user lock themselves out.
         return { ok: false, error: result.error.message || "Could not disconnect GitHub." };
       }
       if (generation === generationRef.current) {
         setStatus("disconnected");
         setData(null);
         setAccountId(null);
+        if (currentUser?.id) {
+          delete memoryGithubCache[currentUser.id];
+          try {
+            localStorage.removeItem(`ratefactor_github_data_${currentUser.id}`);
+          } catch {}
+        }
       }
       return { ok: true };
     } catch (err: any) {
       return { ok: false, error: err?.message || "Could not disconnect GitHub." };
     }
-  }, [accountId]);
+  }, [accountId, currentUser?.id]);
 
   return {
     status,
