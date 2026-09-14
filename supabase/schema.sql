@@ -80,14 +80,16 @@ CREATE INDEX IF NOT EXISTS idx_profiles_username ON public.profiles(username);
 CREATE INDEX IF NOT EXISTS idx_profiles_role ON public.profiles(role);
 
 -- ==========================================================
--- 2. PORTFOLIOS TABLE (Free-tier Quota Enforced: 1 Image <= 2MB, Description >= 200 Words)
+-- 2. PORTFOLIOS TABLE (Free-tier Quota Enforced: 1 Image <= 2MB, Description Optional — App Layer Requires >= 200 Characters if Provided)
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS public.portfolios (
   id TEXT PRIMARY KEY,
   author_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   title TEXT NOT NULL CHECK (char_length(title) >= 3 AND char_length(title) <= 120),
   tagline TEXT NOT NULL CHECK (char_length(tagline) >= 10 AND char_length(tagline) <= 240),
-  -- Description word count enforcement: optional description, capped at 2,500 words to preserve 500MB DB
+  -- This CHECK enforces word count only (optional description, capped at 2,500 words to
+  -- preserve 500MB DB). The application validation layer separately requires at least
+  -- 200 characters when a description is provided (see src/lib/guardrails.ts).
   description TEXT CHECK (
     description IS NULL 
     OR (

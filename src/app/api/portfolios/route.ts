@@ -334,7 +334,7 @@ export async function POST(req: NextRequest) {
           type: "https://ratefactor.dev/errors/validation-error",
           title: "Portfolio Validation Failed",
           status: 400,
-          detail: "Submission does not satisfy constraints (e.g. 200 words min, 2 MB max image).",
+          detail: "Submission does not satisfy constraints (e.g. 200 characters min, 2 MB max image).",
           errors: parseResult.error.flatten().fieldErrors,
         },
         { status: 400 }
