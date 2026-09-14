@@ -29,6 +29,8 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { DeveloperProfile, UserStatus } from "@/types/profile";
 import { Portfolio } from "@/types/portfolio";
+import { AuthUser } from "@/features/auth/hooks/useAuth";
+import { useGithubConnection } from "@/features/dashboard/hooks/useGithubConnection";
 import { cn, formatNumber, formatRating, normalizeAvatarUrl } from "@/lib/utils";
 import { EditStatusModal } from "./EditStatusModal";
 import { EditBioModal } from "./EditBioModal";
@@ -50,6 +52,15 @@ interface DeveloperDashboardProps {
   onRequireAuth?: (intent: string) => void;
   onClose?: () => void;
   isOwner?: boolean;
+  /** Passed through to ActivityHeatmap to resolve authoritative GitHub link status via Better Auth. */
+  currentUser?: AuthUser | null;
+  /**
+   * Optional: a useGithubConnection() instance already created by a parent
+   * (e.g. the profile page's own summary tile). When supplied, it's reused
+   * for ActivityHeatmap instead of instantiating a second one for the same
+   * signed-in user. When omitted, ActivityHeatmap instantiates its own.
+   */
+  githubConnection?: ReturnType<typeof useGithubConnection>;
 }
 
 export function DeveloperDashboard({
@@ -62,6 +73,8 @@ export function DeveloperDashboard({
   onRequireAuth,
   onClose,
   isOwner = true,
+  currentUser,
+  githubConnection,
 }: DeveloperDashboardProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "submissions" | "preview">("overview");
 
@@ -498,6 +511,8 @@ export function DeveloperDashboard({
               onUpdateProfile={onUpdateProfile}
               onRequireAuth={onRequireAuth}
               readOnly={!isOwner}
+              currentUser={currentUser}
+              connection={githubConnection}
             />
 
             {/* 3. GitHub Profile README.md Card */}

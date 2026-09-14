@@ -15,12 +15,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Settings,
-  Edit3,
   Trash2
 } from "@/components/ui/icons";
 import { cn, formatNumber } from "@/lib/utils";
 import { DeveloperProfile } from "@/types/profile";
-import { authClient } from "@/lib/auth/client";
+import { AuthUser } from "@/features/auth/hooks/useAuth";
+import { useGithubConnection } from "@/features/dashboard/hooks/useGithubConnection";
 
 interface ActivityDay {
   date: string;
@@ -33,6 +33,16 @@ interface ActivityHeatmapProps {
   onUpdateProfile?: (updated: DeveloperProfile) => void;
   onRequireAuth?: (intent: string) => void;
   readOnly?: boolean;
+  /** Required (for !readOnly) to resolve authoritative GitHub link status via Better Auth. */
+  currentUser?: AuthUser | null;
+  /**
+   * Optional: a useGithubConnection() instance already created by a parent
+   * (e.g. the owner's profile page, which also needs it for a summary
+   * tile). When supplied, this component reuses it instead of running a
+   * second authoritative listAccounts/sync flow for the same signed-in
+   * user. When omitted, it falls back to instantiating its own.
+   */
+  connection?: ReturnType<typeof useGithubConnection>;
 }
 
 function generateEmptyHeatmap(): ActivityDay[] {
@@ -71,18 +81,18 @@ export function ActivityHeatmap({
   onUpdateProfile,
   onRequireAuth,
   readOnly = false,
+  currentUser,
+  connection,
 }: ActivityHeatmapProps) {
-  const [heatmapDays, setHeatmapDays] = useState<ActivityDay[]>(generateEmptyHeatmap());
-  const [hoveredDay, setHoveredDay] = useState<{ day: ActivityDay; x: number; y: number } | null>(null);
-  const [selectedYear, setSelectedYear] = useState<string>("2026");
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
-  const [manualInput, setManualInput] = useState("");
-  const [isLinking, setIsLinking] = useState(false);
-  const [isChanging, setIsChanging] = useState(false);
-  const [changeInput, setChangeInput] = useState("");
-  const [stats, setStats] = useState<{
+  // ─────────────────────────────────────────────────────────────────────
+  // Read-only mode (viewing someone else's public profile): there is no
+  // session to check, so this keeps displaying whatever GitHub data that
+  // OTHER developer has already synced/persisted, via the profile prop.
+  // ─────────────────────────────────────────────────────────────────────
+  const [publicHeatmapDays, setPublicHeatmapDays] = useState<ActivityDay[]>(generateEmptyHeatmap());
+  const [isLoadingPublic, setIsLoadingPublic] = useState(false);
+  const [publicErrorMsg, setPublicErrorMsg] = useState<string | null>(null);
+  const [publicStats, setPublicStats] = useState<{
     totalContributions?: number;
     currentStreak?: number;
     publicRepos?: number;
@@ -95,10 +105,7 @@ export function ActivityHeatmap({
     followers: profile?.githubSync?.followers,
     lastSyncedAt: profile?.githubSync?.lastSyncedAt,
   });
-
   const lastFetchedUserRef = useRef<string | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<HTMLDivElement>(null);
 
   // Clean and extract GitHub username, prioritizing explicit profile.github over githubSync
   const extractGithubHandle = (val?: string) => {
@@ -112,14 +119,60 @@ export function ActivityHeatmap({
 
   const explicitGithub = extractGithubHandle(profile?.github);
   const syncGithub = extractGithubHandle(profile?.githubSync?.username);
-  const activeGithubUsername = explicitGithub || syncGithub || "";
+  const publicGithubUsername = explicitGithub || syncGithub || "";
 
-  const isConnected = Boolean(
-    activeGithubUsername &&
-      activeGithubUsername !== "developer" &&
-      activeGithubUsername !== "user-default" &&
+  const isPublicConnected = Boolean(
+    publicGithubUsername &&
+      publicGithubUsername !== "developer" &&
+      publicGithubUsername !== "user-default" &&
       (profile?.githubSync?.connected || Boolean(profile?.github))
   );
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Interactive mode (own dashboard): GitHub connection truth comes
+  // exclusively from Better Auth's linked-account state, never from the
+  // profile prop / localStorage / a manually typed username.
+  //
+  // When a parent already instantiated useGithubConnection and passed it in
+  // via `connection`, this internal call is starved of a user identity so
+  // it performs no listAccounts/sync network work of its own — it would
+  // otherwise duplicate the parent's authoritative check for the same user.
+  // (The hook is still called unconditionally, per the rules of hooks.)
+  const internalGithub = useGithubConnection(readOnly || connection ? null : currentUser);
+  const github = connection || internalGithub;
+
+  const isConnected = readOnly ? isPublicConnected : github.status === "connected";
+  // "Verified" specifically claims a real OAuth-linked GitHub account, which
+  // a bare profile.github display URL never proves on its own — only
+  // genuine persisted sync metadata does. isConnected (above) still gates
+  // whether the activity graph itself renders for a bio-linked username, so
+  // public GitHub bio links keep working either way.
+  const isVerified = readOnly ? Boolean(profile?.githubSync?.connected) : isConnected;
+  const activeGithubUsername = readOnly ? publicGithubUsername : (github.data?.username || "");
+  const heatmapDays =
+    readOnly
+      ? publicHeatmapDays
+      : github.data?.days && github.data.days.length > 0
+        ? github.data.days
+        : generateEmptyHeatmap();
+  const isLoading = readOnly ? isLoadingPublic : github.status === "loading" || github.isSyncing;
+  const stats = readOnly
+    ? publicStats
+    : {
+        totalContributions: github.data?.totalContributions,
+        currentStreak: github.data?.currentStreak,
+        publicRepos: github.data?.publicRepos,
+        followers: github.data?.followers,
+        lastSyncedAt: github.data?.lastSyncedAt,
+      };
+
+  const [hoveredDay, setHoveredDay] = useState<{ day: ActivityDay; x: number; y: number } | null>(null);
+  const [selectedYear, setSelectedYear] = useState<string>("2026");
+  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
+  const [disconnectError, setDisconnectError] = useState<string | null>(null);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to latest month (far right)
   const scrollToLatest = useCallback(() => {
@@ -140,14 +193,16 @@ export function ActivityHeatmap({
     }
   };
 
+  // Public/read-only fetch by username only — never used for the interactive
+  // "own dashboard" path, which is driven entirely by useGithubConnection.
   const fetchContributions = useCallback(
     async (usernameToFetch: string, force = false) => {
       if (!usernameToFetch || usernameToFetch === "developer" || usernameToFetch === "user-default") return;
       if (!force && lastFetchedUserRef.current === usernameToFetch) return;
       lastFetchedUserRef.current = usernameToFetch;
 
-      setIsLoading(true);
-      setErrorMsg(null);
+      setIsLoadingPublic(true);
+      setPublicErrorMsg(null);
       try {
         const res = await fetch(
           `/api/github/contributions?username=${encodeURIComponent(usernameToFetch)}${force ? "&force=true" : ""}`
@@ -158,10 +213,10 @@ export function ActivityHeatmap({
         }
 
         if (data.days && Array.isArray(data.days) && data.days.length > 0) {
-          setHeatmapDays(data.days);
+          setPublicHeatmapDays(data.days);
         }
 
-        setStats({
+        setPublicStats({
           totalContributions: data.totalContributions,
           currentStreak: data.currentStreak,
           publicRepos: data.profile?.publicRepos,
@@ -204,19 +259,53 @@ export function ActivityHeatmap({
           onUpdateProfile(updated);
         }
       } catch (err: any) {
-        setErrorMsg(err?.message || "Could not load GitHub contributions.");
+        setPublicErrorMsg(err?.message || "Could not load GitHub contributions.");
       } finally {
-        setIsLoading(false);
+        setIsLoadingPublic(false);
       }
     },
     [profile, onUpdateProfile]
   );
 
+  // Public/read-only auto-fetch by username, for genuinely viewing someone
+  // else's profile (or a logged-out guest's own default placeholder).
   useEffect(() => {
-    if (isConnected && lastFetchedUserRef.current !== activeGithubUsername) {
-      fetchContributions(activeGithubUsername);
+    if (readOnly && isPublicConnected && lastFetchedUserRef.current !== publicGithubUsername) {
+      fetchContributions(publicGithubUsername);
     }
-  }, [activeGithubUsername, isConnected, fetchContributions]);
+  }, [readOnly, publicGithubUsername, isPublicConnected, fetchContributions]);
+
+  // Keep the display profile's GitHub cache fields in sync once the
+  // authoritative hook confirms a genuine connection — display/cache only,
+  // never the source of connection truth.
+  useEffect(() => {
+    if (readOnly || !profile || !onUpdateProfile || github.status !== "connected" || !github.data) return;
+    const d = github.data;
+    if (profile.githubSync?.username === d.username && profile.githubSync?.lastSyncedAt === d.lastSyncedAt) return;
+    onUpdateProfile({
+      ...profile,
+      bio: d.bio || profile.bio,
+      company: d.company || profile.company || "",
+      location: d.location || profile.location || "",
+      website: d.website || profile.website || "",
+      twitter: d.twitter || profile.twitter || "",
+      linkedin: d.linkedin || profile.linkedin || "",
+      github: d.profileUrl || profile.github || `https://github.com/${d.username}`,
+      githubSync: {
+        connected: true,
+        username: d.username,
+        avatarUrl: d.avatarUrl,
+        profileUrl: d.profileUrl || `https://github.com/${d.username}`,
+        totalContributions: d.totalContributions,
+        currentStreak: d.currentStreak,
+        longestStreak: d.longestStreak,
+        publicRepos: d.publicRepos,
+        followers: d.followers,
+        lastSyncedAt: d.lastSyncedAt,
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readOnly, github.status, github.data, profile, onUpdateProfile]);
 
   useEffect(() => {
     scrollToLatest();
@@ -226,199 +315,29 @@ export function ActivityHeatmap({
 
   const handleConnectOAuth = async () => {
     try {
-      await authClient.signIn.social({
-        provider: "github",
-        callbackURL: typeof window !== "undefined" ? window.location.href : "/",
-      });
+      await github.connect();
     } catch (err: any) {
       if (onRequireAuth) {
-        onRequireAuth("Sign in with GitHub to link your live contribution activity.");
-      } else {
-        setErrorMsg(err?.message || "Failed to initiate GitHub OAuth.");
+        onRequireAuth("Sign in to link your GitHub account.");
       }
     }
   };
 
-  const handleSync = async () => {
-    if (!activeGithubUsername) return;
-    setIsLoading(true);
-    setErrorMsg(null);
-    try {
-      const res = await fetch("/api/github/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: activeGithubUsername }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Sync failed");
-
-      if (data.contributions?.days && Array.isArray(data.contributions.days)) {
-        setHeatmapDays(data.contributions.days);
-      }
-
-      setStats({
-        totalContributions: data.contributions?.totalContributions,
-        currentStreak: data.contributions?.currentStreak,
-        publicRepos: data.profile?.publicRepositoryCount || data.repositories?.length,
-        followers: data.profile?.followers,
-        lastSyncedAt: data.syncedAt || "Just now",
-      });
-
-      if (profile && onUpdateProfile) {
-        const updated: DeveloperProfile = {
-          ...profile,
-          name: data.profile?.displayName || profile.name || activeGithubUsername,
-          bio:
-            data.profile?.bio !== undefined && data.profile?.bio !== ""
-              ? data.profile.bio
-              : profile.bio,
-          readmeMarkdown:
-            data.profileReadme?.contentMarkdown ||
-            data.readmeMarkdown ||
-            profile.readmeMarkdown,
-          avatar: data.profile?.avatarUrl || profile.avatar,
-          company: data.profile?.company || profile.company || "",
-          location: data.profile?.location || profile.location || "",
-          website: data.profile?.website || profile.website || "",
-          twitter: data.profile?.twitter || profile.twitter || "",
-          linkedin: data.profile?.linkedin || profile.linkedin || "",
-          github:
-            data.profile?.profileUrl ||
-            profile.github ||
-            `https://github.com/${activeGithubUsername}`,
-          githubSync: {
-            connected: true,
-            username: activeGithubUsername,
-            avatarUrl: data.profile?.avatarUrl || profile.avatar,
-            profileUrl: data.profile?.profileUrl || `https://github.com/${activeGithubUsername}`,
-            totalContributions: data.contributions?.totalContributions,
-            currentStreak: data.contributions?.currentStreak,
-            longestStreak: data.contributions?.longestStreak,
-            publicRepos: data.profile?.publicRepositoryCount || data.repositories?.length,
-            followers: data.profile?.followers,
-            lastSyncedAt: data.syncedAt || "Just now",
-          },
-        };
-        onUpdateProfile(updated);
-      }
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Could not sync GitHub data.");
-    } finally {
-      setIsLoading(false);
-    }
+  const handleSync = () => {
+    github.sync();
   };
 
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
     setShowSettingsDropdown(false);
-    setIsChanging(false);
-    lastFetchedUserRef.current = null;
-    setHeatmapDays(generateEmptyHeatmap());
-    setStats({
-      totalContributions: 0,
-      currentStreak: 0,
-      publicRepos: 0,
-      followers: 0,
-      lastSyncedAt: undefined,
-    });
-
-    if (profile && onUpdateProfile) {
-      const updated: DeveloperProfile = {
-        ...profile,
-        github: "",
-        githubSync: undefined,
-      };
-      onUpdateProfile(updated);
+    setDisconnectError(null);
+    const result = await github.disconnect();
+    if (!result.ok) {
+      setDisconnectError(result.error || "Could not disconnect GitHub.");
     }
   };
 
-  const handleLinkUsername = async (handleToLink?: string) => {
-    const rawTarget = handleToLink !== undefined ? handleToLink : (isChanging ? changeInput : manualInput);
-    const cleaned = extractGithubHandle(rawTarget);
-    if (!cleaned) {
-      setErrorMsg("Please enter a valid GitHub username.");
-      return;
-    }
-
-    setIsLinking(true);
-    setErrorMsg(null);
-    try {
-      const res = await fetch(
-        `/api/github/contributions?username=${encodeURIComponent(cleaned)}&force=true`
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || `Could not find GitHub user @${cleaned}`);
-      }
-
-      if (data.days && Array.isArray(data.days) && data.days.length > 0) {
-        setHeatmapDays(data.days);
-      }
-
-      setStats({
-        totalContributions: data.totalContributions,
-        currentStreak: data.currentStreak,
-        publicRepos: data.profile?.publicRepos,
-        followers: data.profile?.followers,
-        lastSyncedAt: data.syncedAt || "Just now",
-      });
-
-      lastFetchedUserRef.current = cleaned;
-
-      if (profile && onUpdateProfile) {
-        const isDefaultName =
-          !profile.name ||
-          profile.name === "Developer" ||
-          profile.name === "developer";
-        const isDefaultAvatar =
-          !profile.avatar ||
-          profile.avatar.includes("unsplash");
-
-        const updated: DeveloperProfile = {
-          ...profile,
-          name: isDefaultName ? (data.profile?.name || cleaned) : profile.name,
-          bio: data.profile?.bio !== undefined && data.profile?.bio !== "" ? data.profile.bio : profile.bio,
-          readmeMarkdown:
-            data.readmeMarkdown !== undefined && data.readmeMarkdown !== ""
-              ? data.readmeMarkdown
-              : profile.readmeMarkdown,
-          avatar: isDefaultAvatar ? (data.profile?.avatar || profile.avatar) : profile.avatar,
-          company: data.profile?.company || profile.company || "",
-          location: data.profile?.location || profile.location || "",
-          website: data.profile?.website || profile.website || "",
-          twitter: data.profile?.twitter || profile.twitter || "",
-          linkedin: data.profile?.linkedin || profile.linkedin || "",
-          github: `https://github.com/${cleaned}`,
-          githubSync: {
-            connected: true,
-            username: cleaned,
-            avatarUrl: data.profile?.avatar,
-            profileUrl: data.profile?.profileUrl || `https://github.com/${cleaned}`,
-            totalContributions: data.totalContributions,
-            currentStreak: data.currentStreak,
-            longestStreak: data.longestStreak,
-            publicRepos: data.profile?.publicRepos,
-            followers: data.profile?.followers,
-            lastSyncedAt: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-          },
-        };
-        onUpdateProfile(updated);
-      }
-
-      setIsChanging(false);
-      setManualInput("");
-      setChangeInput("");
-    } catch (err: any) {
-      setErrorMsg(err?.message || `Could not link @${cleaned}. Please check the username.`);
-    } finally {
-      setIsLinking(false);
-    }
-  };
-
-  const totalContribs =
-    stats.totalContributions ??
-    profile?.githubSync?.totalContributions ??
-    heatmapDays.reduce((acc, d) => acc + d.count, 0);
-  const streak = stats.currentStreak ?? profile?.githubSync?.currentStreak ?? 0;
+  const totalContribs = stats.totalContributions ?? heatmapDays.reduce((acc, d) => acc + d.count, 0);
+  const streak = stats.currentStreak ?? 0;
 
   // Month positions aligned with week columns (GitHub Standard)
   const monthLabelsWithPositions = useMemo(() => {
@@ -502,17 +421,47 @@ export function ActivityHeatmap({
 
   return (
     <div className="w-full space-y-3 font-sans">
-      {errorMsg && (
+      {readOnly && publicErrorMsg && (
         <div className="p-3 rounded-md bg-[#ffebe9] dark:bg-rose-950/50 border border-[#ff8182]/40 dark:border-rose-800/40 text-[#cf222e] dark:text-rose-300 text-xs font-medium flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-[#cf222e] dark:text-rose-400 shrink-0" />
-            <span>{errorMsg}</span>
+            <span>{publicErrorMsg}</span>
           </div>
           <button
-            onClick={() => setErrorMsg(null)}
+            onClick={() => setPublicErrorMsg(null)}
             className="text-[#cf222e] dark:text-rose-300 hover:underline text-[11px] cursor-pointer"
           >
             Dismiss
+          </button>
+        </div>
+      )}
+
+      {disconnectError && (
+        <div className="p-3 rounded-md bg-[#ffebe9] dark:bg-rose-950/50 border border-[#ff8182]/40 dark:border-rose-800/40 text-[#cf222e] dark:text-rose-300 text-xs font-medium flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-[#cf222e] dark:text-rose-400 shrink-0" />
+            <span>{disconnectError}</span>
+          </div>
+          <button
+            onClick={() => setDisconnectError(null)}
+            className="text-[#cf222e] dark:text-rose-300 hover:underline text-[11px] cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {!readOnly && isConnected && github.syncError && (
+        <div className="p-3 rounded-md bg-[#fff8c5] dark:bg-amber-950/40 border border-[#d4a72c]/40 dark:border-amber-500/30 text-[#7d4e00] dark:text-amber-300 text-xs font-medium flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{github.syncError}</span>
+          </div>
+          <button
+            onClick={handleSync}
+            className="hover:underline text-[11px] cursor-pointer font-semibold shrink-0"
+          >
+            Retry
           </button>
         </div>
       )}
@@ -529,7 +478,7 @@ export function ActivityHeatmap({
               <span>GitHub Contribution Graph</span>
             )}
           </h3>
-          {isConnected && (
+          {isVerified && (
             <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#1a7f37] dark:text-emerald-400 bg-[#dafbe1] dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-[#4ac26b]/30 dark:border-emerald-500/30">
               <CheckCircle2 className="w-3 h-3" />
               Verified
@@ -588,18 +537,6 @@ export function ActivityHeatmap({
                         type="button"
                         onClick={() => {
                           setShowSettingsDropdown(false);
-                          setChangeInput(activeGithubUsername);
-                          setIsChanging(true);
-                        }}
-                        className="w-full text-left px-2 py-1.5 hover:bg-[#f6f8fa] dark:hover:bg-white/5 rounded-md flex items-center justify-between cursor-pointer"
-                      >
-                        <span>Change Account</span>
-                        <Edit3 className="w-3 h-3 text-[#656d76] dark:text-slate-400" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowSettingsDropdown(false);
                           handleSync();
                         }}
                         className="w-full text-left px-2 py-1.5 hover:bg-[#f6f8fa] dark:hover:bg-white/5 rounded-md cursor-pointer"
@@ -607,14 +544,23 @@ export function ActivityHeatmap({
                         Force Fresh Resync
                       </button>
                       <div className="border-t border-[#d0d7de] dark:border-white/10 my-1" />
-                      <button
-                        type="button"
-                        onClick={handleDisconnect}
-                        className="w-full text-left px-2 py-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 rounded-md flex items-center justify-between cursor-pointer"
-                      >
-                        <span>Disconnect GitHub</span>
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                      {github.canDisconnect ? (
+                        <button
+                          type="button"
+                          onClick={handleDisconnect}
+                          className="w-full text-left px-2 py-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 rounded-md flex items-center justify-between cursor-pointer"
+                        >
+                          <span>Disconnect GitHub</span>
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      ) : (
+                        <div
+                          className="px-2 py-1.5 text-[#656d76] dark:text-slate-500 rounded-md"
+                          title="GitHub is your only sign-in method — link another account before disconnecting it."
+                        >
+                          Disconnect unavailable (only sign-in method)
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -647,56 +593,20 @@ export function ActivityHeatmap({
                 <Github className="w-6 h-6" />
               </div>
               <div className="space-y-1">
-                <h4 className="text-sm font-bold text-[#1f2328] dark:text-white">Connect Your GitHub</h4>
+                <h4 className="text-sm font-bold text-[#1f2328] dark:text-white">Connect your GitHub</h4>
                 <p className="text-xs text-[#656d76] dark:text-slate-400 max-w-md">
-                  Enter your public GitHub handle to load your activity calendar, streaks, and repository contributions instantly.
+                  Link GitHub to show your contribution activity, repositories, and profile.
                 </p>
               </div>
-              
-              <div className="flex flex-col items-center gap-3 pt-2 w-full max-w-sm">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleLinkUsername();
-                  }}
-                  className="flex items-center gap-2 w-full"
-                >
-                  <div className="relative flex-1 flex items-center">
-                    <span className="absolute left-3 text-xs text-[#656d76] dark:text-slate-400 select-none">
-                      github.com/
-                    </span>
-                    <input
-                      type="text"
-                      value={manualInput}
-                      onChange={(e) => setManualInput(e.target.value)}
-                      placeholder="username (e.g. hiroqt)"
-                      className="w-full pl-[88px] pr-3 py-1.5 text-xs bg-[#f6f8fa] dark:bg-white/5 border border-[#d0d7de] dark:border-white/10 rounded-lg text-[#1f2328] dark:text-white placeholder:text-[#656d76]/60 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#0969da]/30 focus:border-[#0969da]"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={isLinking || !manualInput.trim()}
-                    className="px-3 py-1.5 bg-[#1f2328] hover:bg-[#24292f] dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 text-xs font-semibold rounded-lg transition disabled:opacity-50 cursor-pointer shrink-0"
-                  >
-                    {isLinking ? "Linking..." : "Link"}
-                  </button>
-                </form>
 
-                <div className="flex items-center gap-2 text-[11px] text-[#656d76] dark:text-slate-500">
-                  <span className="h-[1px] w-8 bg-[#d0d7de] dark:bg-white/10" />
-                  <span>or</span>
-                  <span className="h-[1px] w-8 bg-[#d0d7de] dark:bg-white/10" />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleConnectOAuth}
-                  className="px-3 py-1.5 bg-transparent hover:bg-[#f6f8fa] dark:hover:bg-white/5 text-[#1f2328] dark:text-white border border-[#d0d7de] dark:border-white/10 text-xs font-medium rounded-lg flex items-center gap-2 transition cursor-pointer"
-                >
-                  <Github className="w-3.5 h-3.5" />
-                  <span>Authorize with GitHub OAuth</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleConnectOAuth}
+                className="px-3.5 py-1.5 bg-[#1f2328] hover:bg-[#24292f] dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 text-xs font-semibold rounded-lg flex items-center gap-2 transition cursor-pointer"
+              >
+                <Github className="w-3.5 h-3.5" />
+                <span>Connect GitHub</span>
+              </button>
             </div>
           )
         ) : (
@@ -705,64 +615,15 @@ export function ActivityHeatmap({
             {/* Scroll Navigation Controls */}
             <div className="flex items-center justify-between text-[11px] text-[#656d76] dark:text-slate-400 pb-1">
               <div className="flex items-center gap-2">
-                {!isChanging ? (
-                  <>
-                    <a
-                      href={`https://github.com/${activeGithubUsername}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold text-[#0969da] dark:text-cyan-400 hover:underline flex items-center gap-1 text-xs"
-                    >
-                      <span>@{activeGithubUsername}</span>
-                      <ExternalLink className="w-3 h-3 text-[#656d76] dark:text-slate-400" />
-                    </a>
-                    {!readOnly && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setChangeInput(activeGithubUsername);
-                          setIsChanging(true);
-                        }}
-                        className="text-[11px] text-[#656d76] hover:text-[#1f2328] dark:text-slate-400 dark:hover:text-white underline cursor-pointer ml-1"
-                        title="Change GitHub username"
-                      >
-                        Change
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleLinkUsername();
-                    }}
-                    className="flex items-center gap-1.5"
-                  >
-                    <span className="text-xs text-[#656d76] dark:text-slate-400">@</span>
-                    <input
-                      type="text"
-                      value={changeInput}
-                      onChange={(e) => setChangeInput(e.target.value)}
-                      placeholder="github-username"
-                      className="w-32 px-2 py-0.5 text-xs bg-[#f6f8fa] dark:bg-white/5 border border-[#d0d7de] dark:border-white/10 rounded text-[#1f2328] dark:text-white focus:outline-none focus:ring-1 focus:ring-[#0969da]"
-                      autoFocus
-                    />
-                    <button
-                      type="submit"
-                      disabled={isLinking || !changeInput.trim()}
-                      className="px-2 py-0.5 text-[11px] font-semibold bg-[#1f2328] dark:bg-white text-white dark:text-slate-900 rounded hover:opacity-90 disabled:opacity-50 cursor-pointer"
-                    >
-                      {isLinking ? "Saving..." : "Save"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsChanging(false)}
-                      className="px-1.5 py-0.5 text-[11px] text-[#656d76] dark:text-slate-400 hover:text-[#1f2328] dark:hover:text-white cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  </form>
-                )}
+                <a
+                  href={`https://github.com/${activeGithubUsername}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-[#0969da] dark:text-cyan-400 hover:underline flex items-center gap-1 text-xs"
+                >
+                  <span>@{activeGithubUsername}</span>
+                  <ExternalLink className="w-3 h-3 text-[#656d76] dark:text-slate-400" />
+                </a>
                 {stats.publicRepos !== undefined && stats.publicRepos > 0 && (
                   <span className="hidden sm:inline-flex items-center gap-1 text-[#656d76] dark:text-slate-400">
                     • <BookOpen className="w-3 h-3" /> {stats.publicRepos} repos

@@ -164,15 +164,6 @@ export function EditBioModal({
       : "";
     const cleanGithubUrl = cleanGithubHandle ? `https://github.com/${cleanGithubHandle}` : "";
 
-    const updatedGithubSync = cleanGithubHandle
-      ? {
-          ...(profile.githubSync || {}),
-          connected: true,
-          username: cleanGithubHandle,
-          profileUrl: cleanGithubUrl,
-        }
-      : undefined;
-
     onSaveProfile({
       ...profile,
       name: name.trim() || profile.name,
@@ -184,8 +175,11 @@ export function EditBioModal({
       company: company.trim(),
       location: location.trim(),
       website: website.trim(),
+      // A plain, unverified display link — same as website/twitter/linkedin
+      // below. It must never mark GitHub as "connected": that state is
+      // authoritative only via Better Auth's linked-account check (see
+      // useGithubConnection), never from a freely-editable text field.
       github: cleanGithubUrl,
-      githubSync: updatedGithubSync,
       twitter: twitter.trim(),
       linkedin: linkedin.trim(),
       skills,

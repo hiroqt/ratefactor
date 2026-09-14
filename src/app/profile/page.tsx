@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/icons";
 import { Navbar, Footer } from "@/components/layout";
 import { DeveloperDashboard, useDeveloperProfile } from "@/features/dashboard";
+import { useGithubConnection } from "@/features/dashboard/hooks/useGithubConnection";
 import {
   PortfolioDetailModal,
   SubmitPortfolioModal,
@@ -135,6 +136,11 @@ function ProfilePageContent() {
     updateProfile,
     updatePins,
   } = useDeveloperProfile(currentUser);
+
+  // Owner's GitHub connection status — authoritative from Better Auth's
+  // linked-account state, never from developerProfile.githubSync.connected
+  // (a display cache that can go stale relative to the real linked account).
+  const githubConnection = useGithubConnection(currentUser);
 
   // 3. Real-time Notifications State
   const {
@@ -711,7 +717,7 @@ function ProfilePageContent() {
                       <div className="text-[11px] font-mono text-slate-500 uppercase tracking-wider">
                         GitHub Sync
                       </div>
-                      {developerProfile.githubSync?.connected || Boolean(developerProfile.github) ? (
+                      {githubConnection.status === "connected" ? (
                         <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-600 flex items-center gap-1">
                           <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                           <span className="text-sm font-semibold text-slate-900">Synced</span>
@@ -842,11 +848,12 @@ function ProfilePageContent() {
 
                   {/* GitHub-Style Activity / Contribution Heatmap */}
                   <div className="pt-2">
-                    <ActivityHeatmap 
-                      profile={developerProfile} 
+                    <ActivityHeatmap
+                      profile={developerProfile}
                       onUpdateProfile={updateProfile}
                       onRequireAuth={requireAuth}
                       readOnly={!currentUser}
+                      currentUser={currentUser}
                     />
                   </div>
 
@@ -940,6 +947,8 @@ function ProfilePageContent() {
                     }}
                     onRequireAuth={requireAuth}
                     isOwner={Boolean(currentUser)}
+                    currentUser={currentUser}
+                    githubConnection={githubConnection}
                   />
                 </div>
               )}

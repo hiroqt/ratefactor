@@ -31,9 +31,14 @@ export async function fetchGithubProfile(
   bypassCache = false
 ): Promise<GithubProfileData> {
   const targetUsername = (fallbackUsername || "").trim().replace(/^@/, "");
-  const cacheKey = `profile:${(targetUsername || "viewer").toLowerCase()}`;
+  // An authenticated self lookup (no target username) has no identity to key
+  // a shared cache entry by other than the token itself — so it bypasses the
+  // in-memory cache entirely rather than risk one user's data being served
+  // from a generic "viewer" slot to another user. Explicit-username lookups
+  // (public profiles) keep normal username-scoped caching.
+  const cacheKey = targetUsername ? `profile:${targetUsername.toLowerCase()}` : null;
 
-  if (!bypassCache) {
+  if (!bypassCache && cacheKey) {
     const cached = githubCache.get<GithubProfileData>(cacheKey);
     if (cached) {
       return cached;
@@ -63,7 +68,7 @@ export async function fetchGithubProfile(
           lastSyncedAt: new Date().toISOString(),
         };
 
-        githubCache.set(cacheKey, profile, CACHE_TTL.PROFILE);
+        if (cacheKey) githubCache.set(cacheKey, profile, CACHE_TTL.PROFILE);
         return profile;
       }
     } catch {}
@@ -104,14 +109,21 @@ export async function fetchGithubProfile(
           lastSyncedAt: new Date().toISOString(),
         };
 
-        githubCache.set(cacheKey, profile, CACHE_TTL.PROFILE);
+        // Cache under the resolved real username only — never under a
+        // shared "viewer" slot, since that would leak this user's profile
+        // to the next authenticated caller with no explicit username.
         if (profile.username) {
           githubCache.set(`profile:${profile.username.toLowerCase()}`, profile, CACHE_TTL.PROFILE);
         }
         return profile;
       }
-    } catch {
-      // Fallback
+      throw new Error("GitHub did not return a valid authenticated user.");
+    } catch (err) {
+      // An authenticated self lookup has no username to fall back to
+      // scraping/caching a placeholder for — propagate the failure so the
+      // caller (syncGithubUser) can keep existing data instead of silently
+      // returning fabricated zeros as if the sync succeeded.
+      throw err instanceof Error ? err : new Error("Failed to fetch authenticated GitHub profile.");
     }
   }
 
@@ -199,7 +211,7 @@ export async function fetchGithubProfile(
           lastSyncedAt: new Date().toISOString(),
         };
 
-        githubCache.set(cacheKey, profile, CACHE_TTL.PROFILE);
+        if (cacheKey) githubCache.set(cacheKey, profile, CACHE_TTL.PROFILE);
         return profile;
       }
     } catch {}
@@ -223,20 +235,28 @@ export async function fetchGithubProfile(
     lastSyncedAt: new Date().toISOString(),
   };
 
-  githubCache.set(cacheKey, fallbackProfile, CACHE_TTL.PROFILE);
+  if (cacheKey) githubCache.set(cacheKey, fallbackProfile, CACHE_TTL.PROFILE);
   return fallbackProfile;
 }
 
 /**
  * Saves and caches GitHub profile in PostgreSQL safely.
+ * `userId` must be the canonical public.profiles UUID (see
+ * resolveCanonicalProfileId in src/lib/auth/profile-id.ts) — this table's
+ * user_id column is a foreign key to public.profiles(id), not the Better
+ * Auth TEXT user id.
+ *
+ * Returns whether the primary github_profiles write actually succeeded, so
+ * callers can distinguish a real persistence failure from success instead of
+ * assuming success just because fresh GitHub data was fetched.
  */
 export async function saveGithubProfile(
   userId: string,
   profile: GithubProfileData
-): Promise<void> {
-  if (!userId || !profile.username) return;
+): Promise<boolean> {
+  if (!userId || !profile.username) return false;
 
-  await safeDbQuery(
+  const primary = await safeDbQuery(
     `INSERT INTO public.github_profiles (
       user_id, github_id, username, display_name, bio, avatar_url, profile_url,
       public_repository_count, followers, following, last_synced_at, updated_at
@@ -267,10 +287,12 @@ export async function saveGithubProfile(
     ]
   );
 
-  // Sync to profiles table
+  // Sync to profiles table. Best-effort enrichment: its failure doesn't make
+  // the overall save a failure, since the primary github_profiles cache row
+  // above is what the dashboard actually reads back after a refresh.
   await safeDbQuery(
     `UPDATE public.profiles
-     SET 
+     SET
        bio = COALESCE(NULLIF($2, ''), bio),
        company = COALESCE(NULLIF($3, ''), company),
        location = COALESCE(NULLIF($4, ''), location),
@@ -291,6 +313,8 @@ export async function saveGithubProfile(
       profile.profileUrl,
     ]
   );
+
+  return primary !== null;
 }
 
 /**

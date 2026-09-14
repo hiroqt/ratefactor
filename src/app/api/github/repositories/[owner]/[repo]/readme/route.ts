@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/server-session";
 import { getGithubAccessToken, fetchGithubReadme, getCachedGithubReadme, saveGithubReadme } from "@/lib/github";
+import { resolveCanonicalProfileId } from "@/lib/auth/profile-id";
 
 export async function GET(
   req: NextRequest,
@@ -17,19 +18,20 @@ export async function GET(
     }
 
     const user = await getSessionUser(req);
-    const userId = user?.id;
+    const betterAuthUserId = user?.id;
+    const canonicalProfileId = betterAuthUserId ? resolveCanonicalProfileId(betterAuthUserId) : undefined;
     const repoFullName = `${owner}/${repo}`;
 
     // 1. Check cache first if user is authenticated
-    if (userId) {
-      const cached = await getCachedGithubReadme(userId, repoFullName);
+    if (canonicalProfileId) {
+      const cached = await getCachedGithubReadme(canonicalProfileId, repoFullName);
       if (cached) {
         return NextResponse.json(cached, { status: 200 });
       }
     }
 
     // 2. Fetch fresh README
-    const token = userId ? await getGithubAccessToken(userId) : null;
+    const token = betterAuthUserId ? await getGithubAccessToken(betterAuthUserId) : null;
     const readme = await fetchGithubReadme(owner, repo, token);
 
     if (!readme) {
@@ -39,8 +41,8 @@ export async function GET(
       );
     }
 
-    if (userId) {
-      await saveGithubReadme(userId, readme).catch(() => {});
+    if (canonicalProfileId) {
+      await saveGithubReadme(canonicalProfileId, readme).catch(() => false);
     }
 
     return NextResponse.json(readme, { status: 200 });

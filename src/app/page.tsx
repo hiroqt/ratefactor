@@ -245,6 +245,7 @@ export default function Home() {
                   setIsSubmitModalOpen(true);
                 }}
                 onRequireAuth={requireAuth}
+                currentUser={currentUser}
               />
             </div>
           </div>
@@ -375,6 +376,7 @@ export default function Home() {
             setIsSubmitModalOpen(true);
           }}
           onRequireAuth={requireAuth}
+          currentUser={currentUser}
         />
       )}
 

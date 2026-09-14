@@ -55,9 +55,14 @@ export async function fetchGithubReadme(
   if (!cleanOwner || !cleanRepo) return null;
 
   const repoFullName = `${cleanOwner}/${cleanRepo}`;
-  const cacheKey = `readme:${repoFullName.toLowerCase()}`;
+  // An authenticated (token-bearing) request bypasses the shared in-memory
+  // cache entirely — the cache is keyed only by owner/repo, never by token
+  // or caller identity, so a cached entry from one caller's authenticated
+  // request could otherwise be served back to a different authenticated
+  // caller. Unauthenticated public README requests keep normal caching.
+  const cacheKey = token ? null : `readme:${repoFullName.toLowerCase()}`;
 
-  if (!bypassCache) {
+  if (!bypassCache && cacheKey) {
     const cached = githubCache.get<GithubReadmeData>(cacheKey);
     if (cached) {
       return cached;
@@ -83,7 +88,7 @@ export async function fetchGithubReadme(
         lastSyncedAt: new Date().toISOString(),
       };
 
-      githubCache.set(cacheKey, result, CACHE_TTL.README);
+      if (cacheKey) githubCache.set(cacheKey, result, CACHE_TTL.README);
       return result;
     }
   } catch {
@@ -115,7 +120,7 @@ export async function fetchGithubReadme(
           lastSyncedAt: new Date().toISOString(),
         };
 
-        githubCache.set(cacheKey, result, CACHE_TTL.README);
+        if (cacheKey) githubCache.set(cacheKey, result, CACHE_TTL.README);
         return result;
       }
     } catch {}
@@ -126,14 +131,19 @@ export async function fetchGithubReadme(
 
 /**
  * Saves and caches README in PostgreSQL safely.
+ * `userId` must be the canonical public.profiles UUID (see
+ * resolveCanonicalProfileId in src/lib/auth/profile-id.ts), not the Better
+ * Auth TEXT user id.
+ *
+ * Returns whether the primary github_readmes write actually succeeded.
  */
 export async function saveGithubReadme(
   userId: string,
   data: GithubReadmeData
-): Promise<void> {
-  if (!userId || !data.contentMarkdown) return;
+): Promise<boolean> {
+  if (!userId || !data.contentMarkdown) return false;
 
-  await safeDbQuery(
+  const primary = await safeDbQuery(
     `INSERT INTO public.github_readmes (
       user_id, repository_full_name, content_markdown, content_sha, source_url, last_synced_at, updated_at
     ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
@@ -152,7 +162,9 @@ export async function saveGithubReadme(
     ]
   );
 
-  // If this is the user's profile README (e.g. {username}/{username}), update public.profiles.readme_markdown
+  // If this is the user's profile README (e.g. {username}/{username}), update
+  // public.profiles.readme_markdown. Best-effort enrichment: its failure
+  // doesn't make the overall save a failure.
   const [owner, repoName] = data.repositoryFullName.split("/");
   if (owner && repoName && owner.toLowerCase() === repoName.toLowerCase()) {
     await safeDbQuery(
@@ -162,6 +174,8 @@ export async function saveGithubReadme(
       [userId, data.contentMarkdown]
     );
   }
+
+  return primary !== null;
 }
 
 /**

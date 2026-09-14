@@ -31,9 +31,12 @@ export async function fetchGithubRepositories(
   bypassCache = false
 ): Promise<GithubRepoData[]> {
   const targetUsername = (fallbackUsername || "").trim().replace(/^@/, "");
-  const cacheKey = `repos:${(targetUsername || "viewer").toLowerCase()}`;
+  // Authenticated self lookups (no target username) bypass the in-memory
+  // cache entirely — see the matching comment in profile.ts for why a
+  // shared "viewer" slot would leak between users.
+  const cacheKey = targetUsername ? `repos:${targetUsername.toLowerCase()}` : null;
 
-  if (!bypassCache) {
+  if (!bypassCache && cacheKey) {
     const cached = githubCache.get<GithubRepoData[]>(cacheKey);
     if (cached) {
       return cached;
@@ -56,7 +59,9 @@ export async function fetchGithubRepositories(
       // Fallback
     }
   } else if (token) {
-    // 2. If no target username, fetch authenticated user's own repositories
+    // 2. If no target username, fetch authenticated user's own repositories.
+    // A failure here must propagate rather than silently returning an empty
+    // list indistinguishable from "this user genuinely has zero repos".
     try {
       const data = await githubFetch(
         token,
@@ -64,9 +69,11 @@ export async function fetchGithubRepositories(
       );
       if (Array.isArray(data)) {
         repos = data;
+      } else {
+        throw new Error("GitHub did not return a valid repository list.");
       }
-    } catch {
-      // Fallback
+    } catch (err) {
+      throw err instanceof Error ? err : new Error("Failed to fetch authenticated GitHub repositories.");
     }
   }
 
@@ -88,25 +95,32 @@ export async function fetchGithubRepositories(
     lastSyncedAt: new Date().toISOString(),
   }));
 
-  githubCache.set(cacheKey, mapped, CACHE_TTL.REPOSITORIES);
+  if (cacheKey) githubCache.set(cacheKey, mapped, CACHE_TTL.REPOSITORIES);
   return mapped;
 }
 
 /**
  * Saves and caches repositories in PostgreSQL safely.
+ * `userId` must be the canonical public.profiles UUID (see
+ * resolveCanonicalProfileId in src/lib/auth/profile-id.ts), not the Better
+ * Auth TEXT user id.
+ *
+ * Returns whether every repository row was successfully written, so callers
+ * can distinguish a real persistence failure from success.
  */
 export async function saveGithubRepositories(
   userId: string,
   repos: GithubRepoData[]
-): Promise<void> {
-  if (!userId || repos.length === 0) return;
+): Promise<boolean> {
+  if (!userId || repos.length === 0) return false;
 
+  let allSucceeded = true;
   for (const r of repos) {
-    await safeDbQuery(
+    const res = await safeDbQuery(
       `INSERT INTO public.github_repositories (
         user_id, github_repo_id, name, full_name, description, html_url,
         homepage, language, topics, stars, forks, is_private, created_at,
-        updated_at, pushedAt, last_synced_at
+        updated_at, pushed_at, last_synced_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
       ON CONFLICT (user_id, github_repo_id) DO UPDATE SET
         name = EXCLUDED.name,
@@ -140,7 +154,9 @@ export async function saveGithubRepositories(
         r.pushedAt ? new Date(r.pushedAt) : null,
       ]
     );
+    if (res === null) allSucceeded = false;
   }
+  return allSucceeded;
 }
 
 /**
