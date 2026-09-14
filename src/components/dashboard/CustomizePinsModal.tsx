@@ -292,7 +292,7 @@ export function CustomizePinsModal({
 
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-xs font-mono text-amber-800 dark:text-amber-300 font-semibold hidden sm:inline">
-                      ★ {formatRating(portfolio.rating)}
+                      {portfolio.ratingCount > 0 ? `★ ${formatRating(portfolio.rating)}` : "Unrated"}
                     </span>
 
                     {/* Spotlight toggle button */}

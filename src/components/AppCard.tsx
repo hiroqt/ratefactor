@@ -195,8 +195,14 @@ export function AppCard({
           <div className="flex items-center gap-1.5">
             {/* Rating */}
             <div className="flex items-center gap-0.5 text-[11px] font-mono text-slate-900 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
-              <Star className="w-3 h-3 fill-amber-500 text-amber-500 shrink-0" />
-              <span className="font-bold tabular-nums">{formatRating(portfolio.rating)}</span>
+              {portfolio.ratingCount > 0 ? (
+                <>
+                  <Star className="w-3 h-3 fill-amber-500 text-amber-500 shrink-0" />
+                  <span className="font-bold tabular-nums">{formatRating(portfolio.rating)}</span>
+                </>
+              ) : (
+                <span className="text-slate-500">Unrated</span>
+              )}
             </div>
 
             {/* Reactions / Likes */}

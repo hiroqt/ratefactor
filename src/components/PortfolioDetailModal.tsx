@@ -32,6 +32,16 @@ import { EMOJI_MAP, getEmojiDisplay } from "@/lib/emoji-utils";
 
 export { EMOJI_MAP, getEmojiDisplay };
 
+// Starting position for the "tap stars to rate" inputs before any real rating
+// exists for this viewer. These are editable input defaults only — never
+// written to the portfolio's aggregate rating/breakdown before submission.
+const DEFAULT_CRITERIA: RatingBreakdown = {
+  codeQuality: 5,
+  performance: 5,
+  design: 4.8,
+  documentation: 5,
+};
+
 interface PortfolioDetailModalProps {
   portfolio: Portfolio | null;
   onClose: () => void;
@@ -68,12 +78,7 @@ export function PortfolioDetailModal({
   const modalRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const [criteria, setCriteria] = useState<RatingBreakdown>({
-    codeQuality: 5,
-    performance: 5,
-    design: 4.8,
-    documentation: 5,
-  });
+  const [criteria, setCriteria] = useState<RatingBreakdown>(DEFAULT_CRITERIA);
 
   useEffect(() => {
     if (portfolio) {
@@ -83,8 +88,14 @@ export function PortfolioDetailModal({
       setCommentsList(portfolio.comments || []);
       if (portfolio.userRatingBreakdown) {
         setCriteria(portfolio.userRatingBreakdown);
-      } else if (portfolio.ratingBreakdown) {
+      } else if (portfolio.ratingCount > 0 && portfolio.ratingBreakdown) {
         setCriteria(portfolio.ratingBreakdown);
+      } else {
+        // Unrated portfolio with no existing user rating: seed the editable
+        // stars with valid 1-5 defaults so the first click doesn't submit
+        // fabricated 0s for the untouched dimensions. Never affects the
+        // displayed aggregate score, which reads portfolio.rating directly.
+        setCriteria(DEFAULT_CRITERIA);
       }
       setCommentText("");
       trackEvent("portfolio_view", {
@@ -132,6 +143,12 @@ export function PortfolioDetailModal({
   });
 
   if (!portfolio) return null;
+
+  const isOwnPortfolio = Boolean(
+    currentUser?.username &&
+    portfolio.author?.username &&
+    currentUser.username.toLowerCase() === portfolio.author.username.toLowerCase()
+  );
 
   const handleLike = () => {
     if (!currentUser) {
@@ -216,6 +233,7 @@ export function PortfolioDetailModal({
       onRequireAuth?.("Sign in with GitHub or Email to rate developer portfolios.");
       return;
     }
+    if (isOwnPortfolio) return;
     const next = { ...criteria, [key]: value };
     setCriteria(next);
     const avg = Number(
@@ -527,7 +545,7 @@ export function PortfolioDetailModal({
                 <div className="flex items-center gap-4">
                   <div className="text-center">
                     <div className="text-4xl font-mono font-bold text-amber-800 dark:text-amber-400 tabular-nums">
-                      {portfolio.rating.toFixed(2)}
+                      {portfolio.ratingCount > 0 ? portfolio.rating.toFixed(2) : "—"}
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">out of 5.0</div>
                   </div>
@@ -539,7 +557,9 @@ export function PortfolioDetailModal({
                       interactive={false}
                     />
                     <div className="text-[11px] text-slate-500 dark:text-zinc-400">
-                      Aggregated across {portfolio.ratingCount} peer critiques
+                      {portfolio.ratingCount > 0
+                        ? `Aggregated across ${portfolio.ratingCount} peer critiques`
+                        : "Be the first to submit a genuine peer critique."}
                     </div>
                   </div>
                 </div>
@@ -561,7 +581,13 @@ export function PortfolioDetailModal({
                   Evaluate This Architecture (Tap Stars to Rate)
                 </h4>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {isOwnPortfolio && (
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-900/60 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-zinc-400 text-xs">
+                    You cannot rate your own portfolio.
+                  </div>
+                )}
+
+                <div className={cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3", isOwnPortfolio && "opacity-50 pointer-events-none")}>
                   {[
                     {
                       key: "design" as const,

@@ -43,6 +43,7 @@ export function RatingWidget({
     lg: "w-5 h-5",
   };
 
+  const isUnrated = ratingCount === 0;
   const activeRating = hoverRating !== null ? hoverRating : (selectedRating || currentRating);
 
   const handleSelect = (score: number) => {
@@ -93,8 +94,8 @@ export function RatingWidget({
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-0.5">
           {[1, 2, 3, 4, 5].map((star) => {
-            const isFilled = activeRating >= star;
-            const isPartiallyFilled = activeRating >= star - 0.5 && activeRating < star;
+            const isFilled = !isUnrated && activeRating >= star;
+            const isPartiallyFilled = !isUnrated && activeRating >= star - 0.5 && activeRating < star;
 
             return (
               <button
@@ -126,13 +127,19 @@ export function RatingWidget({
           })}
         </div>
 
-        <span className="font-mono text-xs font-semibold text-amber-800 tabular-nums">
-          {currentRating.toFixed(2)}
-        </span>
+        {isUnrated ? (
+          <span className="text-xs text-slate-500">No ratings yet</span>
+        ) : (
+          <>
+            <span className="font-mono text-xs font-semibold text-amber-800 tabular-nums">
+              {currentRating.toFixed(2)}
+            </span>
 
-        <span className="text-xs text-slate-500 tabular-nums">
-          ({ratingCount} {ratingCount === 1 ? "review" : "reviews"})
-        </span>
+            <span className="text-xs text-slate-500 tabular-nums">
+              ({ratingCount} {ratingCount === 1 ? "review" : "reviews"})
+            </span>
+          </>
+        )}
 
         {selectedRating && (
           <span className="text-[11px] font-mono text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
@@ -141,7 +148,7 @@ export function RatingWidget({
         )}
       </div>
 
-      {breakdown && (
+      {breakdown && !isUnrated && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-slate-200 text-xs">
           {dimensions.map((dim) => {
             const Icon = dim.icon;

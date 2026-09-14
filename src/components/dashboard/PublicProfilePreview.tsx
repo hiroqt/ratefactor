@@ -312,7 +312,9 @@ export function PublicProfilePreview({
 
                     <div className="pt-3 mt-3 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between">
                       <div className="flex items-center gap-3 text-xs font-mono text-slate-500 dark:text-zinc-400">
-                        <span className="text-amber-800 dark:text-amber-400 font-semibold">★ {formatRating(p.rating)}</span>
+                        <span className="text-amber-800 dark:text-amber-400 font-semibold">
+                          {p.ratingCount > 0 ? `★ ${formatRating(p.rating)}` : "Unrated"}
+                        </span>
                         {p.likesCount > 0 && (
                           <span className="flex items-center gap-0.5">
                             <span className="text-xs">{getEmojiDisplay(p.userReaction || "star-struck")}</span>

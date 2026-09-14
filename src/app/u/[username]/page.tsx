@@ -232,9 +232,10 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
   }, [targetAuthorPortfolios]);
 
   const avgRating = useMemo(() => {
-    if (targetAuthorPortfolios.length === 0) return 5.0;
-    const sum = targetAuthorPortfolios.reduce((acc, p) => acc + (p.rating || 5), 0);
-    return sum / targetAuthorPortfolios.length;
+    const ratedPortfolios = targetAuthorPortfolios.filter((p) => p.ratingCount > 0);
+    if (ratedPortfolios.length === 0) return null;
+    const sum = ratedPortfolios.reduce((acc, p) => acc + p.rating, 0);
+    return sum / ratedPortfolios.length;
   }, [targetAuthorPortfolios]);
 
   const showcaseCount = useMemo(() => {
@@ -707,7 +708,7 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
                   <div className="p-2.5 rounded-xl bg-white border border-slate-200">
                     <div className="text-[10px] text-slate-400 font-mono">Rating Score</div>
                     <div className="text-lg font-mono font-bold text-amber-800 mt-0.5">
-                      {formatRating(avgRating)}★
+                      {avgRating !== null ? `${formatRating(avgRating)}★` : "No ratings yet"}
                     </div>
                   </div>
                   <div className="p-2.5 rounded-xl bg-white border border-slate-200">
@@ -916,10 +917,16 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
                                 {/* Rating & Stats */}
                                 <div className="flex items-center gap-4 pt-2 text-xs font-mono text-slate-300 flex-wrap">
                                   <div className="flex items-center gap-1 text-amber-400 font-bold">
-                                    ★ {formatRating(spotlightPortfolio.rating)}
-                                    <span className="text-slate-400 font-normal">
-                                      ({spotlightPortfolio.ratingCount} reviews)
-                                    </span>
+                                    {spotlightPortfolio.ratingCount > 0 ? (
+                                      <>
+                                        ★ {formatRating(spotlightPortfolio.rating)}
+                                        <span className="text-slate-400 font-normal">
+                                          ({spotlightPortfolio.ratingCount} reviews)
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <span className="text-slate-400 font-normal">No ratings yet</span>
+                                    )}
                                   </div>
                                   {spotlightPortfolio.likesCount > 0 && (
                                     <div className="flex items-center gap-1 text-amber-300">
@@ -1029,7 +1036,7 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
                                 <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                                   <div className="flex items-center gap-3 font-mono text-[11px] text-slate-500">
                                     <span className="text-amber-800 font-semibold">
-                                      ★ {formatRating(portfolio.rating)}
+                                      {portfolio.ratingCount > 0 ? `★ ${formatRating(portfolio.rating)}` : "Unrated"}
                                     </span>
                                     {portfolio.likesCount > 0 && (
                                       <span className="flex items-center gap-0.5">
@@ -1139,8 +1146,14 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
                                 {item.category}
                               </span>
                               <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-slate-900/80 text-white text-[10px] font-mono font-bold flex items-center gap-1">
-                                <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
-                                <span>{formatRating(item.rating)}</span>
+                                {item.ratingCount > 0 ? (
+                                  <>
+                                    <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
+                                    <span>{formatRating(item.rating)}</span>
+                                  </>
+                                ) : (
+                                  <span>Unrated</span>
+                                )}
                               </span>
                             </div>
 

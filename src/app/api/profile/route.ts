@@ -206,13 +206,13 @@ export async function GET(req: NextRequest) {
         if (pfRes.rows && pfRes.rows.length > 0) {
           userPortfolios = pfRes.rows.map((row) => ({
             ...row,
-            rating: Number(row.rating) || 5.0,
-            ratingCount: Number(row.ratingCount) || 1,
+            rating: Number(row.rating) || 0,
+            ratingCount: Number(row.ratingCount) || 0,
             ratingBreakdown: {
-              design: Number(row.ratingDesign) || 5.0,
-              codeQuality: Number(row.ratingCodeQuality) || 5.0,
-              performance: Number(row.ratingPerformance) || 5.0,
-              documentation: Number(row.ratingDocumentation) || 5.0,
+              design: Number(row.ratingDesign) || 0,
+              codeQuality: Number(row.ratingCodeQuality) || 0,
+              performance: Number(row.ratingPerformance) || 0,
+              documentation: Number(row.ratingDocumentation) || 0,
             },
             likesCount: Number(row.likesCount) || 0,
             commentsCount: Number(row.commentsCount) || 0,
@@ -454,13 +454,13 @@ export async function PATCH(req: NextRequest) {
         if (pfRes.rows && pfRes.rows.length > 0) {
           userPortfolios = pfRes.rows.map((row) => ({
             ...row,
-            rating: Number(row.rating) || 5.0,
-            ratingCount: Number(row.ratingCount) || 1,
+            rating: Number(row.rating) || 0,
+            ratingCount: Number(row.ratingCount) || 0,
             ratingBreakdown: {
-              design: Number(row.ratingDesign) || 5.0,
-              codeQuality: Number(row.ratingCodeQuality) || 5.0,
-              performance: Number(row.ratingPerformance) || 5.0,
-              documentation: Number(row.ratingDocumentation) || 5.0,
+              design: Number(row.ratingDesign) || 0,
+              codeQuality: Number(row.ratingCodeQuality) || 0,
+              performance: Number(row.ratingPerformance) || 0,
+              documentation: Number(row.ratingDocumentation) || 0,
             },
             likesCount: Number(row.likesCount) || 0,
             commentsCount: Number(row.commentsCount) || 0,

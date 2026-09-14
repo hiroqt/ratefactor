@@ -163,10 +163,16 @@ export function ShowcaseShelf({
                   {/* Rating Breakdown & Stats */}
                   <div className="flex items-center gap-4 pt-2 text-xs font-mono text-slate-300 flex-wrap">
                     <div className="flex items-center gap-1 text-amber-400 font-bold">
-                      ★ {formatRating(spotlightPortfolio.rating)}
-                      <span className="text-slate-400 font-normal">
-                        ({spotlightPortfolio.ratingCount} reviews)
-                      </span>
+                      {spotlightPortfolio.ratingCount > 0 ? (
+                        <>
+                          ★ {formatRating(spotlightPortfolio.rating)}
+                          <span className="text-slate-400 font-normal">
+                            ({spotlightPortfolio.ratingCount} reviews)
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-slate-400 font-normal">No ratings yet</span>
+                      )}
                     </div>
                     {spotlightPortfolio.likesCount > 0 && (
                       <div className="flex items-center gap-1 text-amber-300">
@@ -276,7 +282,7 @@ export function ShowcaseShelf({
                   <div className="pt-3 mt-3 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-3 font-mono text-[11px] text-slate-500 dark:text-zinc-400">
                       <span className="text-amber-800 dark:text-amber-400 font-semibold">
-                        ★ {formatRating(portfolio.rating)}
+                        {portfolio.ratingCount > 0 ? `★ ${formatRating(portfolio.rating)}` : "Unrated"}
                       </span>
                       {portfolio.likesCount > 0 && (
                         <span className="flex items-center gap-0.5">

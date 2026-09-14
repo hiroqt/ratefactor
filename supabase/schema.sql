@@ -103,12 +103,12 @@ CREATE TABLE IF NOT EXISTS public.portfolios (
   image_size_bytes INTEGER NOT NULL CHECK (image_size_bytes > 0 AND image_size_bytes <= 2097152),
   category public.portfolio_category NOT NULL,
   tech_stack TEXT[] NOT NULL DEFAULT '{}',
-  rating NUMERIC(3, 2) NOT NULL DEFAULT 5.00 CHECK (rating >= 1.0 AND rating <= 5.0),
-  rating_count INTEGER NOT NULL DEFAULT 1 CHECK (rating_count >= 0),
-  rating_design NUMERIC(3, 2) NOT NULL DEFAULT 5.00,
-  rating_code_quality NUMERIC(3, 2) NOT NULL DEFAULT 5.00,
-  rating_performance NUMERIC(3, 2) NOT NULL DEFAULT 5.00,
-  rating_documentation NUMERIC(3, 2) NOT NULL DEFAULT 5.00,
+  rating NUMERIC(3, 2) NOT NULL DEFAULT 0.00 CHECK (rating >= 0 AND rating <= 5.0),
+  rating_count INTEGER NOT NULL DEFAULT 0 CHECK (rating_count >= 0),
+  rating_design NUMERIC(3, 2) NOT NULL DEFAULT 0.00,
+  rating_code_quality NUMERIC(3, 2) NOT NULL DEFAULT 0.00,
+  rating_performance NUMERIC(3, 2) NOT NULL DEFAULT 0.00,
+  rating_documentation NUMERIC(3, 2) NOT NULL DEFAULT 0.00,
   likes_count INTEGER NOT NULL DEFAULT 0 CHECK (likes_count >= 0),
   comments_count INTEGER NOT NULL DEFAULT 0 CHECK (comments_count >= 0),
   is_showcase BOOLEAN NOT NULL DEFAULT FALSE,
@@ -418,11 +418,11 @@ BEGIN
 
   UPDATE public.portfolios
   SET
-    rating = COALESCE(avg_score, 5.00),
-    rating_design = COALESCE(avg_design, 5.00),
-    rating_code_quality = COALESCE(avg_code, 5.00),
-    rating_performance = COALESCE(avg_perf, 5.00),
-    rating_documentation = COALESCE(avg_doc, 5.00),
+    rating = COALESCE(avg_score, 0.00),
+    rating_design = COALESCE(avg_design, 0.00),
+    rating_code_quality = COALESCE(avg_code, 0.00),
+    rating_performance = COALESCE(avg_perf, 0.00),
+    rating_documentation = COALESCE(avg_doc, 0.00),
     rating_count = COALESCE(cnt, 0)
   WHERE id = target_portfolio_id;
 
@@ -434,6 +434,36 @@ DROP TRIGGER IF EXISTS tr_sync_ratings ON public.ratings;
 CREATE TRIGGER tr_sync_ratings
   AFTER INSERT OR UPDATE OR DELETE ON public.ratings
   FOR EACH ROW EXECUTE FUNCTION public.sync_ratings();
+
+-- Trigger: Database-level self-rating protection. This app's server connects
+-- via a single privileged pg pool with no Supabase Auth JWT/session context
+-- (see src/lib/auth/better-auth.ts), so auth.uid()-based RLS policies cannot
+-- reliably enforce this invariant for the app's actual write path. A BEFORE
+-- trigger fires unconditionally regardless of the connecting role, giving a
+-- genuine database backstop to the API-level ownership check in
+-- src/app/api/portfolios/[id]/rate/route.ts. Individual ratings remain 1.0-5.0.
+CREATE OR REPLACE FUNCTION public.prevent_self_rating()
+RETURNS TRIGGER AS $$
+DECLARE
+  portfolio_author_id UUID;
+BEGIN
+  SELECT author_id INTO portfolio_author_id
+  FROM public.portfolios
+  WHERE id = NEW.portfolio_id;
+
+  IF portfolio_author_id IS NOT NULL AND portfolio_author_id = NEW.user_id THEN
+    RAISE EXCEPTION 'Portfolio owners cannot rate their own portfolio.'
+      USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS tr_prevent_self_rating ON public.ratings;
+CREATE TRIGGER tr_prevent_self_rating
+  BEFORE INSERT OR UPDATE ON public.ratings
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_self_rating();
 
 -- Trigger: Auto-flag comments when report count reaches threshold (3)
 CREATE OR REPLACE FUNCTION public.sync_comment_reports()
