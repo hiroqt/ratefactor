@@ -23,6 +23,39 @@ export function CookieConsentBanner() {
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
   const [preferencesEnabled, setPreferencesEnabled] = useState(true);
+  const [isOtherModalActive, setIsOtherModalActive] = useState(false);
+
+  // Detect when any other modal dialog is open in the DOM and automatically hide cookie controls
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const checkModalActive = () => {
+      const hasOverflowHidden = document.body.style.overflow === "hidden";
+      const hasModalBackdrop = Boolean(
+        document.querySelector(
+          ".modal-backdrop, [role='dialog']:not([aria-label='Cookie preferences']), [aria-modal='true']:not([aria-label='Cookie preferences'])"
+        )
+      );
+      setIsOtherModalActive(hasOverflowHidden || hasModalBackdrop);
+    };
+
+    checkModalActive();
+
+    const observer = new MutationObserver(() => {
+      checkModalActive();
+    });
+
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["style", "class"],
+      childList: true,
+      subtree: true,
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -121,9 +154,9 @@ export function CookieConsentBanner() {
 
   return (
     <>
-      {/* 1. Persistent Floating Button (Always available in the corner) */}
+      {/* 1. Persistent Floating Button (Hidden when cookie banner or any other modal is active) */}
       <AnimatePresence>
-        {!isVisible && (
+        {!isVisible && !isOtherModalActive && (
           <motion.button
             key="rf-cookie-pill-badge"
             type="button"
@@ -138,7 +171,8 @@ export function CookieConsentBanner() {
             whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.96 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-4 left-4 z-[9990] inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface/90 hover:bg-surface border border-border/80 hover:border-amber-500/40 text-foreground text-xs font-medium shadow-glass-modal backdrop-blur-xl transition-all cursor-pointer group select-none"
+            className="fixed bottom-4 right-4 sm:right-6 z-40 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface/90 hover:bg-surface border border-border/80 hover:border-amber-500/40 text-foreground text-xs font-medium shadow-glass-modal backdrop-blur-xl transition-all cursor-pointer group select-none"
+            style={{ transformOrigin: "bottom right" }}
           >
             <div className="w-5 h-5 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center group-hover:bg-amber-500/20 transition-colors">
               <Cookie className="w-3.5 h-3.5" />
@@ -150,18 +184,19 @@ export function CookieConsentBanner() {
         )}
       </AnimatePresence>
 
-      {/* 2. Main Friendly Cookie Preferences Dialog */}
+      {/* 2. Main Friendly Cookie Preferences Dialog (Hidden when another modal is active) */}
       <AnimatePresence>
-        {isVisible && (
+        {isVisible && !isOtherModalActive && (
           <motion.aside
             key="ratefactor-cookie-consent-dialog"
             role="dialog"
             aria-label="Cookie preferences"
-            initial={{ opacity: 0, y: 32, scale: 0.96 }}
+            initial={{ opacity: 0, y: 24, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.96 }}
+            exit={{ opacity: 0, y: 16, scale: 0.96 }}
             transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-[9999] p-4 sm:p-5 rounded-2xl border border-border/80 bg-surface/95 backdrop-blur-2xl shadow-glass-modal text-foreground select-none"
+            style={{ transformOrigin: "bottom right" }}
+            className="fixed bottom-4 right-4 sm:right-6 w-[calc(100vw-2rem)] sm:w-full sm:max-w-md z-40 p-4 sm:p-5 rounded-2xl border border-border/80 bg-surface/95 backdrop-blur-2xl shadow-glass-modal text-foreground select-none"
           >
             {/* Header row */}
             <div className="flex items-start justify-between gap-3">

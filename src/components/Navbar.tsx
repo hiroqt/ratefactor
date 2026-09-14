@@ -60,6 +60,7 @@ export interface NavbarProps {
   onSignOut?: () => void;
   portfolios?: Portfolio[];
   onVisitUser?: (userProfile: DeveloperProfile) => void;
+  onSelectProfileTab?: (tab: "dashboard" | "bookmarks" | "settings" | "edit" | "account") => void;
 }
 
 export function Navbar({
@@ -85,7 +86,8 @@ export function Navbar({
   onOpenAuthModal,
   onSignOut,
   portfolios = [],
-  onVisitUser,
+  onVisitUser = () => {},
+  onSelectProfileTab,
 }: NavbarProps) {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [localNotificationOpen, setLocalNotificationOpen] = useState(false);
@@ -251,6 +253,12 @@ export function Navbar({
       if (pathname !== "/profile") {
         router.push("/profile");
       } else {
+        if (onOpenDashboard) onOpenDashboard();
+        if (onSelectProfileTab) onSelectProfileTab("dashboard");
+        if (typeof window !== "undefined") {
+          window.history.pushState(null, "", "/profile?tab=dashboard");
+          window.dispatchEvent(new CustomEvent("ratefactor:switch-profile-tab", { detail: "dashboard" }));
+        }
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
     } else if (tab === "apps") {
@@ -618,10 +626,16 @@ export function Navbar({
                           type="button"
                           onClick={() => {
                             setIsProfileDropdownOpen(false);
-                            if (pathname !== "/profile") {
-                              router.push("/profile?tab=dashboard");
+                            if (pathname === "/profile") {
+                              if (onOpenDashboard) onOpenDashboard();
+                              if (onSelectProfileTab) onSelectProfileTab("dashboard");
+                              if (typeof window !== "undefined") {
+                                window.history.pushState(null, "", "/profile?tab=dashboard");
+                                window.dispatchEvent(new CustomEvent("ratefactor:switch-profile-tab", { detail: "dashboard" }));
+                                window.scrollTo({ top: 0, behavior: "smooth" });
+                              }
                             } else {
-                              window.scrollTo({ top: 0, behavior: "smooth" });
+                              router.push("/profile?tab=dashboard");
                             }
                           }}
                           className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer text-left"
@@ -634,7 +648,16 @@ export function Navbar({
                           type="button"
                           onClick={() => {
                             setIsProfileDropdownOpen(false);
-                            router.push("/profile?tab=bookmarks");
+                            if (pathname === "/profile") {
+                              if (onSelectProfileTab) onSelectProfileTab("bookmarks");
+                              if (typeof window !== "undefined") {
+                                window.history.pushState(null, "", "/profile?tab=bookmarks");
+                                window.dispatchEvent(new CustomEvent("ratefactor:switch-profile-tab", { detail: "bookmarks" }));
+                                window.scrollTo({ top: 0, behavior: "smooth" });
+                              }
+                            } else {
+                              router.push("/profile?tab=bookmarks");
+                            }
                           }}
                           className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer text-left"
                         >
@@ -646,7 +669,16 @@ export function Navbar({
                           type="button"
                           onClick={() => {
                             setIsProfileDropdownOpen(false);
-                            router.push("/profile?tab=edit");
+                            if (pathname === "/profile") {
+                              if (onSelectProfileTab) onSelectProfileTab("account");
+                              if (typeof window !== "undefined") {
+                                window.history.pushState(null, "", "/profile?tab=settings");
+                                window.dispatchEvent(new CustomEvent("ratefactor:switch-profile-tab", { detail: "account" }));
+                                window.scrollTo({ top: 0, behavior: "smooth" });
+                              }
+                            } else {
+                              router.push("/profile?tab=settings");
+                            }
                           }}
                           className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer text-left"
                         >

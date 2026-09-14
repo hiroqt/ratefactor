@@ -2,6 +2,8 @@ import {
   COOKIE_UI_PREFS,
   COOKIE_GUEST_BOOKMARKS,
   COOKIE_CONSENT,
+  COOKIE_SESSION_TOKEN,
+  COOKIE_SESSION_TOKEN_FALLBACK,
   UIPrefs,
   CookieConsent,
 } from "./constants";
@@ -73,4 +75,18 @@ export function getClientCookieConsent(): CookieConsent | null {
 
 export function setClientCookieConsent(consent: CookieConsent): void {
   setCookie(COOKIE_CONSENT, JSON.stringify(consent), 60 * 60 * 24 * 180);
+}
+
+export function getClientSessionToken(): string | null {
+  return getCookie(COOKIE_SESSION_TOKEN) || getCookie(COOKIE_SESSION_TOKEN_FALLBACK);
+}
+
+export function setClientSessionToken(token: string): void {
+  setCookie(COOKIE_SESSION_TOKEN_FALLBACK, token, 60 * 60 * 24 * 30);
+  setCookie(COOKIE_SESSION_TOKEN, token, 60 * 60 * 24 * 30);
+}
+
+export function clearClientSessionToken(): void {
+  setCookie(COOKIE_SESSION_TOKEN_FALLBACK, "", 0);
+  setCookie(COOKIE_SESSION_TOKEN, "", 0);
 }

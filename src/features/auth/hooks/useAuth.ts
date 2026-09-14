@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { authClient, useSession, normalizeUsername } from "@/lib/auth/client";
+import { setClientSessionToken, clearClientSessionToken } from "@/lib/cookies";
 
 export interface AuthUser {
   id: string;
@@ -33,6 +34,9 @@ export function useAuth(options?: UseAuthOptions) {
       if (savedUser) {
         const parsed = JSON.parse(savedUser);
         setCurrentUser((prev) => prev || parsed);
+        if (parsed?.id) {
+          setClientSessionToken(parsed.id);
+        }
       }
     } catch (e) {}
   }, []);
@@ -65,6 +69,7 @@ export function useAuth(options?: UseAuthOptions) {
         };
         try {
           localStorage.setItem("ratefactor_auth_user", JSON.stringify(u));
+          setClientSessionToken(u.id);
         } catch (e) {}
         return u;
       });
@@ -92,6 +97,7 @@ export function useAuth(options?: UseAuthOptions) {
       setCurrentUser(u);
       try {
         localStorage.setItem("ratefactor_auth_user", JSON.stringify(u));
+        setClientSessionToken(u.id);
       } catch (e) {
         // ignore
       }
@@ -112,6 +118,7 @@ export function useAuth(options?: UseAuthOptions) {
       // ignore
     }
     setCurrentUser(null);
+    clearClientSessionToken();
     try {
       localStorage.removeItem("ratefactor_auth_user");
     } catch (e) {

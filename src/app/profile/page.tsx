@@ -78,22 +78,50 @@ function ProfilePageContent() {
   const [visitedUser, setVisitedUser] = useState<DeveloperProfile | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const normalizeTab = (raw: string | null): ActiveTabId | null => {
+    if (!raw) return null;
+    if (raw === "settings") return "account";
+    if (["dashboard", "github", "preview", "bookmarks", "edit", "account"].includes(raw)) {
+      return raw as ActiveTabId;
+    }
+    return null;
+  };
+
   // Tab mapping
-  const initialTab = (searchParams.get("tab") as ActiveTabId) || "dashboard";
+  const initialTab = normalizeTab(searchParams.get("tab")) || "dashboard";
   const [activeTab, setActiveTab] = useState<ActiveTabId>(initialTab);
   const [lastDashboardMode, setLastDashboardMode] = useState<"dashboard" | "github">(
     initialTab === "github" ? "github" : "dashboard"
   );
 
   useEffect(() => {
-    const tabFromQuery = searchParams.get("tab") as ActiveTabId;
-    if (tabFromQuery && ["dashboard", "github", "preview", "bookmarks", "edit", "account"].includes(tabFromQuery)) {
+    const tabFromQuery = normalizeTab(searchParams.get("tab"));
+    if (tabFromQuery) {
       setActiveTab(tabFromQuery);
       if (tabFromQuery === "dashboard" || tabFromQuery === "github") {
         setLastDashboardMode(tabFromQuery);
       }
     }
   }, [searchParams]);
+
+  // Handle direct tab switch events from Navbar dropdown or header actions
+  useEffect(() => {
+    const handleSwitchEvent = (e: Event) => {
+      const customEvt = e as CustomEvent<string>;
+      const target = normalizeTab(customEvt.detail);
+      if (target) {
+        setActiveTab(target);
+        if (target === "dashboard" || target === "github") {
+          setLastDashboardMode(target);
+        }
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    };
+    window.addEventListener("ratefactor:switch-profile-tab", handleSwitchEvent);
+    return () => {
+      window.removeEventListener("ratefactor:switch-profile-tab", handleSwitchEvent);
+    };
+  }, []);
 
   // Bookmarks state
   const { bookmarkedIds, toggleBookmark, isBookmarked } = useBookmarks();
@@ -386,19 +414,31 @@ function ProfilePageContent() {
       if (activeTab === "dashboard") {
         setActiveTab("github");
         setLastDashboardMode("github");
+        if (typeof window !== "undefined") {
+          window.history.replaceState(null, "", "/profile?tab=github");
+        }
         toast.info("Switched to GitHub Studio");
       } else if (activeTab === "github") {
         setActiveTab("dashboard");
         setLastDashboardMode("dashboard");
+        if (typeof window !== "undefined") {
+          window.history.replaceState(null, "", "/profile?tab=dashboard");
+        }
         toast.info("Switched to Architecture Deck");
       } else {
         setActiveTab(lastDashboardMode);
+        if (typeof window !== "undefined") {
+          window.history.replaceState(null, "", `/profile?tab=${lastDashboardMode}`);
+        }
       }
       return;
     }
     const selected = tabIds[index];
     if (selected) {
       setActiveTab(selected);
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", `/profile?tab=${selected === "account" ? "settings" : selected}`);
+      }
     }
   };
 
@@ -430,7 +470,24 @@ function ProfilePageContent() {
         }}
         onOpenDashboard={() => {
           setActiveTab("dashboard");
+          setLastDashboardMode("dashboard");
+          if (typeof window !== "undefined") {
+            window.history.replaceState(null, "", "/profile?tab=dashboard");
+          }
           window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+        onSelectProfileTab={(tab) => {
+          const target = normalizeTab(tab);
+          if (target) {
+            setActiveTab(target);
+            if (target === "dashboard" || target === "github") {
+              setLastDashboardMode(target);
+            }
+            if (typeof window !== "undefined") {
+              window.history.replaceState(null, "", `/profile?tab=${tab}`);
+            }
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }
         }}
         activeNavTab="dashboard"
         setActiveNavTab={() => {}}

@@ -268,9 +268,10 @@ export function HeroSection({
                     <button
                       type="button"
                       onClick={onExploreClick}
-                      className="text-xs sm:text-[13px] text-slate-500 dark:text-zinc-400 hover:text-foreground transition-colors text-left font-normal cursor-pointer leading-tight mt-0.5 tracking-tight"
+                      className="text-xs sm:text-[13px] text-slate-500 dark:text-zinc-400 hover:text-foreground transition-colors text-left font-normal cursor-pointer leading-tight mt-0.5 tracking-tight flex items-center gap-1 group/explore"
                     >
-                      Explore the component library
+                      <span>Explore developer portfolios</span>
+                      <ArrowRight className="w-2.5 h-2.5 opacity-60 group-hover/explore:opacity-100 group-hover/explore:translate-x-0.5 transition-all" />
                     </button>
                   </div>
                 </div>

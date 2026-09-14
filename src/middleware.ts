@@ -21,6 +21,7 @@ export function middleware(request: NextRequest) {
   // 2. Read session tokens from cookies or development/test authorization headers
   const sessionToken =
     request.cookies.get("better-auth.session_token")?.value ||
+    request.cookies.get("__Secure-better-auth.session_token")?.value ||
     request.cookies.get("session_token")?.value;
 
   const authHeader = request.headers.get("authorization");
