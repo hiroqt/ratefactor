@@ -74,9 +74,12 @@ export function AuthModal({
     setIsLoading(true);
     setLoadingProvider("google");
     try {
+      const redirectUrl = typeof window !== "undefined"
+        ? `${window.location.origin}/profile?new=true`
+        : "/profile?new=true";
       await authClient.signIn.social({
         provider: "google",
-        callbackURL: typeof window !== "undefined" ? window.location.href : "/",
+        callbackURL: redirectUrl,
       });
     } catch (err: any) {
       setError(err?.message || "Failed to initiate Google sign-in. Please try again.");
@@ -91,9 +94,12 @@ export function AuthModal({
     setIsLoading(true);
     setLoadingProvider("github");
     try {
+      const redirectUrl = typeof window !== "undefined"
+        ? `${window.location.origin}/profile?new=true`
+        : "/profile?new=true";
       await authClient.signIn.social({
         provider: "github",
-        callbackURL: typeof window !== "undefined" ? window.location.href : "/",
+        callbackURL: redirectUrl,
       });
     } catch (err: any) {
       setError(err?.message || "Failed to initiate GitHub sign-in. Please try again.");

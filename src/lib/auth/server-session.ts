@@ -10,6 +10,7 @@ export interface AuthenticatedUser {
   username: string;
   role: AppRole;
   avatar?: string;
+  createdAt?: string;
 }
 
 import { pool } from "./better-auth";
@@ -24,6 +25,9 @@ export async function getSessionUser(req: NextRequest): Promise<AuthenticatedUse
     const session = await auth.api.getSession({ headers: req.headers });
     if (session?.user) {
       const u = session.user;
+      const createdAt = (u as any).createdAt
+        ? new Date((u as any).createdAt).toISOString()
+        : undefined;
       return {
         id: u.id,
         name: u.name || "Developer",
@@ -31,6 +35,7 @@ export async function getSessionUser(req: NextRequest): Promise<AuthenticatedUse
         username: normalizeUsername(u.email || u.name),
         role: ((u as any).role as AppRole) || "developer",
         avatar: u.image || undefined,
+        createdAt,
       };
     }
   } catch {
@@ -44,7 +49,7 @@ export async function getSessionUser(req: NextRequest): Promise<AuthenticatedUse
     if (sessionMatch) {
       const rawToken = decodeURIComponent(sessionMatch[1].trim()).split(".")[0];
       const dbRes = await pool.query(
-        `SELECT s.id, s."userId", u.name, u.email, u.image, u.role
+        `SELECT s.id, s."userId", u.name, u.email, u.image, u.role, u."createdAt"
          FROM public.session s
          JOIN public."user" u ON s."userId" = u.id
          WHERE s.token = $1 AND s."expiresAt" > NOW()
@@ -60,6 +65,7 @@ export async function getSessionUser(req: NextRequest): Promise<AuthenticatedUse
           username: normalizeUsername(row.email || row.name),
           role: (row.role as AppRole) || "developer",
           avatar: row.image || undefined,
+          createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : undefined,
         };
       }
     }
@@ -70,7 +76,7 @@ export async function getSessionUser(req: NextRequest): Promise<AuthenticatedUse
   if (userId) {
     try {
       const userRes = await pool.query(
-        `SELECT id, name, email, image, role FROM public."user" WHERE id = $1 LIMIT 1`,
+        `SELECT id, name, email, image, role, "createdAt" FROM public."user" WHERE id = $1 LIMIT 1`,
         [userId]
       );
       if (userRes.rows && userRes.rows.length > 0) {
@@ -82,12 +88,13 @@ export async function getSessionUser(req: NextRequest): Promise<AuthenticatedUse
           username: normalizeUsername(u.email || u.name),
           role: (u.role as AppRole) || "developer",
           avatar: u.image || undefined,
+          createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : undefined,
         };
       }
 
       // Check profiles table as well
       const profileRes = await pool.query(
-        `SELECT id, full_name, username, avatar_url, role FROM public.profiles WHERE id::text = $1 OR LOWER(username) = LOWER($1) LIMIT 1`,
+        `SELECT id, full_name, username, avatar_url, role, created_at FROM public.profiles WHERE id::text = $1 OR LOWER(username) = LOWER($1) LIMIT 1`,
         [userId]
       );
       if (profileRes.rows && profileRes.rows.length > 0) {
@@ -98,6 +105,7 @@ export async function getSessionUser(req: NextRequest): Promise<AuthenticatedUse
           username: p.username || normalizeUsername(userId),
           role: (p.role as AppRole) || "developer",
           avatar: p.avatar_url || undefined,
+          createdAt: p.created_at ? new Date(p.created_at).toISOString() : undefined,
         };
       }
     } catch {}

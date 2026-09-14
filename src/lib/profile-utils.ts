@@ -10,6 +10,8 @@ export function createProfileFromAuthor(
     isVerified?: boolean;
     availableForHire?: boolean;
     customHireMessage?: string;
+    createdAt?: string;
+    joinedDate?: string;
   },
   portfolios: Portfolio[],
   baseProfile?: DeveloperProfile
@@ -21,6 +23,21 @@ export function createProfileFromAuthor(
   );
 
   const allSkills = Array.from(new Set(authorPortfolios.flatMap((p) => p.techStack || [])));
+
+  const earliestPortfolioDate = authorPortfolios.length > 0
+    ? authorPortfolios.reduce((earliest, p) => {
+        const pDate = new Date(p.createdAt).getTime();
+        const eDate = new Date(earliest).getTime();
+        return !isNaN(pDate) && pDate < eDate ? p.createdAt : earliest;
+      }, authorPortfolios[0].createdAt)
+    : undefined;
+
+  const resolvedJoinedDate =
+    author.createdAt ||
+    author.joinedDate ||
+    (baseProfile?.joinedDate && baseProfile.joinedDate !== "2026" ? baseProfile.joinedDate : undefined) ||
+    earliestPortfolioDate ||
+    new Date().toISOString();
 
   if (baseProfile && baseProfile.username.toLowerCase() === author.username.toLowerCase()) {
     return {
@@ -35,6 +52,10 @@ export function createProfileFromAuthor(
           : authorPortfolios.slice(0, 6).map((p) => p.id),
       spotlightPortfolioId: baseProfile.spotlightPortfolioId || authorPortfolios[0]?.id,
       skills: baseProfile.skills.length > 0 ? baseProfile.skills : allSkills,
+      joinedDate:
+        (baseProfile.joinedDate && baseProfile.joinedDate !== "2026")
+          ? baseProfile.joinedDate
+          : resolvedJoinedDate,
     };
   }
 
@@ -60,6 +81,6 @@ export function createProfileFromAuthor(
     pinnedPortfolioIds: authorPortfolios.slice(0, 6).map((p) => p.id),
     spotlightPortfolioId: authorPortfolios[0]?.id,
     skills: allSkills.length > 0 ? allSkills : ["TypeScript", "Next.js", "React"],
-    joinedDate: authorPortfolios[0]?.createdAt || new Date().toISOString(),
+    joinedDate: resolvedJoinedDate,
   };
 }

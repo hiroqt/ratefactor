@@ -66,7 +66,8 @@ export async function GET(req: NextRequest) {
           pr.avatar_url as "authorAvatar",
           pr.role as "authorRole",
           pr.is_verified as "authorIsVerified",
-          pr.available_for_hire as "authorAvailableForHire"
+          pr.available_for_hire as "authorAvailableForHire",
+          pr.created_at as "authorCreatedAt"
         FROM public.portfolios p
         LEFT JOIN public.profiles pr ON p.author_id = pr.id
         WHERE p.status = 'published'
@@ -168,6 +169,8 @@ export async function GET(req: NextRequest) {
               role: row.authorRole || "developer",
               isVerified: Boolean(row.authorIsVerified),
               availableForHire: row.authorAvailableForHire ?? true,
+              createdAt: row.authorCreatedAt ? new Date(row.authorCreatedAt).toISOString() : undefined,
+              joinedDate: row.authorCreatedAt ? new Date(row.authorCreatedAt).toISOString() : undefined,
             },
           };
         });

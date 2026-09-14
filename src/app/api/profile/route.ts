@@ -128,7 +128,15 @@ export async function GET(req: NextRequest) {
     try {
       if (requestedUsername) {
         const res = await pool.query(
-          `SELECT id, full_name as name, username, avatar_url, bio, skills, available_for_hire, custom_hire_message, company, location, website, github, twitter, linkedin FROM profiles WHERE LOWER(username) = LOWER($1) LIMIT 1`,
+          `SELECT 
+             p.id, p.full_name as name, p.username, p.avatar_url, p.role, p.onboarded, 
+             p.bio, p.skills, p.available_for_hire, p.custom_hire_message, 
+             p.company, p.location, p.website, p.github, p.twitter, p.linkedin,
+             COALESCE(p.created_at, u."createdAt") as created_at
+           FROM profiles p
+           LEFT JOIN public."user" u ON (p.id::text = u.id OR LOWER(p.username) = LOWER(REGEXP_REPLACE(u.name, '[^a-zA-Z0-9_-]', '', 'g')))
+           WHERE LOWER(p.username) = LOWER($1)
+           LIMIT 1`,
           [requestedUsername]
         );
         if (res.rows && res.rows.length > 0) {
@@ -139,6 +147,8 @@ export async function GET(req: NextRequest) {
             name: row.name || profile.name,
             username: row.username || profile.username,
             avatar: row.avatar_url || profile.avatar,
+            role: row.role || profile.role || "user",
+            onboarded: row.onboarded ?? profile.onboarded ?? true,
             bio: row.bio ?? profile.bio,
             skills: Array.isArray(row.skills) ? row.skills : profile.skills,
             availableForHire: row.available_for_hire ?? profile.availableForHire,
@@ -149,11 +159,40 @@ export async function GET(req: NextRequest) {
             github: row.github ?? profile.github,
             twitter: row.twitter ?? profile.twitter,
             linkedin: row.linkedin ?? profile.linkedin,
+            joinedDate: row.created_at ? new Date(row.created_at).toISOString() : profile.joinedDate,
           };
+        } else {
+          // Direct fallback to Better Auth user table
+          const uRes = await pool.query(
+            `SELECT id, name, email, image as avatar_url, role, "createdAt" as created_at 
+             FROM public."user" 
+             WHERE LOWER(name) = LOWER($1) OR LOWER(REGEXP_REPLACE(name, '[^a-zA-Z0-9_-]', '', 'g')) = LOWER($1) 
+             LIMIT 1`,
+            [requestedUsername]
+          );
+          if (uRes.rows && uRes.rows.length > 0) {
+            const uRow = uRes.rows[0];
+            profile = {
+              ...profile,
+              id: uRow.id || profile.id,
+              name: uRow.name || profile.name,
+              avatar: uRow.avatar_url || profile.avatar,
+              role: uRow.role || profile.role,
+              joinedDate: uRow.created_at ? new Date(uRow.created_at).toISOString() : profile.joinedDate,
+            };
+          }
         }
       } else if (authUser?.id) {
         const res = await pool.query(
-          `SELECT id, full_name as name, username, avatar_url, bio, skills, available_for_hire, custom_hire_message, company, location, website, github, twitter, linkedin FROM profiles WHERE id::text = $1 OR LOWER(username) = LOWER($2) LIMIT 1`,
+          `SELECT 
+             p.id, p.full_name as name, p.username, p.avatar_url, p.role, p.onboarded, 
+             p.bio, p.skills, p.available_for_hire, p.custom_hire_message, 
+             p.company, p.location, p.website, p.github, p.twitter, p.linkedin,
+             COALESCE(p.created_at, u."createdAt") as created_at
+           FROM profiles p
+           LEFT JOIN public."user" u ON (p.id::text = u.id OR LOWER(p.username) = LOWER(REGEXP_REPLACE(u.name, '[^a-zA-Z0-9_-]', '', 'g')))
+           WHERE p.id::text = $1 OR LOWER(p.username) = LOWER($2)
+           LIMIT 1`,
           [authUser.id, authUser.username || ""]
         );
         if (res.rows && res.rows.length > 0) {
@@ -163,6 +202,8 @@ export async function GET(req: NextRequest) {
             name: row.name || profile.name,
             username: row.username || profile.username,
             avatar: row.avatar_url || profile.avatar,
+            role: row.role || profile.role || "user",
+            onboarded: row.onboarded ?? profile.onboarded ?? false,
             bio: row.bio ?? profile.bio,
             skills: Array.isArray(row.skills) ? row.skills : profile.skills,
             availableForHire: row.available_for_hire ?? profile.availableForHire,
@@ -173,6 +214,14 @@ export async function GET(req: NextRequest) {
             github: row.github ?? profile.github,
             twitter: row.twitter ?? profile.twitter,
             linkedin: row.linkedin ?? profile.linkedin,
+            joinedDate: row.created_at
+              ? new Date(row.created_at).toISOString()
+              : (authUser.createdAt || profile.joinedDate),
+          };
+        } else if (authUser.createdAt) {
+          profile = {
+            ...profile,
+            joinedDate: new Date(authUser.createdAt).toISOString(),
           };
         }
       }
@@ -344,10 +393,46 @@ export async function PATCH(req: NextRequest) {
     const current =
       userProfiles.get(targetKey) || userProfiles.get("default") || { ...INITIAL_DEVELOPER_PROFILE };
 
+    // Check if new username is already taken by another account
+    const cleanUsername = data.username ? data.username.toLowerCase().replace(/^@/, "").trim() : undefined;
+    if (cleanUsername && cleanUsername !== (current.username || "").toLowerCase()) {
+      try {
+        const conflictRes = await pool.query(
+          `SELECT id FROM public.profiles WHERE LOWER(username) = LOWER($1) AND id::text != $2 LIMIT 1`,
+          [cleanUsername, authUser.id]
+        );
+        if (conflictRes.rows && conflictRes.rows.length > 0) {
+          return NextResponse.json(
+            {
+              type: "https://ratefactor.dev/errors/username-taken",
+              title: "Username Taken",
+              status: 409,
+              detail: `The username @${cleanUsername} is already taken. Please choose another username.`,
+              invalidParams: [{ name: "username", reason: "Username already taken" }],
+            },
+            {
+              status: 409,
+              headers: { "Content-Type": "application/problem+json" },
+            }
+          );
+        }
+      } catch {
+        // Fallback if DB offline
+      }
+    }
+
+    const safeName = data.name !== undefined
+      ? ((data.name && data.name.trim()) ? data.name.trim() : (cleanUsername || current.name || "User"))
+      : current.name;
+
     const updated: DeveloperProfile = {
       ...current,
       id: authUser.id,
-      name: data.name !== undefined ? data.name : current.name,
+      name: safeName,
+      username: cleanUsername !== undefined ? cleanUsername : current.username,
+      role: data.role !== undefined ? data.role : (current.role || "user"),
+      avatar: data.avatar !== undefined ? data.avatar : current.avatar,
+      onboarded: data.onboarded !== undefined ? data.onboarded : (current.onboarded ?? true),
       bio: data.bio !== undefined ? (data.bio ?? "") : current.bio,
       skills: data.skills !== undefined ? data.skills : current.skills,
       availableForHire:
@@ -362,6 +447,10 @@ export async function PATCH(req: NextRequest) {
       github: data.github !== undefined ? (data.github ?? "") : current.github,
       twitter: data.twitter !== undefined ? (data.twitter ?? "") : current.twitter,
       linkedin: data.linkedin !== undefined ? (data.linkedin ?? "") : current.linkedin,
+      joinedDate:
+        current.joinedDate && current.joinedDate !== "2026"
+          ? current.joinedDate
+          : (authUser.createdAt || current.joinedDate || new Date().toISOString()),
     };
 
     userProfiles.set(targetKey, updated);
@@ -378,7 +467,23 @@ export async function PATCH(req: NextRequest) {
 
       if (data.name !== undefined) {
         setClauses.push(`full_name = $${paramIdx++}`);
-        values.push(data.name);
+        values.push(safeName);
+      }
+      if (cleanUsername !== undefined) {
+        setClauses.push(`username = $${paramIdx++}`);
+        values.push(cleanUsername);
+      }
+      if (data.role !== undefined) {
+        setClauses.push(`role = $${paramIdx++}`);
+        values.push(data.role);
+      }
+      if (data.avatar !== undefined) {
+        setClauses.push(`avatar_url = $${paramIdx++}`);
+        values.push(data.avatar);
+      }
+      if (data.onboarded !== undefined) {
+        setClauses.push(`onboarded = $${paramIdx++}`);
+        values.push(data.onboarded);
       }
       if (data.bio !== undefined) {
         setClauses.push(`bio = $${paramIdx++}`);
@@ -423,8 +528,36 @@ export async function PATCH(req: NextRequest) {
 
       if (setClauses.length > 1) {
         values.push(authUser.id);
-        const query = `UPDATE profiles SET ${setClauses.join(", ")} WHERE id = $${paramIdx}`;
+        const query = `UPDATE public.profiles SET ${setClauses.join(", ")} WHERE id::text = $${paramIdx} OR LOWER(username) = LOWER($${paramIdx})`;
         await pool.query(query, values);
+      }
+
+      // Sync changes to Better Auth public."user" table
+      const userSetClauses: string[] = ['"updatedAt" = CURRENT_TIMESTAMP'];
+      const userValues: any[] = [];
+      let uIdx = 1;
+      if (data.name !== undefined) {
+        userSetClauses.push(`"name" = $${uIdx++}`);
+        userValues.push(safeName);
+      }
+      if (data.avatar !== undefined) {
+        userSetClauses.push(`"image" = $${uIdx++}`);
+        userValues.push(data.avatar);
+      }
+      if (data.role !== undefined) {
+        userSetClauses.push(`"role" = $${uIdx++}`);
+        userValues.push(data.role);
+      }
+      if (data.onboarded !== undefined) {
+        userSetClauses.push(`"onboarded" = $${uIdx++}`);
+        userValues.push(data.onboarded);
+      }
+      if (userSetClauses.length > 1) {
+        userValues.push(authUser.id);
+        await pool.query(
+          `UPDATE public."user" SET ${userSetClauses.join(", ")} WHERE "id" = $${uIdx}`,
+          userValues
+        );
       }
     } catch {
       // Graceful fallback if database connection is offline

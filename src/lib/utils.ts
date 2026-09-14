@@ -74,7 +74,10 @@ export function formatRating(val?: number | null, fallback = 5.0): string {
  * Formats a joined date into 'MMM DD, YYYY' format (e.g. 'Sep 12, 2026', 'Jan 01, 2026').
  */
 export function formatJoinedDate(dateStr?: string | Date | null): string {
-  if (!dateStr) return "Jan 01, 2026";
+  if (!dateStr || dateStr === "2026") {
+    // If not set, default to recent join date
+    return "Sep 13, 2026";
+  }
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) {
     return String(dateStr);

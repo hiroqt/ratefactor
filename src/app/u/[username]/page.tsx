@@ -166,8 +166,14 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
 
     // If viewing current user's profile
     if (myDevProfile.username.toLowerCase().replace(/^@/, "") === rawUsername.toLowerCase()) {
+      const accurateJoined =
+        (myDevProfile.joinedDate && myDevProfile.joinedDate !== "2026")
+          ? myDevProfile.joinedDate
+          : (currentUser?.createdAt || liveProfile?.joinedDate || myDevProfile.joinedDate);
+
       return {
         ...myDevProfile,
+        joinedDate: accurateJoined,
         availableForHire: myDevProfile.availableForHire ?? true,
         customHireMessage:
           myDevProfile.customHireMessage ||
@@ -177,8 +183,22 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
 
     // Base profile derived from live API fetch if available
     if (liveProfile && liveProfile.username?.toLowerCase().replace(/^@/, "") === rawUsername.toLowerCase()) {
+      const earliestPortfolioDate = targetAuthorPortfolios.length > 0
+        ? targetAuthorPortfolios.reduce((earliest, p) => {
+            const pDate = new Date(p.createdAt).getTime();
+            const eDate = new Date(earliest).getTime();
+            return !isNaN(pDate) && pDate < eDate ? p.createdAt : earliest;
+          }, targetAuthorPortfolios[0].createdAt)
+        : undefined;
+
+      const accurateJoined =
+        (liveProfile.joinedDate && liveProfile.joinedDate !== "2026")
+          ? liveProfile.joinedDate
+          : (targetAuthorPortfolios[0]?.author?.createdAt || earliestPortfolioDate || liveProfile.joinedDate);
+
       return {
         ...liveProfile,
+        joinedDate: accurateJoined,
         pinnedPortfolioIds: liveProfile.pinnedPortfolioIds || targetAuthorPortfolios.slice(0, 6).map((p) => p.id),
         spotlightPortfolioId: liveProfile.spotlightPortfolioId || targetAuthorPortfolios[0]?.id,
         skills: liveProfile.skills?.length ? liveProfile.skills : ["TypeScript", "Next.js", "React", "Node.js", "PostgreSQL"],
@@ -188,8 +208,16 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
     // If matched in portfolios
     if (targetAuthorPortfolios.length > 0) {
       const author = targetAuthorPortfolios[0].author;
-      return createProfileFromAuthor(author, portfolios);
+      return createProfileFromAuthor(author, portfolios, liveProfile || undefined);
     }
+
+    const earliestFallbackDate = targetAuthorPortfolios.length > 0
+      ? targetAuthorPortfolios.reduce((earliest, p) => {
+          const pDate = new Date(p.createdAt).getTime();
+          const eDate = new Date(earliest).getTime();
+          return !isNaN(pDate) && pDate < eDate ? p.createdAt : earliest;
+        }, targetAuthorPortfolios[0].createdAt)
+      : undefined;
 
     // Default fallback profile for the username
     return {
@@ -210,9 +238,13 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
       pinnedPortfolioIds: targetAuthorPortfolios.slice(0, 6).map((p) => p.id),
       spotlightPortfolioId: targetAuthorPortfolios[0]?.id,
       skills: ["TypeScript", "Next.js", "React", "Node.js", "PostgreSQL"],
-      joinedDate: targetAuthorPortfolios[0]?.createdAt || new Date().toISOString(),
+      joinedDate:
+        (liveProfile?.joinedDate && liveProfile.joinedDate !== "2026" ? liveProfile.joinedDate : undefined) ||
+        (currentUser && currentUser.username?.toLowerCase() === rawUsername.toLowerCase() ? currentUser.createdAt : undefined) ||
+        earliestFallbackDate ||
+        new Date().toISOString(),
     };
-  }, [rawUsername, myDevProfile, liveProfile, targetAuthorPortfolios, portfolios]);
+  }, [rawUsername, myDevProfile, liveProfile, targetAuthorPortfolios, portfolios, currentUser?.createdAt]);
 
   // Determine whether current user owns this profile
   const isOwner = Boolean(
@@ -369,11 +401,17 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
             <h2 className="text-xl font-bold text-slate-900">Developer Profile Not Found</h2>
             <p className="text-xs text-slate-500 mt-1">We couldn't locate a developer profile for "@{rawUsername}".</p>
             <Link
-              href="/"
-              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-black transition-colors"
+              href="/apps"
+              onClick={(e) => {
+                if (typeof window !== "undefined" && window.history.length > 1 && document.referrer && document.referrer.includes(window.location.host)) {
+                  e.preventDefault();
+                  router.back();
+                }
+              }}
+              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-black transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back to Discovery Feed</span>
+              <span>Back to Architecture Feed</span>
             </Link>
           </div>
         </main>
@@ -423,8 +461,14 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
             <div className="flex items-center gap-3">
               <Link
-                href="/"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-950 px-3 py-1.5 rounded-full bg-white border border-slate-200 hover:bg-slate-100 transition-colors shadow-2xs"
+                href="/apps"
+                onClick={(e) => {
+                  if (typeof window !== "undefined" && window.history.length > 1 && document.referrer && document.referrer.includes(window.location.host)) {
+                    e.preventDefault();
+                    router.back();
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-950 px-3 py-1.5 rounded-full bg-white border border-slate-200 hover:bg-slate-100 transition-colors shadow-2xs cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>Back to Architecture Feed</span>

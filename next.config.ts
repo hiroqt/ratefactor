@@ -46,6 +46,18 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return [
+      {
+        source: "/architectures",
+        destination: "/apps",
+      },
+      {
+        source: "/architecture",
+        destination: "/apps",
+      },
+    ];
+  },
 };
 
 export default withSentryConfig(nextConfig, {

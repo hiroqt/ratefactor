@@ -84,6 +84,7 @@ import {
   CircleDotIcon,
   Sun01Icon,
   Moon01Icon,
+  Camera01Icon,
 } from "@hugeicons/core-free-icons";
 
 export interface IconProps extends Omit<HugeiconsProps, "icon"> {
@@ -263,6 +264,6 @@ export const Cookie = React.forwardRef<SVGSVGElement, IconProps>(
     </svg>
   )
 );
-Cookie.displayName = "Cookie";
+export const Camera = createIcon(Camera01Icon, "Camera");
 
 

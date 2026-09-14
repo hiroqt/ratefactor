@@ -4,9 +4,39 @@ export const profileUpdateSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(1, "Name must not be empty")
     .max(80, "Name must not exceed 80 characters")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  username: z
+    .string()
+    .trim()
+    .min(3, "Username must be at least 3 characters")
+    .max(10, "Username must not exceed 10 characters")
+    .regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, underscores, and hyphens")
     .optional(),
+  role: z
+    .string()
+    .trim()
+    .min(1, "Role must not be empty")
+    .max(60, "Role must not exceed 60 characters")
+    .optional(),
+  avatar: z
+    .string()
+    .trim()
+    .refine(
+      (val) => {
+        if (!val) return true;
+        if (/^data:image\/(jpeg|jpg|png|webp);base64,/i.test(val)) return true;
+        if (/^https?:\/\//i.test(val)) return true;
+        return false;
+      },
+      {
+        message: "Avatar must be a valid HTTP/HTTPS URL or base64 image data URI.",
+      }
+    )
+    .optional(),
+  onboarded: z.boolean().optional(),
   bio: z
     .string()
     .trim()

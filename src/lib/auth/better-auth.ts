@@ -96,8 +96,14 @@ export const auth = betterAuth({
       role: {
         type: "string",
         required: false,
-        defaultValue: "developer",
-        input: false,
+        defaultValue: "user",
+        input: true,
+      },
+      onboarded: {
+        type: "boolean",
+        required: false,
+        defaultValue: false,
+        input: true,
       },
     },
   },

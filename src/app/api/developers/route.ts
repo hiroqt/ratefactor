@@ -67,6 +67,8 @@ export async function GET(req: NextRequest) {
           avatar: row.avatar || "",
           role: row.role || "developer",
           isVerified: Boolean(row.isVerified),
+          createdAt: row.created_at ? new Date(row.created_at).toISOString() : undefined,
+          joinedDate: row.created_at ? new Date(row.created_at).toISOString() : undefined,
         }));
       }
     } catch {
@@ -89,6 +91,8 @@ export async function GET(req: NextRequest) {
               avatar: p.author.avatar || "",
               role: p.author.role || "developer",
               isVerified: p.author.isVerified,
+              createdAt: p.author.createdAt || p.createdAt,
+              joinedDate: p.author.joinedDate || p.author.createdAt || p.createdAt,
             });
           }
         }

@@ -26,6 +26,9 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
         if (parsed.bio && parsed.bio.includes("Ready to share architectures")) {
           parsed.bio = "";
         }
+        if (parsed.joinedDate === "2026") {
+          delete parsed.joinedDate;
+        }
         if (
           parsed.readmeMarkdown &&
           (parsed.readmeMarkdown.includes("Welcome to My Profile") ||
@@ -104,22 +107,27 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
         const nextUsername = targetHandle || prev.username;
         const nextAvatar = currentUser.avatar || prev.avatar;
         const nextRole = currentUser.role || prev.role;
+        const nextJoinedDate = (currentUser.createdAt && currentUser.createdAt !== "2026")
+          ? currentUser.createdAt
+          : (prev.joinedDate && prev.joinedDate !== "2026" ? prev.joinedDate : undefined);
 
         if (
           prev.name === nextName &&
           prev.username === nextUsername &&
           prev.avatar === nextAvatar &&
-          prev.role === nextRole
+          prev.role === nextRole &&
+          (!nextJoinedDate || prev.joinedDate === nextJoinedDate)
         ) {
           return prev;
         }
 
-        const updated = {
+        const updated: DeveloperProfile = {
           ...prev,
           name: nextName,
           username: nextUsername,
           avatar: nextAvatar,
           role: nextRole,
+          joinedDate: nextJoinedDate || prev.joinedDate,
         };
         try {
           localStorage.setItem("ratefactor_dev_profile", JSON.stringify(updated));
@@ -134,7 +142,46 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
       // (see useGithubConnection), not from this profile's cached
       // githubSync.connected flag, which is a display cache only.
     }
-  }, [currentUser?.username, currentUser?.name, currentUser?.avatar, currentUser?.role]);
+  }, [currentUser?.username, currentUser?.name, currentUser?.avatar, currentUser?.role, currentUser?.createdAt]);
+
+  // Fetch authoritative profile from API if user is authenticated to sync database joinedDate
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let isCancelled = false;
+
+    const syncApiProfile = async () => {
+      try {
+        const res = await fetch("/api/profile");
+        if (res.ok) {
+          const data = await res.json();
+          const p = data.profile || data;
+          if (p && !isCancelled) {
+            setDeveloperProfile((prev) => {
+              const authoritativeJoinedDate =
+                (p.joinedDate && p.joinedDate !== "2026")
+                  ? p.joinedDate
+                  : (currentUser.createdAt || (prev.joinedDate !== "2026" ? prev.joinedDate : undefined));
+
+              const merged: DeveloperProfile = {
+                ...prev,
+                ...p,
+                joinedDate: authoritativeJoinedDate || prev.joinedDate,
+              };
+              try {
+                localStorage.setItem("ratefactor_dev_profile", JSON.stringify(merged));
+              } catch {}
+              return merged;
+            });
+          }
+        }
+      } catch {}
+    };
+
+    syncApiProfile();
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentUser?.id, currentUser?.createdAt]);
 
 
   const updateProfile = useCallback((updated: DeveloperProfile) => {

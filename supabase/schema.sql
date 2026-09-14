@@ -1024,3 +1024,118 @@ ALTER TABLE public.github_repositories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.github_readmes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.github_contributions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.github_contribution_summaries ENABLE ROW LEVEL SECURITY;
+
+-- ==========================================================
+-- 17. ROLES, ONBOARDING, AND STRATEGIC PERFORMANCE INDEXES
+-- Support multi-discipline roles, profile onboarding tracking,
+-- and enterprise-grade composite, partial, covering, and functional indexes.
+-- ==========================================================
+
+-- Evolve profiles and user role to TEXT with default 'user'
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'profiles' AND column_name = 'role'
+  ) THEN
+    ALTER TABLE public.profiles ALTER COLUMN role DROP DEFAULT;
+    ALTER TABLE public.profiles ALTER COLUMN role TYPE TEXT USING role::text;
+    ALTER TABLE public.profiles ALTER COLUMN role SET DEFAULT 'user';
+  END IF;
+END $$;
+
+ALTER TABLE public.profiles 
+  ADD COLUMN IF NOT EXISTS onboarded BOOLEAN NOT NULL DEFAULT FALSE;
+
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'user' AND column_name = 'role'
+  ) THEN
+    ALTER TABLE public."user" DROP CONSTRAINT IF EXISTS user_role_check;
+    ALTER TABLE public."user" ALTER COLUMN "role" SET DEFAULT 'user';
+  END IF;
+END $$;
+
+ALTER TABLE public."user"
+  ADD COLUMN IF NOT EXISTS "onboarded" BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- High-Performance Strategic Indexes
+CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_lower_username 
+  ON public.profiles(LOWER(username));
+
+CREATE INDEX IF NOT EXISTS idx_profiles_lower_full_name 
+  ON public.profiles(LOWER(full_name));
+
+CREATE INDEX IF NOT EXISTS idx_profiles_created_at_id 
+  ON public.profiles(created_at DESC, id DESC);
+
+CREATE INDEX IF NOT EXISTS idx_profiles_role_hire 
+  ON public.profiles(role, available_for_hire) 
+  WHERE available_for_hire = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_profiles_onboarded 
+  ON public.profiles(onboarded);
+
+CREATE INDEX IF NOT EXISTS idx_portfolios_published_feed 
+  ON public.portfolios(category, rating DESC, created_at DESC) 
+  WHERE status = 'published';
+
+CREATE INDEX IF NOT EXISTS idx_portfolios_published_likes 
+  ON public.portfolios(category, likes_count DESC, created_at DESC) 
+  WHERE status = 'published';
+
+CREATE INDEX IF NOT EXISTS idx_portfolios_published_recent 
+  ON public.portfolios(category, created_at DESC) 
+  WHERE status = 'published';
+
+CREATE INDEX IF NOT EXISTS idx_portfolios_all_published_rating 
+  ON public.portfolios(rating DESC, created_at DESC) 
+  WHERE status = 'published';
+
+CREATE INDEX IF NOT EXISTS idx_portfolios_all_published_likes 
+  ON public.portfolios(likes_count DESC, created_at DESC) 
+  WHERE status = 'published';
+
+CREATE INDEX IF NOT EXISTS idx_portfolios_all_published_recent 
+  ON public.portfolios(created_at DESC) 
+  WHERE status = 'published';
+
+CREATE INDEX IF NOT EXISTS idx_portfolios_author_created 
+  ON public.portfolios(author_id, created_at DESC) 
+  INCLUDE (id, title, rating, likes_count, comments_count);
+
+CREATE INDEX IF NOT EXISTS idx_ratings_portfolio_aggregate 
+  ON public.ratings(portfolio_id) 
+  INCLUDE (score, design, code_quality, performance, documentation);
+
+CREATE INDEX IF NOT EXISTS idx_likes_portfolio_id 
+  ON public.likes(portfolio_id);
+
+CREATE INDEX IF NOT EXISTS idx_comments_portfolio_approved 
+  ON public.comments(portfolio_id, created_at ASC) 
+  WHERE status = 'approved';
+
+CREATE INDEX IF NOT EXISTS idx_comments_reported_pending 
+  ON public.comments(report_count DESC, created_at DESC) 
+  WHERE is_reported = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_notifications_unread_recipient 
+  ON public.notifications(recipient_id, created_at DESC) 
+  WHERE is_read = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_user_lower_email 
+  ON public."user"(LOWER(email));
+
+CREATE INDEX IF NOT EXISTS idx_session_token_expires 
+  ON public."session"(token, "expiresAt");
+
+CREATE INDEX IF NOT EXISTS idx_account_user_provider 
+  ON public."account"("userId", "providerId");
+
+CREATE INDEX IF NOT EXISTS idx_github_repos_user_stars 
+  ON public.github_repositories(user_id, stars DESC) 
+  WHERE is_private = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_github_contributions_user_date_asc 
+  ON public.github_contributions(user_id, date ASC);
+

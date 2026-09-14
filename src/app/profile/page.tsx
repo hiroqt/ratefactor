@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, Suspense } from "react";
+import React, { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { 
@@ -40,7 +40,9 @@ import {
   Boxes,
   Compass,
   Smile,
-  Briefcase
+  Briefcase,
+  Camera,
+  Upload
 } from "@/components/ui/icons";
 import { Navbar, Footer } from "@/components/layout";
 import { DeveloperDashboard, useDeveloperProfile } from "@/features/dashboard";
@@ -55,7 +57,8 @@ import { useNotifications } from "@/features/notifications";
 import { useToast } from "@/hooks/useToast";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { PublicProfileModal } from "@/components/PublicProfileModal";
-import { DeveloperProfile, UserStatus } from "@/types/profile";
+import { ProfileOnboardingModal } from "@/components/profile/ProfileOnboardingModal";
+import { DeveloperProfile, UserStatus, AVAILABLE_ROLES } from "@/types/profile";
 import { Portfolio } from "@/types/portfolio";
 import { HookSidebar, HookSidebarItem } from "@/components/ui/hook-sidebar";
 import { HireSwitch } from "@/components/ui/HireSwitch";
@@ -66,6 +69,8 @@ import { EditStatusModal } from "@/components/dashboard/EditStatusModal";
 import { EditBioModal } from "@/components/dashboard/EditBioModal";
 import { PublicProfilePreview } from "@/components/dashboard/PublicProfilePreview";
 import { MarkdownRenderer } from "@/components/dashboard/MarkdownRenderer";
+import { compressProfileImage } from "@/lib/image-compression";
+import { authClient } from "@/lib/auth/client";
 import { cn, formatNumber, formatRating, formatJoinedDate, normalizeAvatarUrl } from "@/lib/utils";
 import { getEmojiDisplay } from "@/components/PortfolioDetailModal";
 
@@ -130,6 +135,8 @@ function ProfilePageContent() {
   const [isPinsModalOpen, setIsPinsModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isBioModalOpen, setIsBioModalOpen] = useState(false);
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
+  const [isGoogleUser, setIsGoogleUser] = useState(false);
 
   // 1. Unified Authentication State
   const {
@@ -143,7 +150,7 @@ function ProfilePageContent() {
     handleSignOut,
   } = useAuth({
     onAuthSuccess: (u) => {
-      toast.success(`Authenticated as @${u.username || u.name} (${(u.role || "developer").toUpperCase()})`);
+      toast.success(`Authenticated as @${u.username || u.name} (${(u.role || "user").toUpperCase()})`);
     },
     onSignOut: () => {
       toast.info("Signed out. Returning to home...");
@@ -157,6 +164,41 @@ function ProfilePageContent() {
       router.push("/");
     }
   }, [currentUser, isAuthLoading, router]);
+
+  const hasTriggeredWelcomeToast = useRef(false);
+
+  // Check if newly created account or onboarding requested
+  useEffect(() => {
+    const isNew = searchParams.get("new") === "true";
+    const isOnboardParam = searchParams.get("onboarding") === "true";
+    const needsOnboard = Boolean(currentUser && currentUser.onboarded === false);
+
+    if (isNew || isOnboardParam || needsOnboard) {
+      setIsOnboardingModalOpen(true);
+    }
+
+    if (isNew && !hasTriggeredWelcomeToast.current) {
+      hasTriggeredWelcomeToast.current = true;
+      toast.success("Account created successfully! Welcome to RateFactor.");
+    }
+  }, [searchParams, currentUser, toast]);
+
+  // Check if current user is authenticated with Google
+  useEffect(() => {
+    async function checkLinkedAccounts() {
+      try {
+        const res = await authClient.listAccounts();
+        const accounts = res.data || [];
+        const googleAccount = accounts.find((a: any) => a?.providerId === "google");
+        setIsGoogleUser(Boolean(googleAccount));
+      } catch {
+        // ignore
+      }
+    }
+    if (currentUser) {
+      checkLinkedAccounts();
+    }
+  }, [currentUser]);
 
   // 2. Developer Profile State
   const {
@@ -281,6 +323,26 @@ function ProfilePageContent() {
     customHireMessage: developerProfile.customHireMessage || "",
   });
 
+  const [editAvatarCompressing, setEditAvatarCompressing] = useState(false);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleEditAvatarUpload = async (file: File) => {
+    setEditAvatarCompressing(true);
+    try {
+      const result = await compressProfileImage(file, {
+        maxDimension: 512,
+        initialQuality: 0.85,
+        maxSizeBytes: 2 * 1024 * 1024,
+      });
+      setEditForm((prev) => ({ ...prev, avatar: result.dataUrl }));
+      toast.success("Avatar image uploaded successfully");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to process avatar.");
+    } finally {
+      setEditAvatarCompressing(false);
+    }
+  };
+
   useEffect(() => {
     setEditForm({
       name: developerProfile.name || "",
@@ -301,7 +363,7 @@ function ProfilePageContent() {
     });
   }, [developerProfile]);
 
-  const handleSaveEditProfile = (e: React.FormEvent) => {
+  const handleSaveEditProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     const skillsArray = editForm.skillsInput
       .split(",")
@@ -331,6 +393,29 @@ function ProfilePageContent() {
     };
 
     updateProfile(updated);
+    try {
+      await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: updated.name,
+          username: updated.username,
+          role: updated.role,
+          avatar: updated.avatar,
+          bio: updated.bio,
+          skills: updated.skills,
+          availableForHire: updated.availableForHire,
+          customHireMessage: updated.customHireMessage,
+          github: updated.github,
+          twitter: updated.twitter,
+          linkedin: updated.linkedin,
+          website: updated.website,
+          onboarded: true,
+        }),
+      });
+    } catch {
+      // ignore
+    }
     toast.success("Developer profile updated successfully!");
   };
 
@@ -565,6 +650,14 @@ function ProfilePageContent() {
                 <Eye className="w-3.5 h-3.5" />
                 <span>Public View</span>
               </button>
+              <button
+                type="button"
+                onClick={() => setIsOnboardingModalOpen(true)}
+                className="px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50/70 border border-emerald-200/60 font-medium"
+              >
+                <Settings className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Configure Profile</span>
+              </button>
             </div>
           </div>
 
@@ -599,6 +692,9 @@ function ProfilePageContent() {
                     <p className="text-[11px] font-mono text-slate-500 truncate">
                       @{developerProfile.username}
                     </p>
+                    <span className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                      {developerProfile.role || "User"}
+                    </span>
                   </div>
                 </div>
 
@@ -648,6 +744,15 @@ function ProfilePageContent() {
                     </button>
                   </div>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => setIsOnboardingModalOpen(true)}
+                  className="w-full mt-2 py-1.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Settings className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Configure Profile</span>
+                </button>
 
                 {/* Available for Hire Quick Toggle */}
                 <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
@@ -1146,27 +1251,31 @@ function ProfilePageContent() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                           <label className="text-xs font-semibold text-slate-700">
-                            Full Name
+                            Name
                           </label>
                           <input
                             type="text"
                             value={editForm.name}
                             onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                            required
+                            placeholder="e.g. Alex Chen"
                             className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
                           />
                         </div>
 
                         <div className="space-y-1.5">
-                          <label className="text-xs font-semibold text-slate-700">
-                            Username
-                          </label>
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-semibold text-slate-700">
+                              Username
+                            </label>
+                            <span className="text-[11px] text-slate-400 font-mono">3–10 chars</span>
+                          </div>
                           <div className="relative">
                             <span className="absolute left-3.5 top-2.5 text-xs text-slate-400 font-mono">@</span>
                             <input
                               type="text"
                               value={editForm.username}
-                              onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                              onChange={(e) => setEditForm({ ...editForm, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 10) })}
+                              maxLength={10}
                               required
                               className="w-full pl-8 pr-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900"
                             />
@@ -1174,30 +1283,105 @@ function ProfilePageContent() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-semibold text-slate-700">
-                            Role / Title
-                          </label>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-semibold text-slate-700">
+                              Role / Discipline
+                            </label>
+                            <span className="text-[11px] text-slate-400">Default: User</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {AVAILABLE_ROLES.map((roleOption) => {
+                              const isSelected = editForm.role.toLowerCase() === roleOption.toLowerCase();
+                              return (
+                                <button
+                                  key={roleOption}
+                                  type="button"
+                                  onClick={() => setEditForm({ ...editForm, role: roleOption })}
+                                  className={cn(
+                                    "px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer",
+                                    isSelected
+                                      ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
+                                      : "bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300"
+                                  )}
+                                >
+                                  <span>{roleOption}</span>
+                                  {roleOption === "User" && (
+                                    <span className="ml-1 text-[9px] opacity-70 font-mono">default</span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
                           <input
                             type="text"
                             value={editForm.role}
                             onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                            placeholder="e.g. Senior Fullstack Architect"
+                            placeholder="Select above or type custom role (e.g. Senior Fullstack Architect)"
                             className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
                           />
                         </div>
 
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-semibold text-slate-700">
-                            Avatar URL
-                          </label>
-                          <input
-                            type="url"
-                            value={editForm.avatar}
-                            onChange={(e) => setEditForm({ ...editForm, avatar: e.target.value })}
-                            className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                          />
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-semibold text-slate-700">
+                              Profile Picture (Avatar)
+                            </label>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="relative w-12 h-12 rounded-full overflow-hidden border border-slate-200 bg-slate-100 shrink-0">
+                              {editForm.avatar ? (
+                                <img
+                                  src={editForm.avatar}
+                                  alt="Avatar Preview"
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                  <Camera className="w-5 h-5" />
+                                </div>
+                              )}
+                              {editAvatarCompressing && (
+                                <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center text-white">
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 space-y-1.5">
+                              <div className="flex gap-2">
+                                <input
+                                  type="url"
+                                  value={editForm.avatar}
+                                  onChange={(e) => setEditForm({ ...editForm, avatar: e.target.value })}
+                                  placeholder="https://... or upload local image"
+                                  className="flex-1 px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => editFileInputRef.current?.click()}
+                                  disabled={editAvatarCompressing}
+                                  className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-medium flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+                                >
+                                  <Upload className="w-3.5 h-3.5" />
+                                  <span>Upload</span>
+                                </button>
+                              </div>
+                              <input
+                                ref={editFileInputRef}
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/jpg"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleEditAvatarUpload(file);
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-slate-400">
+                            Max image size: 2 MB
+                          </p>
                         </div>
                       </div>
 
@@ -1388,7 +1572,11 @@ function ProfilePageContent() {
                           <div className="p-3 bg-white rounded-xl border border-slate-200/80">
                             <span className="text-slate-400 font-mono">Member Since</span>
                             <p className="font-semibold text-slate-900 mt-0.5">
-                              {formatJoinedDate(developerProfile.joinedDate)}
+                              {formatJoinedDate(
+                                (developerProfile.joinedDate && developerProfile.joinedDate !== "2026")
+                                  ? developerProfile.joinedDate
+                                  : (currentUser?.createdAt || developerProfile.joinedDate)
+                              )}
                             </p>
                           </div>
                         </div>
@@ -1504,6 +1692,20 @@ function ProfilePageContent() {
         onClose={() => setIsBioModalOpen(false)}
         profile={developerProfile}
         onSaveProfile={handleSaveBio}
+      />
+
+      {/* Profile Onboarding Modal for New Accounts */}
+      <ProfileOnboardingModal
+        isOpen={isOnboardingModalOpen}
+        onClose={() => setIsOnboardingModalOpen(false)}
+        profile={developerProfile}
+        onSaveSuccess={(updated) => {
+          updateProfile(updated);
+          toast.success("Profile configured successfully!");
+        }}
+        isGoogleUser={isGoogleUser}
+        hasGithubLinked={githubConnection.status === "connected"}
+        isNewAccount={searchParams.get("new") === "true" || currentUser?.onboarded === false}
       />
 
       <Footer />

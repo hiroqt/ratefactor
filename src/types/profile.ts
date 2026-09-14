@@ -19,6 +19,22 @@ export interface GitHubSyncDetails {
   lastSyncedAt?: string;
 }
 
+export const AVAILABLE_ROLES = [
+  "User",
+  "Front End",
+  "Backend",
+  "Fullstack",
+  "UI/UX",
+  "QA",
+  "ML",
+  "Cloud",
+  "Network",
+  "Data",
+  "Graphics",
+] as const;
+
+export type StandardRole = typeof AVAILABLE_ROLES[number];
+
 export interface DeveloperProfile {
   id: string;
   name: string;
@@ -43,6 +59,7 @@ export interface DeveloperProfile {
   skills: string[];
   joinedDate: string;
   isVerified?: boolean;
+  onboarded?: boolean;
 }
 
 export interface ShowcaseAccolade {
@@ -62,6 +79,9 @@ export interface DeveloperSummary {
   avatar: string;
   role: string;
   isVerified?: boolean;
+  onboarded?: boolean;
+  createdAt?: string;
+  joinedDate?: string;
 }
 
 

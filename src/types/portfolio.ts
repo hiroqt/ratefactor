@@ -81,6 +81,8 @@ export interface Portfolio {
     role: string;
     isVerified?: boolean;
     availableForHire?: boolean;
+    createdAt?: string;
+    joinedDate?: string;
   };
   techStack: string[];
   category: "Developer" | "Arts" | "Client" | "Frontend" | "Fullstack" | "Systems" | "Design Engineer" | "Mobile" | "AI / ML";
