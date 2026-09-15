@@ -38,7 +38,8 @@ export async function GET(req: NextRequest) {
       (!hostParam || hostParam === "all") &&
       !query &&
       sort === "highest_rated" &&
-      offset === 0;
+      offset === 0 &&
+      limit === 20;
     let cached = getCachedPortfolios();
 
     let dynamicPortfolios = [...getDynamicPortfolios()];
@@ -94,10 +95,10 @@ export async function GET(req: NextRequest) {
           totalDevelopers: cached.developersCount,
           developersCount: cached.developersCount,
           pagination: {
-            total: cached.portfolios.length,
+            total: cached.total,
             offset,
             limit,
-            hasMore: offset + limit < cached.portfolios.length,
+            hasMore: offset + limit < cached.total,
           },
         },
         {
@@ -347,7 +348,7 @@ export async function GET(req: NextRequest) {
 
     // Store in L1 cache if this was a default query
     if (isDefaultQuery && databasePortfolios) {
-      setCachedPortfolios(databasePortfolios, totalDevelopers);
+      setCachedPortfolios(databasePortfolios, totalDevelopers, databaseTotal);
       cached = getCachedPortfolios();
     }
 
