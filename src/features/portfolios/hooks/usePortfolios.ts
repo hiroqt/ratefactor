@@ -953,17 +953,32 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
     [options]
   );
 
-  // Delete portfolio
+  // Delete portfolio — real, persistent delete. No optimistic removal: local
+  // state (and the selected-portfolio modal it drives) only changes after the
+  // server confirms the row is gone, so a failed request leaves the
+  // portfolio visible everywhere.
   const handleDeletePortfolio = useCallback(
-    (portfolioId: string) => {
-      setPortfolios((prev) => prev.filter((p) => p.id !== portfolioId));
-      if (selectedPortfolio && selectedPortfolio.id === portfolioId) {
-        setSelectedPortfolio(null);
-      }
-      options?.onUnpin?.(portfolioId);
+    async (portfolioId: string) => {
+      try {
+        const res = await fetch(`/api/portfolios/${portfolioId}`, { method: "DELETE" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.detail || "Failed to delete portfolio. Please try again.");
+        }
 
-      trackEvent("portfolio_delete", { portfolioId });
-      options?.onToast?.("Portfolio removed from registry.");
+        setPortfolios((prev) => prev.filter((p) => p.id !== portfolioId));
+        if (selectedPortfolio && selectedPortfolio.id === portfolioId) {
+          setSelectedPortfolio(null);
+        }
+        options?.onUnpin?.(portfolioId);
+
+        trackEvent("portfolio_delete", { portfolioId });
+        options?.onToast?.("Portfolio removed from registry.");
+      } catch (err: any) {
+        const message = err?.message || "Failed to delete portfolio. Please try again.";
+        options?.onToast?.(message);
+        throw err instanceof Error ? err : new Error(message);
+      }
     },
     [options, selectedPortfolio]
   );
