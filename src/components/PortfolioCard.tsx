@@ -15,6 +15,7 @@ import { cn, formatNumber, formatRating, getOptimizedImageUrl } from "@/lib/util
 import { trackEvent } from "@/lib/analytics";
 import { EmojiReaction } from "@/components/ui/emoji-reaction";
 import { getEmojiDisplay } from "@/lib/emoji-utils";
+import { GithubVerifiedPill } from "@/components/GithubVerifiedBadge";
 
 export interface PortfolioCardProps {
   portfolio: Portfolio;
@@ -176,6 +177,7 @@ export function PortfolioCard({
                   <Flame className="w-3 h-3 text-orange-600 dark:text-orange-400" /> Roast Welcome
                 </span>
               )}
+              <GithubVerifiedPill verification={portfolio.githubVerification} />
             </div>
 
             <h4 className="text-sm font-semibold text-slate-900 dark:text-white group-hover:underline truncate">{portfolio.title}</h4>
@@ -304,6 +306,7 @@ export function PortfolioCard({
                   <Flame className="w-3 h-3 text-orange-600 dark:text-orange-400" /> Roast Welcome
                 </span>
               )}
+              <GithubVerifiedPill verification={portfolio.githubVerification} />
             </div>
 
             <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-white/95 dark:bg-[#18181b]/95 px-2.5 py-1 rounded-md border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white backdrop-blur-xs">
@@ -466,6 +469,7 @@ export function PortfolioCard({
               <Flame className="w-3 h-3 text-orange-600 dark:text-orange-400" /> Roast Welcome
             </span>
           )}
+          <GithubVerifiedPill verification={portfolio.githubVerification} />
         </div>
 
         {/* Author Badge */}

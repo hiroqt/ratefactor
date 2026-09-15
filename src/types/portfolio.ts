@@ -102,6 +102,19 @@ export interface Portfolio {
   showcaseType?: "daily" | "weekly" | null;
   showcaseReason?: string;
   requestCritique?: boolean;
+  /**
+   * PROJECT-level GitHub repository verification (owner/contributor of the
+   * repo linked by githubUrl). Deliberately separate from author.isVerified,
+   * which is a profile-level indicator unrelated to any specific repository.
+   * Absent/undefined means not checked or could not be authoritatively
+   * verified — never render a negative "unverified" badge for that case.
+   */
+  githubVerification?: {
+    status: "owner" | "contributor" | "none";
+    login?: string;
+    repositoryFullName?: string;
+    verifiedAt?: string;
+  };
 }
 
 export interface NotificationItem {

@@ -47,6 +47,14 @@ export const RATE_LIMIT_PRESETS: Record<string, RateLimitConfig> = {
     windowSeconds: 600,
     debounceSeconds: 30,
   },
+  // GitHub project verification preview: each check costs 2-4 GitHub API
+  // calls against the caller's own token, so this is capped well below
+  // GitHub's own rate limits while still allowing normal edit-and-recheck use.
+  GITHUB_VERIFY_PREVIEW: {
+    limit: 20,
+    windowSeconds: 3600,
+    debounceSeconds: 3,
+  },
 };
 
 interface WindowEntry {

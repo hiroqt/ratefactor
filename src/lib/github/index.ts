@@ -6,3 +6,4 @@ export * from "./repositories";
 export * from "./readme";
 export * from "./contributions";
 export * from "./sync";
+export * from "./repository-verification";

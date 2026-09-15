@@ -13,6 +13,7 @@ import { cn, formatNumber, formatRating, getOptimizedImageUrl } from "@/lib/util
 import { trackEvent } from "@/lib/analytics";
 import { EmojiReaction } from "@/components/ui/emoji-reaction";
 import { getEmojiDisplay } from "@/lib/emoji-utils";
+import { GithubVerifiedPill } from "@/components/GithubVerifiedBadge";
 
 export interface AppCardProps {
   portfolio: Portfolio;
@@ -208,15 +209,18 @@ export function AppCard({
 
         {/* Card Footer: Domain Category Badge, Rating, Reactions, Comments */}
         <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-slate-100">
-          {/* Domain Category Pill */}
-          <span
-            className={cn(
-              "text-[10px] font-mono font-medium px-2 py-0.5 rounded-md border",
-              getCategoryColor(portfolio.category)
-            )}
-          >
-            {portfolio.category}
-          </span>
+          {/* Domain Category Pill + Project-level GitHub Verification */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span
+              className={cn(
+                "text-[10px] font-mono font-medium px-2 py-0.5 rounded-md border shrink-0",
+                getCategoryColor(portfolio.category)
+              )}
+            >
+              {portfolio.category}
+            </span>
+            <GithubVerifiedPill verification={portfolio.githubVerification} className="shrink-0" />
+          </div>
 
           <div className="flex items-center gap-1.5">
             {/* Rating */}
