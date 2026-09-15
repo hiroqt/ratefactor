@@ -6,8 +6,8 @@
 -- re-run at any time. Compare counts/rows against the expectations noted
 -- in each section's comment.
 
--- 1. Tables — expect exactly 19 rows, matching the Phase 0B table list.
-\echo '=== 1. Tables (expect 19) ==='
+-- 1. Tables — expect 14 rows after removing transient GitHub mirrors.
+\echo '=== 1. Tables (expect 14) ==='
 SELECT count(*) AS table_count FROM information_schema.tables
 WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
 

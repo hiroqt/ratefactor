@@ -745,6 +745,13 @@ CREATE TRIGGER tr_user_updated_at BEFORE UPDATE ON public."user" FOR EACH ROW EX
 DROP TRIGGER IF EXISTS tr_verification_updated_at ON public.verification;
 CREATE TRIGGER tr_verification_updated_at BEFORE UPDATE ON public.verification FOR EACH ROW EXECUTE FUNCTION public.set_better_auth_updated_at();
 
+-- GitHub API responses are transient in-memory data, never Neon mirrors.
+DROP TABLE IF EXISTS public.github_readmes;
+DROP TABLE IF EXISTS public.github_repositories;
+DROP TABLE IF EXISTS public.github_contribution_summaries;
+DROP TABLE IF EXISTS public.github_contributions;
+DROP TABLE IF EXISTS public.github_profiles;
+
 -- No RLS is enabled on Neon: enforcement lives entirely in the triggers
 -- above and in the application's API-layer checks (see audit §2). RLS
 -- policies referencing auth.uid()/auth.role() are Supabase-only and were
