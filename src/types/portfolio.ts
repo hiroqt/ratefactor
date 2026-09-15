@@ -73,6 +73,10 @@ export interface Portfolio {
   githubUrl: string;
   demoUrl?: string;
   thumbnail: string;
+  thumbnailPublicId?: string;
+  thumbnailUploadReceipt?: string;
+  thumbnailUploadVersion?: number;
+  thumbnailUploadSignature?: string;
   imageSizeBytes?: number;
   author: {
     name: string;

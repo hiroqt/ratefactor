@@ -53,6 +53,10 @@ export const portfolioSubmissionSchema = z.object({
     .optional()
     .or(z.literal("")),
   thumbnailUrl: z.string().min(1, "Cover image thumbnail is required"),
+  thumbnailPublicId: z.string().optional(),
+  thumbnailUploadReceipt: z.string().optional(),
+  thumbnailUploadVersion: z.number().int().positive().optional(),
+  thumbnailUploadSignature: z.string().regex(/^[a-f0-9]{40}$/).optional(),
   imageSizeBytes: z
     .number()
     .positive()

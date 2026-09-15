@@ -932,6 +932,10 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
           githubUrl: newPortfolio.githubUrl,
           demoUrl: newPortfolio.demoUrl,
           thumbnailUrl: newPortfolio.thumbnail,
+          thumbnailPublicId: newPortfolio.thumbnailPublicId,
+          thumbnailUploadReceipt: newPortfolio.thumbnailUploadReceipt,
+          thumbnailUploadVersion: newPortfolio.thumbnailUploadVersion,
+          thumbnailUploadSignature: newPortfolio.thumbnailUploadSignature,
           imageSizeBytes: newPortfolio.imageSizeBytes || 1024 * 500,
           category: newPortfolio.category,
           techStack: newPortfolio.techStack,
@@ -948,7 +952,9 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
           const errData = await res.json();
           errMessage = errData.detail || errData.title || errMessage;
         } catch {}
-        throw new Error(errMessage);
+        const error = new Error(errMessage) as Error & { status?: number };
+        error.status = res.status;
+        throw error;
       }
 
       const resData = await res.json().catch(() => ({}));
