@@ -3,6 +3,9 @@ import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { getSessionUser } from "@/lib/auth/server-session";
 import { pool } from "@/lib/auth/better-auth";
 import { resolveCanonicalProfileId } from "@/lib/auth/profile-id";
+import { deletePortfolioAsset } from "@/lib/cloudinary";
+import { invalidatePortfoliosCache } from "@/lib/dynamic-portfolios";
+import { invalidateDevelopersCache } from "@/lib/developers-cache";
 
 export async function DELETE(
   req: NextRequest,
@@ -40,7 +43,7 @@ export async function DELETE(
     let portfolioCheck;
     try {
       portfolioCheck = await pool.query(
-        `SELECT author_id FROM public.portfolios WHERE id = $1 LIMIT 1`,
+        `SELECT author_id, thumbnail_public_id FROM public.portfolios WHERE id = $1 LIMIT 1`,
         [portfolioId]
       );
     } catch (dbErr) {
@@ -57,6 +60,9 @@ export async function DELETE(
     }
 
     const dbAuthorId = portfolioCheck.rows[0]?.author_id ? String(portfolioCheck.rows[0].author_id) : null;
+    const thumbnailPublicId = portfolioCheck.rows[0]?.thumbnail_public_id
+      ? String(portfolioCheck.rows[0].thumbnail_public_id)
+      : null;
     if (!dbAuthorId) {
       return NextResponse.json(
         {
@@ -97,6 +103,15 @@ export async function DELETE(
         { status: 502 }
       );
     }
+
+    if (thumbnailPublicId) {
+      await deletePortfolioAsset(thumbnailPublicId).catch((error) => {
+        console.warn("[DELETE portfolio] Cloudinary cleanup failed:", error instanceof Error ? error.message : "unknown error");
+      });
+    }
+
+    invalidatePortfoliosCache();
+    invalidateDevelopersCache();
 
     return NextResponse.json({ message: "Portfolio deleted.", portfolioId });
   } catch (error: any) {

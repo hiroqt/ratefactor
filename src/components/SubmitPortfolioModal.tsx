@@ -37,6 +37,7 @@ import {
   MIN_DESCRIPTION_CHARACTERS,
 } from "@/lib/guardrails";
 import { compressPortfolioCoverImage } from "@/lib/image-compression";
+import { cleanupPortfolioCover, uploadPortfolioCover, UploadedPortfolioCover } from "@/lib/portfolio-cover-upload";
 
 export interface SubmitPortfolioModalProps {
   isOpen: boolean;
@@ -244,15 +245,8 @@ export function SubmitPortfolioModal({
       const compressed = await compressPortfolioCoverImage(file);
       setUploadedFile({ name: file.name, size: compressed.compressedSizeBytes, url: compressed.dataUrl });
       setThumbnail(compressed.dataUrl);
-    } catch {
-      // Fallback to standard reader if offscreen canvas is unavailable
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const url = event.target?.result as string;
-        setUploadedFile({ name: file.name, size: file.size, url });
-        setThumbnail(url);
-      };
-      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setFileUploadError(err?.message || "Could not optimize the cover image.");
     } finally {
       setIsCompressingImage(false);
     }
@@ -421,7 +415,16 @@ export function SubmitPortfolioModal({
     };
 
     setIsSubmitting(true);
+    let uploadedAsset: UploadedPortfolioCover | null = null;
     try {
+      if (uploadedFile) {
+        uploadedAsset = await uploadPortfolioCover(uploadedFile.url);
+        newPortfolio.thumbnail = uploadedAsset.secureUrl;
+        newPortfolio.thumbnailPublicId = uploadedAsset.publicId;
+        newPortfolio.thumbnailUploadReceipt = uploadedAsset.receipt;
+        newPortfolio.thumbnailUploadVersion = uploadedAsset.version;
+        newPortfolio.thumbnailUploadSignature = uploadedAsset.signature;
+      }
       const result = await onSubmit(newPortfolio);
       const confirmedPortfolio = (result && typeof result === "object" && "title" in result)
         ? (result as Portfolio)
@@ -430,6 +433,9 @@ export function SubmitPortfolioModal({
       setIsSuccess(true);
       resetForm();
     } catch (err: any) {
+      if (uploadedAsset && Number(err?.status) >= 400 && Number(err?.status) < 500) {
+        await cleanupPortfolioCover(uploadedAsset).catch(() => undefined);
+      }
       setError(err?.message || "Failed to submit portfolio. Please check your connection and try again.");
     } finally {
       setIsSubmitting(false);

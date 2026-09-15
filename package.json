@@ -20,6 +20,7 @@
     "@types/marked": "^5.0.2",
     "better-auth": "^1.7.4",
     "canvas-confetti": "^1.9.4",
+    "cloudinary": "^2.11.0",
     "clsx": "^2.1.1",
     "framer-motion": "^13.2.0",
     "hugeicons-react": "^0.4.0",

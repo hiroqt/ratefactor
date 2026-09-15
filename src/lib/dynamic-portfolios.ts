@@ -3,6 +3,7 @@ import { Portfolio } from "@/types/portfolio";
 // In-memory runtime cache for real dynamic portfolios submitted by real users
 let dynamicPortfolios: Portfolio[] = [];
 let cachedDevelopersCount = 0;
+let cachedPortfolioTotal = 0;
 let portfoliosCacheTime = 0;
 let portfoliosCacheEtag = "";
 
@@ -13,6 +14,7 @@ const CACHE_TTL_MS = 45 * 1000;
 export function getCachedPortfolios(): {
   portfolios: Portfolio[];
   developersCount: number;
+  total: number;
   etag: string;
   isFresh: boolean;
 } {
@@ -25,14 +27,16 @@ export function getCachedPortfolios(): {
   return {
     portfolios: dynamicPortfolios,
     developersCount: cachedDevelopersCount,
+    total: cachedPortfolioTotal,
     etag: portfoliosCacheEtag,
     isFresh,
   };
 }
 
-export function setCachedPortfolios(portfolios: Portfolio[], developersCount: number): void {
+export function setCachedPortfolios(portfolios: Portfolio[], developersCount: number, total: number): void {
   dynamicPortfolios = portfolios;
   cachedDevelopersCount = developersCount;
+  cachedPortfolioTotal = total;
   portfoliosCacheTime = Date.now();
 
   // Generate lightweight deterministic ETag based on length, timestamp, and IDs

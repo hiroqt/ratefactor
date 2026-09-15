@@ -49,8 +49,6 @@ pnpm-debug.log*
 *.sublime-workspace
 
 .docs/
-docs/
-docs
 # ========================
 # OS Files
 # ========================

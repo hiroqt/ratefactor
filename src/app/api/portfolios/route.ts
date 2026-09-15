@@ -14,6 +14,13 @@ import {
 } from "@/lib/dynamic-portfolios";
 import { verifyGithubProjectRelationship } from "@/lib/github/repository-verification";
 import { invalidateDevelopersCache } from "@/lib/developers-cache";
+import {
+  deletePortfolioAsset,
+  getCloudinaryConfig,
+  isAllowedPortfolioThumbnail,
+  verifyPortfolioUploadResponse,
+  verifyUploadReceipt,
+} from "@/lib/cloudinary";
 
 export async function GET(req: NextRequest) {
   try {
@@ -31,7 +38,8 @@ export async function GET(req: NextRequest) {
       (!hostParam || hostParam === "all") &&
       !query &&
       sort === "highest_rated" &&
-      offset === 0;
+      offset === 0 &&
+      limit === 20;
     let cached = getCachedPortfolios();
 
     let dynamicPortfolios = [...getDynamicPortfolios()];
@@ -87,10 +95,10 @@ export async function GET(req: NextRequest) {
           totalDevelopers: cached.developersCount,
           developersCount: cached.developersCount,
           pagination: {
-            total: cached.portfolios.length,
+            total: cached.total,
             offset,
             limit,
-            hasMore: offset + limit < cached.portfolios.length,
+            hasMore: offset + limit < cached.total,
           },
         },
         {
@@ -340,7 +348,7 @@ export async function GET(req: NextRequest) {
 
     // Store in L1 cache if this was a default query
     if (isDefaultQuery && databasePortfolios) {
-      setCachedPortfolios(databasePortfolios, totalDevelopers);
+      setCachedPortfolios(databasePortfolios, totalDevelopers, databaseTotal);
       cached = getCachedPortfolios();
     }
 
@@ -477,6 +485,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  let cleanupPublicId: string | null = null;
   try {
     const ip = req.headers.get("x-forwarded-for") || "127.0.0.1";
     const authUser = await getSessionUser(req);
@@ -519,6 +528,25 @@ export async function POST(req: NextRequest) {
     }
 
     const data = parseResult.data;
+    const cloudinaryConfig = getCloudinaryConfig();
+    const thumbnailPublicId = data.thumbnailPublicId || null;
+    if (!isAllowedPortfolioThumbnail(data.thumbnailUrl, thumbnailPublicId, cloudinaryConfig) ||
+        (thumbnailPublicId && (!data.thumbnailUploadReceipt || !data.thumbnailUploadVersion || !data.thumbnailUploadSignature ||
+          !verifyUploadReceipt(
+            data.thumbnailUploadReceipt,
+            actorId,
+            thumbnailPublicId,
+            Math.floor(Date.now() / 1000),
+            cloudinaryConfig.secret
+          ) || !verifyPortfolioUploadResponse(
+            thumbnailPublicId,
+            data.thumbnailUploadVersion,
+            data.thumbnailUploadSignature
+          ))) ||
+        (!thumbnailPublicId && (data.thumbnailUploadReceipt || data.thumbnailUploadVersion || data.thumbnailUploadSignature))) {
+      return NextResponse.json({ detail: "Invalid portfolio cover reference." }, { status: 400 });
+    }
+    cleanupPublicId = thumbnailPublicId;
     const slug = data.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     const id = `${slug}-${Date.now().toString(36)}`;
 
@@ -543,6 +571,7 @@ export async function POST(req: NextRequest) {
       githubUrl: data.githubUrl,
       demoUrl: data.demoUrl || data.portfolioUrl,
       thumbnail: data.thumbnailUrl,
+      thumbnailPublicId: thumbnailPublicId || undefined,
       imageSizeBytes: data.imageSizeBytes,
       author: {
         name: body.authorName || authUser.name || "Developer",
@@ -627,10 +656,10 @@ export async function POST(req: NextRequest) {
         await pool.query(
           `INSERT INTO public.portfolios (
             id, author_id, title, tagline, description, portfolio_url, github_url, demo_url,
-            thumbnail_url, image_size_bytes, category, tech_stack, comments_count, is_showcase,
+            thumbnail_url, thumbnail_public_id, image_size_bytes, category, tech_stack, comments_count, is_showcase,
             status, request_critique, github_verification_status, github_verified_login,
             github_repository_full_name, github_verified_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::public.portfolio_category, $12, 0, false, 'published', $13, $14, $15, $16, $17)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::public.portfolio_category, $13, 0, false, 'published', $14, $15, $16, $17, $18)
           ON CONFLICT (id) DO NOTHING`,
           [
             id,
@@ -642,6 +671,7 @@ export async function POST(req: NextRequest) {
             data.githubUrl,
             data.demoUrl || data.portfolioUrl,
             data.thumbnailUrl,
+            thumbnailPublicId,
             data.imageSizeBytes || 1024 * 500,
             data.category,
             data.techStack,
@@ -652,9 +682,11 @@ export async function POST(req: NextRequest) {
             githubVerification.status ? githubVerification.verifiedAt : null,
           ]
         );
+        cleanupPublicId = null;
       }
     } catch (dbErr) {
       console.error("[POST /api/portfolios] Database persist error:", dbErr);
+      throw dbErr;
     }
 
     const currentPortfolios = getDynamicPortfolios();
@@ -671,6 +703,15 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
+    if (cleanupPublicId) {
+      const referenced = await pool.query(
+        "SELECT 1 FROM public.portfolios WHERE thumbnail_public_id = $1 LIMIT 1",
+        [cleanupPublicId]
+      ).catch(() => null);
+      if (referenced && !referenced.rowCount) {
+        await deletePortfolioAsset(cleanupPublicId).catch(() => undefined);
+      }
+    }
     return NextResponse.json(
       {
         type: "https://ratefactor.dev/errors/internal",
