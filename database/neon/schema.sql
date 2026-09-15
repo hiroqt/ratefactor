@@ -539,95 +539,6 @@ CREATE TABLE IF NOT EXISTS public.rate_limits (
     CONSTRAINT rate_limits_pkey PRIMARY KEY (key)
 );
 
--- ---- GitHub cache tables ----
-
-CREATE TABLE IF NOT EXISTS public.github_profiles (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    user_id uuid NOT NULL,
-    github_id bigint NOT NULL,
-    username text NOT NULL,
-    display_name text,
-    bio text,
-    avatar_url text,
-    profile_url text,
-    public_repository_count integer DEFAULT 0 NOT NULL,
-    followers integer DEFAULT 0 NOT NULL,
-    following integer DEFAULT 0 NOT NULL,
-    last_synced_at timestamp with time zone DEFAULT now() NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT github_profiles_pkey PRIMARY KEY (id),
-    CONSTRAINT uq_github_profiles_user UNIQUE (user_id),
-    CONSTRAINT github_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS public.github_repositories (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    user_id uuid NOT NULL,
-    github_repo_id bigint NOT NULL,
-    name text NOT NULL,
-    full_name text NOT NULL,
-    description text,
-    html_url text NOT NULL,
-    homepage text,
-    language text,
-    topics text[] DEFAULT '{}'::text[] NOT NULL,
-    stars integer DEFAULT 0 NOT NULL,
-    forks integer DEFAULT 0 NOT NULL,
-    is_private boolean DEFAULT false NOT NULL,
-    created_at timestamp with time zone,
-    updated_at timestamp with time zone,
-    pushed_at timestamp with time zone,
-    last_synced_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT github_repositories_pkey PRIMARY KEY (id),
-    CONSTRAINT uq_github_repos_user_repo UNIQUE (user_id, github_repo_id),
-    CONSTRAINT github_repositories_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS public.github_readmes (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    user_id uuid NOT NULL,
-    repository_id uuid,
-    repository_full_name text NOT NULL,
-    content_markdown text NOT NULL,
-    content_sha text,
-    source_url text NOT NULL,
-    last_synced_at timestamp with time zone DEFAULT now() NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT github_readmes_pkey PRIMARY KEY (id),
-    CONSTRAINT uq_github_readmes_user_repo UNIQUE (user_id, repository_full_name),
-    CONSTRAINT github_readmes_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.github_repositories(id) ON DELETE CASCADE,
-    CONSTRAINT github_readmes_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS public.github_contributions (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    user_id uuid NOT NULL,
-    date date NOT NULL,
-    contribution_count integer DEFAULT 0 NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT github_contributions_pkey PRIMARY KEY (id),
-    CONSTRAINT uq_github_contributions_user_date UNIQUE (user_id, date),
-    CONSTRAINT github_contributions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS public.github_contribution_summaries (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    user_id uuid NOT NULL,
-    year integer NOT NULL,
-    total_contributions integer DEFAULT 0 NOT NULL,
-    current_streak integer DEFAULT 0 NOT NULL,
-    longest_streak integer DEFAULT 0 NOT NULL,
-    last_synced_at timestamp with time zone DEFAULT now() NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT github_contribution_summaries_pkey PRIMARY KEY (id),
-    CONSTRAINT uq_github_summaries_user_year UNIQUE (user_id, year),
-    CONSTRAINT github_contribution_summaries_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE
-);
-
 -- ==========================================================
 -- 4. Indexes
 -- ==========================================================
@@ -649,8 +560,6 @@ CREATE INDEX IF NOT EXISTS idx_comments_reported ON public.comments USING btree 
 CREATE INDEX IF NOT EXISTS idx_comments_reported_pending ON public.comments USING btree (report_count DESC, created_at DESC) WHERE (is_reported = true);
 CREATE INDEX IF NOT EXISTS idx_comments_user ON public.comments USING btree (user_id);
 
-CREATE INDEX IF NOT EXISTS idx_github_contributions_user_date_asc ON public.github_contributions USING btree (user_id, date);
-CREATE INDEX IF NOT EXISTS idx_github_repos_user_stars ON public.github_repositories USING btree (user_id, stars DESC) WHERE (is_private = false);
 
 CREATE INDEX IF NOT EXISTS idx_likes_portfolio_id ON public.likes USING btree (portfolio_id);
 CREATE INDEX IF NOT EXISTS idx_likes_portfolio_user ON public.likes USING btree (portfolio_id, user_id);
@@ -745,12 +654,6 @@ CREATE TRIGGER tr_user_updated_at BEFORE UPDATE ON public."user" FOR EACH ROW EX
 DROP TRIGGER IF EXISTS tr_verification_updated_at ON public.verification;
 CREATE TRIGGER tr_verification_updated_at BEFORE UPDATE ON public.verification FOR EACH ROW EXECUTE FUNCTION public.set_better_auth_updated_at();
 
--- GitHub API responses are transient in-memory data, never Neon mirrors.
-DROP TABLE IF EXISTS public.github_readmes;
-DROP TABLE IF EXISTS public.github_repositories;
-DROP TABLE IF EXISTS public.github_contribution_summaries;
-DROP TABLE IF EXISTS public.github_contributions;
-DROP TABLE IF EXISTS public.github_profiles;
 
 -- No RLS is enabled on Neon: enforcement lives entirely in the triggers
 -- above and in the application's API-layer checks (see audit §2). RLS
