@@ -9,24 +9,18 @@ import { AuthUser } from "@/features/auth/hooks/useAuth";
 let memoryProfileCache: DeveloperProfile | null = null;
 
 export function useDeveloperProfile(currentUser?: AuthUser | null) {
-  const [developerProfile, setDeveloperProfile] = useState<DeveloperProfile>(() => {
-    if (memoryProfileCache) {
-      return memoryProfileCache;
-    }
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("ratefactor_dev_profile");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && typeof parsed === "object" && parsed.name) {
-            memoryProfileCache = parsed;
-            return parsed;
-          }
-        }
-      } catch {}
-    }
-    return INITIAL_DEVELOPER_PROFILE;
-  });
+  // Must match the server-rendered output exactly; localStorage is only safe to read
+  // after mount (see effect below), otherwise SSR and the first client render diverge.
+  const [developerProfile, setDeveloperProfile] = useState<DeveloperProfile>(
+    () => memoryProfileCache ?? INITIAL_DEVELOPER_PROFILE
+  );
+
+  // False on SSR and the first client render so consumers can show a neutral
+  // skeleton instead of INITIAL_DEVELOPER_PROFILE's placeholder identity.
+  // A populated memoryProfileCache means this is a client-side remount (e.g.
+  // route navigation back to the profile page), not the initial hydration
+  // pass, so it's safe to skip the skeleton in that case.
+  const [isProfileReady, setIsProfileReady] = useState(() => memoryProfileCache !== null);
 
   // Load from localStorage on mount and clean any legacy placeholder strings
   useEffect(() => {
@@ -55,6 +49,8 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
       }
     } catch (e) {
       // ignore
+    } finally {
+      setIsProfileReady(true);
     }
   }, []);
 
@@ -327,6 +323,7 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
   return {
     developerProfile,
     setDeveloperProfile,
+    isProfileReady,
     updateProfile,
     updateStatus,
     updateBio,

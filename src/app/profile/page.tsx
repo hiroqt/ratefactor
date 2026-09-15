@@ -45,6 +45,7 @@ import {
   Upload
 } from "@/components/ui/icons";
 import { Navbar, Footer } from "@/components/layout";
+import { Skeleton } from "@/components/feedback/Skeleton";
 import { DeveloperDashboard, useDeveloperProfile } from "@/features/dashboard";
 import { useGithubConnection } from "@/features/dashboard/hooks/useGithubConnection";
 import {
@@ -246,6 +247,7 @@ function ProfilePageContent() {
   // 2. Developer Profile State
   const {
     developerProfile,
+    isProfileReady,
     updateProfile,
     updatePins,
   } = useDeveloperProfile(currentUser);
@@ -705,7 +707,11 @@ function ProfilePageContent() {
               </div>
               <span className="text-slate-300 hidden sm:inline">•</span>
               <div className="flex items-center gap-1.5 text-xs text-slate-600 font-mono">
-                <span className="font-semibold text-slate-900">@{developerProfile.username}</span>
+                {isProfileReady ? (
+                  <span className="font-semibold text-slate-900">@{developerProfile.username}</span>
+                ) : (
+                  <Skeleton className="w-16 h-3.5 rounded" />
+                )}
                 <span className="text-slate-400">/</span>
                 <span className="text-slate-500 capitalize">
                   {activeTab === "github" ? "GitHub Studio" : activeTab === "preview" ? "Public Showcase" : activeTab === "edit" ? "Identity & README" : activeTab === "account" ? "Security & Session" : activeTab.replace("-", " ")}
@@ -776,29 +782,43 @@ function ProfilePageContent() {
               <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="relative shrink-0">
-                    <div className="w-10 h-10 rounded-xl overflow-hidden ring-1 ring-slate-200">
-                      <img
-                        src={normalizeAvatarUrl(developerProfile.avatar, developerProfile.username)}
-                        alt={developerProfile.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src =
-                            "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80";
-                        }}
-                      />
-                    </div>
+                    {isProfileReady ? (
+                      <div className="w-10 h-10 rounded-xl overflow-hidden ring-1 ring-slate-200">
+                        <img
+                          src={normalizeAvatarUrl(developerProfile.avatar, developerProfile.username)}
+                          alt={developerProfile.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80";
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <Skeleton className="w-10 h-10 rounded-xl" />
+                    )}
                     <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white bg-emerald-500" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-slate-900 text-xs sm:text-sm truncate">
-                      {developerProfile.name}
-                    </h3>
-                    <p className="text-[11px] font-mono text-slate-500 truncate">
-                      @{developerProfile.username}
-                    </p>
-                    <span className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                      {developerProfile.role || "User"}
-                    </span>
+                    {isProfileReady ? (
+                      <>
+                        <h3 className="font-bold text-slate-900 text-xs sm:text-sm truncate">
+                          {developerProfile.name}
+                        </h3>
+                        <p className="text-[11px] font-mono text-slate-500 truncate">
+                          @{developerProfile.username}
+                        </p>
+                        <span className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                          {developerProfile.role || "User"}
+                        </span>
+                      </>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <Skeleton className="w-24 h-3.5 rounded" />
+                        <Skeleton className="w-16 h-3 rounded" />
+                        <Skeleton className="w-14 h-4 rounded-full" />
+                      </div>
+                    )}
                   </div>
                 </div>
 
