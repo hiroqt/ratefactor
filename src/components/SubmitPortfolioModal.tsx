@@ -28,6 +28,8 @@ import { Portfolio, PortfolioCategory } from "@/types/portfolio";
 import { DeveloperProfile } from "@/types/profile";
 import { PortfolioCard } from "./PortfolioCard";
 import { Avatar } from "@/components/ui/Avatar";
+import { GithubVerificationLabel } from "@/components/GithubVerifiedBadge";
+import { authClient } from "@/lib/auth/client";
 import { cn, isValidHttpUrl, normalizeUrl } from "@/lib/utils";
 import { 
   validatePortfolioDescription, 
@@ -101,6 +103,16 @@ export function SubmitPortfolioModal({
   const [requestCritique, setRequestCritique] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"form" | "preview">("form");
+
+  // Project-level GitHub verification PREVIEW only — server-derived, never
+  // trusted at publish time (the publish route re-verifies independently).
+  // This purely informs what the modal shows the user before they submit.
+  const [githubPreview, setGithubPreview] = useState<{
+    status: "owner" | "contributor" | "none" | null;
+    reason?: string;
+    repositoryFullName?: string;
+  } | null>(null);
+  const [isCheckingGithub, setIsCheckingGithub] = useState(false);
 
   // Submission & Success state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -232,12 +244,42 @@ export function SubmitPortfolioModal({
     reader.readAsDataURL(file);
   };
 
+  const handleGithubUrlBlur = useCallback(async () => {
+    const url = githubUrl.trim();
+    if (!currentUser || !url || !isValidHttpUrl(url)) return;
+    setIsCheckingGithub(true);
+    try {
+      const res = await fetch("/api/github/verify-project", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ githubUrl: url }),
+      });
+      const json = await res.json().catch(() => null);
+      if (json) {
+        setGithubPreview({ status: json.status, reason: json.reason, repositoryFullName: json.repositoryFullName });
+      }
+    } catch {
+      // Non-blocking preview — a failed check just means no badge shows yet.
+      setGithubPreview({ status: null, reason: "unavailable" });
+    } finally {
+      setIsCheckingGithub(false);
+    }
+  }, [githubUrl, currentUser]);
+
+  const handleConnectGithub = useCallback(() => {
+    authClient.linkSocial({
+      provider: "github",
+      callbackURL: typeof window !== "undefined" ? window.location.href : "/",
+    });
+  }, []);
+
   const resetForm = () => {
     setTitle("");
     setTagline("");
     setDescription("");
     setPortfolioUrl("");
     setGithubUrl("");
+    setGithubPreview(null);
     setDemoUrl("");
     setThumbnail(PRESET_THUMBNAILS[0].url);
     setUploadedFile(null);
@@ -857,17 +899,47 @@ export function SubmitPortfolioModal({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-900 dark:text-white mb-1 flex items-center gap-1">
-                    <Github className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> GitHub Repository *
-                  </label>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <label className="text-xs font-medium text-slate-900 dark:text-white flex items-center gap-1">
+                      <Github className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> GitHub Repository *
+                    </label>
+                    {/* Project-level GitHub verification preview — informational only, never trusted at publish */}
+                    {isCheckingGithub && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium text-slate-500 dark:text-zinc-400 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 px-2 py-0.5 rounded-md shrink-0">
+                        <RefreshCw className="w-3 h-3 animate-spin" /> Verifying…
+                      </span>
+                    )}
+                    {!isCheckingGithub && githubPreview?.status && githubPreview.status !== "none" && (
+                      <GithubVerificationLabel verification={{ status: githubPreview.status }} variant="pill" />
+                    )}
+                  </div>
                   <input
                     type="url"
                     placeholder="https://github.com/user/repo"
                     value={githubUrl}
-                    onChange={(e) => setGithubUrl(e.target.value)}
+                    onChange={(e) => {
+                      setGithubUrl(e.target.value);
+                      setGithubPreview(null);
+                    }}
+                    onBlur={handleGithubUrlBlur}
                     className="w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-slate-900 dark:focus:border-zinc-400 focus:ring-1 focus:ring-slate-900/10 dark:focus:ring-white/10 transition-colors shadow-xs"
                     required
                   />
+
+                  {!isCheckingGithub && githubPreview?.status === null && githubPreview.reason === "not_linked" && (
+                    <button
+                      type="button"
+                      onClick={handleConnectGithub}
+                      className="mt-1.5 text-[11px] text-sky-700 dark:text-sky-400 hover:underline font-medium cursor-pointer"
+                    >
+                      Connect GitHub to verify your relationship to this repository
+                    </button>
+                  )}
+                  {!isCheckingGithub && githubPreview?.status === null && githubPreview.reason === "unavailable" && (
+                    <p className="mt-1.5 text-[11px] text-slate-400 dark:text-zinc-500 font-mono">
+                      Couldn't verify GitHub relationship right now — you can still publish.
+                    </p>
+                  )}
                 </div>
               </div>
 

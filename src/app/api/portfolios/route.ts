@@ -6,6 +6,7 @@ import { pool } from "@/lib/auth/better-auth";
 import { Portfolio } from "@/types/portfolio";
 import { portfolioComments } from "@/lib/comments-store";
 import { getDynamicPortfolios, setDynamicPortfolios } from "@/lib/dynamic-portfolios";
+import { verifyGithubProjectRelationship } from "@/lib/github/repository-verification";
 
 export async function GET(req: NextRequest) {
   try {
@@ -59,6 +60,10 @@ export async function GET(req: NextRequest) {
           p.showcase_type as "showcaseType",
           p.showcase_reason as "showcaseReason",
           p.request_critique as "requestCritique",
+          p.github_verification_status as "githubVerificationStatus",
+          p.github_verified_login as "githubVerifiedLogin",
+          p.github_repository_full_name as "githubRepositoryFullName",
+          p.github_verified_at as "githubVerifiedAt",
           p.created_at as "createdAt",
           pr.id as "authorProfileId",
           pr.full_name as "authorName",
@@ -161,6 +166,14 @@ export async function GET(req: NextRequest) {
             showcaseType: row.showcaseType || null,
             showcaseReason: row.showcaseReason || null,
             requestCritique: Boolean(row.requestCritique),
+            githubVerification: row.githubVerificationStatus
+              ? {
+                  status: row.githubVerificationStatus,
+                  login: row.githubVerifiedLogin || undefined,
+                  repositoryFullName: row.githubRepositoryFullName || undefined,
+                  verifiedAt: row.githubVerifiedAt ? new Date(row.githubVerifiedAt).toISOString() : undefined,
+                }
+              : undefined,
             createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : new Date().toISOString(),
             author: {
               name: row.authorName || "Developer",
@@ -348,6 +361,18 @@ export async function POST(req: NextRequest) {
     const slug = data.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     const id = `${slug}-${Date.now().toString(36)}`;
 
+    // Project-level GitHub verification: server-authoritative, derived from
+    // the authenticated caller's own linked GitHub account. The browser
+    // never supplies a trusted verification status here — only the
+    // submitted githubUrl feeds this, and it's re-parsed/re-checked from
+    // scratch regardless of any client-side preview the modal showed.
+    // A verification failure (GitHub unavailable, no linked account,
+    // private/malformed repo, rate limit) must never block publishing —
+    // the badge is additive, not a submission requirement.
+    const githubVerification = await verifyGithubProjectRelationship(actorId, data.githubUrl).catch(
+      (): { status: null; reason: "unavailable" } => ({ status: null, reason: "unavailable" })
+    );
+
     const newPortfolio: Portfolio = {
       id,
       title: data.title,
@@ -383,6 +408,14 @@ export async function POST(req: NextRequest) {
       comments: [],
       createdAt: new Date().toISOString(),
       isShowcase: false,
+      githubVerification: githubVerification.status
+        ? {
+            status: githubVerification.status,
+            login: githubVerification.githubLogin,
+            repositoryFullName: githubVerification.repositoryFullName,
+            verifiedAt: githubVerification.verifiedAt,
+          }
+        : undefined,
     };
 
     // Attempt PostgreSQL database persistence
@@ -434,8 +467,9 @@ export async function POST(req: NextRequest) {
           `INSERT INTO public.portfolios (
             id, author_id, title, tagline, description, portfolio_url, github_url, demo_url,
             thumbnail_url, image_size_bytes, category, tech_stack, comments_count, is_showcase,
-            status, request_critique
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::public.portfolio_category, $12, 0, false, 'published', $13)
+            status, request_critique, github_verification_status, github_verified_login,
+            github_repository_full_name, github_verified_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::public.portfolio_category, $12, 0, false, 'published', $13, $14, $15, $16, $17)
           ON CONFLICT (id) DO NOTHING`,
           [
             id,
@@ -451,6 +485,10 @@ export async function POST(req: NextRequest) {
             data.category,
             data.techStack,
             Boolean(data.requestCritique),
+            githubVerification.status,
+            githubVerification.status ? githubVerification.githubLogin : null,
+            githubVerification.status ? githubVerification.repositoryFullName : null,
+            githubVerification.status ? githubVerification.verifiedAt : null,
           ]
         );
       }

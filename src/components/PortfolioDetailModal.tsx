@@ -25,6 +25,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Portfolio, CommentItem, RatingBreakdown, CritiqueTag, CRITIQUE_TAG_CONFIG } from "@/types/portfolio";
 import { RatingWidget } from "./RatingWidget";
+import { GithubVerificationMark } from "./GithubVerifiedBadge";
 import { cn, formatNumber, timeAgo, formatRating, normalizeAvatarUrl } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
 import { validateCommentContent, MIN_COMMENT_LENGTH } from "@/lib/guardrails";
@@ -378,10 +379,18 @@ export function PortfolioDetailModal({
                   href={portfolio.githubUrl}
                   target="_blank"
                   rel="noreferrer"
+                  aria-label={
+                    portfolio.githubVerification?.status === "owner"
+                      ? "View GitHub repository — Verified Owner"
+                      : portfolio.githubVerification?.status === "contributor"
+                        ? "View GitHub repository — Verified Contributor"
+                        : "View GitHub repository"
+                  }
                   className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-lg bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 text-xs font-medium border border-slate-200 dark:border-zinc-700 transition-all cursor-pointer"
                 >
                   <Github className="w-4 h-4" />
                   <span>GitHub</span>
+                  <GithubVerificationMark verification={portfolio.githubVerification} className="pl-1 border-l border-slate-300 dark:border-zinc-600" />
                   <ExternalLink className="w-3 h-3 text-slate-400 dark:text-zinc-500" />
                 </a>
               )}
