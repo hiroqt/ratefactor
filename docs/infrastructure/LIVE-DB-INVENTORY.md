@@ -168,3 +168,6 @@ Reconfirmed at the same granularity as Phase 0A: all 19 tables have `relrowsecur
 **5. Phase 0B Result: PASS.** No live object was found that the migration plan doesn't already account for; no repo-declared object was found missing live. The only genuinely new discoveries (event triggers, the `current_user_role()` type mismatch) both reinforce the existing plan (exclude Supabase RLS/platform machinery) rather than contradict it. Nothing here blocks a Postgres 17 → Postgres 17 Neon migration.
 
 **6. Exact next task**: Phase 1 — provision the Neon project/branch and Cloudinary account (no live Supabase access needed for this step; still no data migration, no app changes, per the roadmap's ordering).
+# Current Neon follow-up
+
+The five transient `github_*` mirror tables were subsequently removed from Neon. GitHub display data is now live/on-demand with short-lived application caching; Better Auth and durable portfolio verification remain in Neon.

@@ -160,3 +160,6 @@ Other confirmed findings not tied to a single table:
 | GitHub Sync unconditional rewrites | **MEDIUM** | No change-detection before writing (`content_sha` captured but unused, `readme.ts:146-163`). | Compare fetched vs. stored hash before issuing writes. |
 
 **Direct answer on the portfolios 25s interval**: neither remove it outright nor merely slow it down. The evidence shows the interval is expensive *because of what it fetches* (full base64 images + entire site's comments, unbounded), not because of its frequency alone. The right combination is **(b) mutation-driven refresh** for the current user's own actions (several optimistic-update call sites already exist to build on) **supplemented by (d)** a much longer/looser background interval or HTTP edge caching as a safety net for other users' changes — but only *after* the query itself is paginated and stops shipping base64 thumbnails. A 25s poll of a properly paginated, image-URL-only list is a non-issue; a 5-minute poll of the current unbounded query would still be expensive.
+# Current implementation update
+
+Portfolio covers now use Cloudinary and Neon stores HTTPS URLs plus nullable public IDs; the local backfill completed with zero remaining base64 portfolio covers. Transient GitHub mirrors were removed in favor of live GitHub fetches with bounded in-memory caching.

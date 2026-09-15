@@ -148,3 +148,6 @@ Before any implementation begins, **you** (the human) need to:
 4. Decide the Phase 9 maintenance-window approach (open question #5), since that shapes how Phase 2's data migration script needs to be written (one-shot vs. resumable).
 
 Once those four are in hand, the next engineering step is Phase 1 (provisioning) followed by Phase 2 (schema clone + validation) — both still fully reversible and non-destructive to the current production Supabase database.
+# Migration status update
+
+Completed locally: Neon schema/data baseline, Cloudinary portfolio covers (zero base64 covers), transient GitHub mirror removal, and portfolio cache pagination metadata preservation. Production cutover remains pending: rebase, push, PR/merge, configure Neon/Cloudinary production variables, smoke test, observe rollback window, then decide Supabase retirement.
