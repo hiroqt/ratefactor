@@ -34,7 +34,7 @@ export async function fetchGithubRepositories(
   // Authenticated self lookups (no target username) bypass the in-memory
   // cache entirely — see the matching comment in profile.ts for why a
   // shared "viewer" slot would leak between users.
-  const cacheKey = targetUsername ? `repos:${targetUsername.toLowerCase()}` : null;
+  const cacheKey = token ? null : targetUsername ? `repos:${targetUsername.toLowerCase()}` : null;
 
   if (!bypassCache && cacheKey) {
     const cached = githubCache.get<GithubRepoData[]>(cacheKey);

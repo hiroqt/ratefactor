@@ -16,17 +16,17 @@ WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
 ORDER BY table_name;
 
 -- 2. Columns — 211 migrated columns plus portfolios.thumbnail_public_id.
-\echo '=== 2. Column count (expect 212) ==='
+\echo '=== 2. Column count (expect 156) ==='
 SELECT count(*) AS column_count FROM information_schema.columns
 WHERE table_schema = 'public';
 
 -- 3. Primary keys — expect 19 (one per table).
-\echo '=== 3. Primary keys (expect 19) ==='
+\echo '=== 3. Primary keys (expect 14) ==='
 SELECT count(*) AS pk_count FROM information_schema.table_constraints
 WHERE table_schema = 'public' AND constraint_type = 'PRIMARY KEY';
 
 -- 4. Unique constraints — 11 migrated constraints plus thumbnail_public_id.
-\echo '=== 4. Unique constraints (expect 12) ==='
+\echo '=== 4. Unique constraints (expect 7) ==='
 SELECT count(*) AS unique_count FROM information_schema.table_constraints
 WHERE table_schema = 'public' AND constraint_type = 'UNIQUE';
 
@@ -36,7 +36,7 @@ SELECT count(*) AS check_count FROM pg_constraint
 WHERE contype = 'c' AND connamespace = 'public'::regnamespace;
 
 -- 6. Foreign keys — expect 21 (22 live minus the dropped auth_challenges->auth.users FK).
-\echo '=== 6. Foreign keys (expect 21) ==='
+\echo '=== 6. Foreign keys (expect 15) ==='
 SELECT count(*) AS fk_count FROM pg_constraint
 WHERE contype = 'f' AND connamespace = 'public'::regnamespace;
 
@@ -53,7 +53,7 @@ WHERE contype = 'f' AND connamespace = 'public'::regnamespace
   AND pg_get_constraintdef(oid) ILIKE '%auth.users%';
 
 -- 7. Indexes — 86 migrated indexes plus thumbnail_public_id uniqueness.
-\echo '=== 7. Indexes (expect 87) ==='
+\echo '=== 7. Indexes (expect 75) ==='
 SELECT count(*) AS index_count FROM pg_indexes WHERE schemaname = 'public';
 
 -- 8. Enums / custom types — expect 4.
@@ -131,19 +131,10 @@ GROUP BY table_name
 ORDER BY table_name;
 
 -- 16. github_* tables — spot-check structure and FKs.
-\echo '=== 16. github_* tables: column counts ==='
-SELECT table_name, count(*) AS column_count
-FROM information_schema.columns
-WHERE table_schema = 'public' AND table_name LIKE 'github_%'
-GROUP BY table_name
-ORDER BY table_name;
-
-\echo '=== 16b. github_* foreign keys (expect 6: 5x ->profiles, 1x readmes->repositories) ==='
-SELECT conrelid::regclass AS table_name, conname, pg_get_constraintdef(oid) AS def
-FROM pg_constraint
-WHERE contype = 'f' AND connamespace = 'public'::regnamespace
-  AND conrelid::regclass::text LIKE 'github_%'
-ORDER BY 1, conname;
+\echo '=== 16. github_* mirror tables (expect 0 rows) ==='
+SELECT table_name FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_name IN ('github_profiles', 'github_repositories', 'github_readmes', 'github_contributions', 'github_contribution_summaries');
 
 -- 17. Extensions installed — expect uuid-ossp and pgcrypto.
 \echo '=== 17. Extensions (expect uuid-ossp, pgcrypto present) ==='

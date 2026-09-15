@@ -150,4 +150,16 @@ Before any implementation begins, **you** (the human) need to:
 Once those four are in hand, the next engineering step is Phase 1 (provisioning) followed by Phase 2 (schema clone + validation) — both still fully reversible and non-destructive to the current production Supabase database.
 # Migration status update
 
+## COMPLETED LOCALLY
+
+Neon schema/data validation, Cloudinary portfolio-cover storage, and the GitHub transient-mirror removal are complete locally. Portfolio covers have zero remaining base64 rows. GitHub display data now comes from GitHub with bounded in-memory caching; portfolio verification remains durable in Neon.
+
+## PENDING PRODUCTION CUTOVER
+
+Production has not switched to Neon or Cloudinary. Rebase against upstream, push this branch, open/review/merge one PR, configure production Neon/Cloudinary variables, smoke test, and retain a rollback observation window before any Supabase retirement decision.
+
+## OPTIONAL FUTURE WORK
+
+Avatar migration and any Supabase retirement are separate decisions.
+
 Completed locally: Neon schema/data baseline, Cloudinary portfolio covers (zero base64 covers), transient GitHub mirror removal, and portfolio cache pagination metadata preservation. Production cutover remains pending: rebase, push, PR/merge, configure Neon/Cloudinary production variables, smoke test, observe rollback window, then decide Supabase retirement.

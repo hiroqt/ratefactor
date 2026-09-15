@@ -36,7 +36,7 @@ export async function fetchGithubProfile(
   // in-memory cache entirely rather than risk one user's data being served
   // from a generic "viewer" slot to another user. Explicit-username lookups
   // (public profiles) keep normal username-scoped caching.
-  const cacheKey = targetUsername ? `profile:${targetUsername.toLowerCase()}` : null;
+  const cacheKey = token ? null : targetUsername ? `profile:${targetUsername.toLowerCase()}` : null;
 
   if (!bypassCache && cacheKey) {
     const cached = githubCache.get<GithubProfileData>(cacheKey);
@@ -112,7 +112,7 @@ export async function fetchGithubProfile(
         // Cache under the resolved real username only — never under a
         // shared "viewer" slot, since that would leak this user's profile
         // to the next authenticated caller with no explicit username.
-        if (profile.username) {
+        if (!token && profile.username) {
           githubCache.set(`profile:${profile.username.toLowerCase()}`, profile, CACHE_TTL.PROFILE);
         }
         return profile;

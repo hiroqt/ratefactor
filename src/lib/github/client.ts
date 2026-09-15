@@ -79,7 +79,7 @@ export async function githubFetch<T>(
   const response = await fetch(cleanPath, {
     ...init,
     headers,
-    next: { revalidate: 300 },
+    ...(token ? { cache: "no-store" as const } : { next: { revalidate: 300 } }),
   });
 
   if (!response.ok) {
@@ -106,7 +106,7 @@ export async function githubGraphQL<T>(
       "User-Agent": "RateFactor-App",
     },
     body: JSON.stringify({ query, variables }),
-    next: { revalidate: 300 },
+    cache: "no-store",
   });
 
   if (!response.ok) {
