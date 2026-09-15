@@ -339,12 +339,18 @@ export function ActivityHeatmap({
   const totalContribs = stats.totalContributions ?? heatmapDays.reduce((acc, d) => acc + d.count, 0);
   const streak = stats.currentStreak ?? 0;
 
+  // Total week columns in the grid — shared by the day grid, the month-label
+  // grid, and the label-overlap filter below so all three stay in lockstep.
+  const totalWeeks = useMemo(
+    () => (heatmapDays && heatmapDays.length > 0 ? Math.ceil(heatmapDays.length / 7) : 0),
+    [heatmapDays]
+  );
+
   // Month positions aligned with week columns (GitHub Standard)
   const monthLabelsWithPositions = useMemo(() => {
-    if (!heatmapDays || heatmapDays.length === 0) return [];
+    if (!heatmapDays || heatmapDays.length === 0 || totalWeeks === 0) return [];
 
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const totalWeeks = Math.ceil(heatmapDays.length / 7);
     const rawLabels: { month: string; colIndex: number }[] = [];
     let lastMonth = "";
 
@@ -405,7 +411,7 @@ export function ActivityHeatmap({
     }
 
     return labels;
-  }, [heatmapDays]);
+  }, [heatmapDays, totalWeeks]);
 
   const handleCellMouseEnter = (day: ActivityDay, e: React.MouseEvent<HTMLDivElement>) => {
     if (chartRef.current) {
@@ -420,7 +426,11 @@ export function ActivityHeatmap({
   };
 
   return (
-    <div className="w-full space-y-3 font-sans">
+    // container-type here lets the header row and the graph below react to the
+    // ACTUAL contribution card width (via `@[…]:` container-query variants)
+    // instead of viewport width, since the card can be much narrower than the
+    // viewport when a dashboard sidebar is present.
+    <div className="w-full space-y-3 font-sans [container-type:inline-size]">
       {readOnly && publicErrorMsg && (
         <div className="p-3 rounded-md bg-[#ffebe9] dark:bg-rose-950/50 border border-[#ff8182]/40 dark:border-rose-800/40 text-[#cf222e] dark:text-rose-300 text-xs font-medium flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -466,8 +476,11 @@ export function ActivityHeatmap({
         </div>
       )}
 
-      {/* GitHub Section Header: "{Count} contributions in {Year}" */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+      {/* GitHub Section Header: "{Count} contributions in {Year}" — stacks on
+          narrow cards (e.g. a viewport-wide but sidebar-narrowed dashboard
+          column) and goes to one row once the card has ~740px, the same
+          threshold the calendar below uses to switch modes. */}
+      <div className="flex flex-col @[740px]:flex-row @[740px]:items-center justify-between gap-3 pb-1">
         <div className="flex items-center gap-2">
           <h3 className="text-sm sm:text-base font-semibold text-[#1f2328] dark:text-white tracking-tight">
             {isConnected ? (
@@ -516,7 +529,7 @@ export function ActivityHeatmap({
                     className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#656d76] dark:text-slate-400 hover:text-[#1f2328] dark:hover:text-white bg-[#f6f8fa] dark:bg-white/5 hover:bg-[#eaeef2] dark:hover:bg-white/10 border border-[#d0d7de] dark:border-white/10 rounded-md transition cursor-pointer"
                   >
                     <Settings className="w-3 h-3" />
-                    <span className="hidden sm:inline">Settings</span>
+                    <span className="hidden @[740px]:inline">Settings</span>
                   </button>
 
                   {showSettingsDropdown && (
@@ -571,9 +584,9 @@ export function ActivityHeatmap({
       </div>
 
       {/* GitHub Card Container */}
-      <div 
+      <div
         ref={chartRef}
-        className="relative bg-white dark:bg-[#121215] border border-[#d0d7de] dark:border-white/10 rounded-md p-4 shadow-xs"
+        className="relative bg-white dark:bg-[#121215] border border-[#d0d7de] dark:border-white/10 rounded-md p-4 shadow-xs [container-type:inline-size]"
       >
         {!isConnected ? (
           /* Empty / Unconnected State */
@@ -625,12 +638,12 @@ export function ActivityHeatmap({
                   <ExternalLink className="w-3 h-3 text-[#656d76] dark:text-slate-400" />
                 </a>
                 {stats.publicRepos !== undefined && stats.publicRepos > 0 && (
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[#656d76] dark:text-slate-400">
+                  <span className="hidden @[740px]:inline-flex items-center gap-1 text-[#656d76] dark:text-slate-400">
                     • <BookOpen className="w-3 h-3" /> {stats.publicRepos} repos
                   </span>
                 )}
                 {stats.followers !== undefined && stats.followers > 0 && (
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[#656d76] dark:text-slate-400">
+                  <span className="hidden @[740px]:inline-flex items-center gap-1 text-[#656d76] dark:text-slate-400">
                     • <Users className="w-3 h-3" /> {stats.followers} followers
                   </span>
                 )}
@@ -663,21 +676,40 @@ export function ActivityHeatmap({
               </div>
             </div>
 
-            {/* Scrollable Contribution Calendar Grid */}
+            {/* Contribution Calendar Grid — fluid on a wide card (all weeks
+                fit, no scroll), but below the card's own 740px container-query
+                breakpoint the week columns get a readable minimum width via
+                --rf-cellmin and this becomes the horizontal scroll boundary
+                instead of squeezing cells further. 740px = the content width
+                53 columns need at the 10.5px readable minimum: 53*10.5 (cells)
+                + 52*3 (max gap) + 28 (weekday gutter) ≈ 740px — below that,
+                fluid sizing would want cells smaller than readable, so scroll
+                mode kicks in instead. Uses a container query (not `sm:`
+                viewport) since the card can be far narrower than the viewport
+                when a dashboard sidebar is present. Month labels + cells share
+                this one scroller so they always move together; weekday labels
+                stay pinned via sticky. */}
             <div
               ref={scrollContainerRef}
-              className="overflow-x-auto pb-2 pt-1 max-w-full overscroll-x-contain select-none scrollbar-thin"
+              className="w-full pb-2 pt-1 select-none overflow-x-auto overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [--rf-cellmin:10.5px] @[740px]:[--rf-cellmin:0px]"
+              style={{
+                ["--rf-gap" as string]: "clamp(1px, 0.6cqw, 3px)",
+              }}
             >
-              <div className="inline-block min-w-max">
-                {/* Month Labels aligned to 53 week columns */}
+              <div className="w-full">
+                {/* Month Labels — same N-column grid as the day grid below,
+                    so each label sits over its actual week column at any width. */}
                 <div className="flex items-center mb-1">
-                  <div className="w-[28px] shrink-0 sticky left-0 bg-white dark:bg-[#121215] z-10" />
-                  <div className="relative h-4 flex-1">
+                  <div className="w-3 @[740px]:w-[28px] shrink-0 sticky left-0 z-10 bg-white dark:bg-[#121215]" />
+                  <div
+                    className="grid flex-1 h-4"
+                    style={{ gridTemplateColumns: `repeat(${Math.max(totalWeeks, 1)}, minmax(var(--rf-cellmin), 1fr))` }}
+                  >
                     {monthLabelsWithPositions.map((item, idx) => (
                       <span
                         key={`${item.month}-${item.colIndex}-${idx}`}
-                        className="absolute text-[10px] font-normal text-[#656d76] dark:text-slate-400 whitespace-nowrap leading-none top-0"
-                        style={{ left: `${item.colIndex * 13.5}px` }}
+                        className="text-[10px] font-normal text-[#656d76] dark:text-slate-400 whitespace-nowrap leading-none self-start justify-self-start row-start-1"
+                        style={{ gridColumnStart: item.colIndex + 1 }}
                       >
                         {item.month}
                       </span>
@@ -685,28 +717,34 @@ export function ActivityHeatmap({
                   </div>
                 </div>
 
-                <div className="flex items-start">
-                  {/* Weekday Labels (Mon, Wed, Fri) */}
+                <div className="flex items-stretch">
+                  {/* Weekday Labels (Mon, Wed, Fri) — pinned to the left edge
+                      while the calendar scrolls beneath on narrow cards; text
+                      hides below the 740px container breakpoint so the gutter
+                      doesn't eat into the narrow-card grid width. */}
                   <div
-                    className="w-[28px] shrink-0 grid grid-flow-row text-[9px] font-normal text-[#656d76] dark:text-slate-500 select-none pr-1.5 text-right sticky left-0 bg-white dark:bg-[#121215] z-10"
-                    style={{ gridTemplateRows: "repeat(7, 10.5px)", rowGap: "3px" }}
+                    className="w-3 @[740px]:w-[28px] shrink-0 sticky left-0 z-10 bg-white dark:bg-[#121215] grid text-[9px] font-normal text-[#656d76] dark:text-slate-500 select-none pr-1.5 text-right"
+                    style={{ gridTemplateRows: "repeat(7, minmax(0, 1fr))", rowGap: "var(--rf-gap)" }}
                   >
-                    <span className="h-[10.5px] leading-[10.5px]" />
-                    <span className="h-[10.5px] leading-[10.5px]">Mon</span>
-                    <span className="h-[10.5px] leading-[10.5px]" />
-                    <span className="h-[10.5px] leading-[10.5px]">Wed</span>
-                    <span className="h-[10.5px] leading-[10.5px]" />
-                    <span className="h-[10.5px] leading-[10.5px]">Fri</span>
-                    <span className="h-[10.5px] leading-[10.5px]" />
+                    <span className="h-full" />
+                    <span className="hidden @[740px]:flex h-full items-center justify-end">Mon</span>
+                    <span className="h-full" />
+                    <span className="hidden @[740px]:flex h-full items-center justify-end">Wed</span>
+                    <span className="h-full" />
+                    <span className="hidden @[740px]:flex h-full items-center justify-end">Fri</span>
+                    <span className="h-full" />
                   </div>
 
-                  {/* 7 rows x 53 columns SVG/Grid */}
+                  {/* 7 rows x N week columns — fluid width once the card is wide
+                      enough, readable minimum width (scrollable) below that
+                      container breakpoint; square cells either way */}
                   <div
-                    className="grid grid-flow-col"
-                    style={{ 
-                      gridTemplateRows: "repeat(7, 10.5px)",
-                      rowGap: "3px",
-                      columnGap: "3px"
+                    className="grid grid-flow-col flex-1 min-w-0"
+                    style={{
+                      gridTemplateColumns: `repeat(${Math.max(totalWeeks, 1)}, minmax(var(--rf-cellmin), 1fr))`,
+                      gridTemplateRows: "repeat(7, auto)",
+                      rowGap: "var(--rf-gap)",
+                      columnGap: "var(--rf-gap)"
                     }}
                   >
                     {heatmapDays.map((day) => {
@@ -722,7 +760,7 @@ export function ActivityHeatmap({
                           onMouseEnter={(e) => handleCellMouseEnter(day, e)}
                           onMouseLeave={() => setHoveredDay(null)}
                           className={cn(
-                            "w-[10.5px] h-[10.5px] rounded-[2px] transition-transform cursor-pointer hover:outline hover:outline-1 hover:outline-[#1f2328] dark:hover:outline-white hover:scale-125 z-0 hover:z-20",
+                            "w-full aspect-square rounded-[2px] transition-transform cursor-pointer hover:outline hover:outline-1 hover:outline-[#1f2328] dark:hover:outline-white hover:scale-125 z-0 hover:z-20",
                             bgClass
                           )}
                         />
