@@ -3,7 +3,7 @@ import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { getSessionUser } from "@/lib/auth/server-session";
 import { getCanonicalEmailHash } from "@/lib/auth/email";
 import { pool } from "@/lib/auth/better-auth";
-import { getDynamicPortfolios } from "@/lib/dynamic-portfolios";
+import { getDynamicPortfolios, invalidatePortfoliosCache } from "@/lib/dynamic-portfolios";
 import { resolveCanonicalProfileId } from "@/lib/auth/profile-id";
 
 // In-memory like tracker keyed by canonical mailbox hash to prevent multi-account like manipulation
@@ -194,6 +194,8 @@ export async function POST(
     } catch (dbErr) {
       console.warn("[POST like] Database persist notice:", dbErr);
     }
+
+    invalidatePortfoliosCache();
 
     return NextResponse.json({
       portfolioId,

@@ -4,7 +4,7 @@ import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { getSessionUser } from "@/lib/auth/server-session";
 import { getCanonicalEmailHash } from "@/lib/auth/email";
 import { pool } from "@/lib/auth/better-auth";
-import { getDynamicPortfolios } from "@/lib/dynamic-portfolios";
+import { getDynamicPortfolios, invalidatePortfoliosCache } from "@/lib/dynamic-portfolios";
 import { resolveCanonicalProfileId } from "@/lib/auth/profile-id";
 
 // In-memory rating storage keyed by canonical mailbox hash to prevent multi-account Sybil manipulation
@@ -200,6 +200,8 @@ export async function POST(
         { status: 502 }
       );
     }
+
+    invalidatePortfoliosCache();
 
     return NextResponse.json({
       message: "Rating successfully recorded.",

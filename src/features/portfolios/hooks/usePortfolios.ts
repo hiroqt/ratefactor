@@ -128,7 +128,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
   const refreshPortfolios = useCallback(async () => {
     if (options?.enabled === false) return;
     try {
-      const res = await fetch("/api/portfolios?limit=50", { cache: "no-store" });
+      const res = await fetch("/api/portfolios?limit=50");
       if (!res.ok) return;
       const data = await res.json();
       if (data?.portfolios && Array.isArray(data.portfolios)) {
@@ -214,12 +214,23 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
 
     refreshPortfolios();
 
-    // Re-fetch on tab focus and network reconnect to keep feed real-time across users
-    window.addEventListener("focus", refreshPortfolios);
-    window.addEventListener("online", refreshPortfolios);
+    // Re-fetch on tab focus, network reconnect, and custom local events
+    const handleRefetch = () => {
+      if (!document.hidden) {
+        refreshPortfolios();
+      }
+    };
+
+    window.addEventListener("focus", handleRefetch);
+    window.addEventListener("online", handleRefetch);
+    window.addEventListener("ratefactor:portfolio-created", handleRefetch);
+    window.addEventListener("ratefactor:portfolio-updated", handleRefetch);
+
     return () => {
-      window.removeEventListener("focus", refreshPortfolios);
-      window.removeEventListener("online", refreshPortfolios);
+      window.removeEventListener("focus", handleRefetch);
+      window.removeEventListener("online", handleRefetch);
+      window.removeEventListener("ratefactor:portfolio-created", handleRefetch);
+      window.removeEventListener("ratefactor:portfolio-updated", handleRefetch);
     };
   }, [options?.enabled, refreshPortfolios]);
 

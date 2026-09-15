@@ -159,3 +159,113 @@ export async function compressProfileImage(
     reader.readAsDataURL(file);
   });
 }
+
+export const DEFAULT_COVER_MAX_WIDTH = 1200;
+export const DEFAULT_COVER_MAX_HEIGHT = 675; // 16:9 standard
+export const MAX_COVER_SIZE_BYTES = 180 * 1024; // 180 KB max for cover thumbnails
+
+export interface CompressCoverOptions {
+  maxWidth?: number;
+  maxHeight?: number;
+  initialQuality?: number;
+  maxSizeBytes?: number;
+}
+
+/**
+ * Compresses a portfolio cover/thumbnail image file down to an optimized WebP/JPEG,
+ * downscaling to max 1200x675 while preserving aspect ratio and visual clarity.
+ * Ensures the output data URL is tiny (< 180 KB) so it doesn't inflate database egress.
+ */
+export async function compressPortfolioCoverImage(
+  file: File | Blob,
+  options: CompressCoverOptions = {}
+): Promise<CompressedImageResult> {
+  const maxW = options.maxWidth || DEFAULT_COVER_MAX_WIDTH;
+  const maxH = options.maxHeight || DEFAULT_COVER_MAX_HEIGHT;
+  const maxBytes = options.maxSizeBytes || MAX_COVER_SIZE_BYTES;
+  const originalSize = file.size;
+
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      return reject(new Error("No image file provided for compression."));
+    }
+
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Failed to read image file."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Failed to load image for compression. Invalid or corrupted format."));
+      img.onload = () => {
+        try {
+          const srcWidth = img.naturalWidth || img.width;
+          const srcHeight = img.naturalHeight || img.height;
+
+          if (!srcWidth || !srcHeight) {
+            return reject(new Error("Image has invalid dimensions (0x0)."));
+          }
+
+          // Calculate scaling factor preserving aspect ratio (fit within maxW x maxH)
+          const scale = Math.min(1, maxW / srcWidth, maxH / srcHeight);
+          const targetWidth = Math.round(srcWidth * scale);
+          const targetHeight = Math.round(srcHeight * scale);
+
+          const canvas = document.createElement("canvas");
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            return reject(new Error("Failed to obtain 2D canvas context for cover image compression."));
+          }
+
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+
+          ctx.drawImage(img, 0, 0, srcWidth, srcHeight, 0, 0, targetWidth, targetHeight);
+
+          // Try modern WebP compression first, fallback to JPEG
+          let format: "image/webp" | "image/jpeg" = "image/webp";
+          let quality = options.initialQuality || 0.82;
+          let dataUrl = canvas.toDataURL(format, quality);
+
+          if (!dataUrl.startsWith("data:image/webp")) {
+            format = "image/jpeg";
+            dataUrl = canvas.toDataURL(format, quality);
+          }
+
+          const computeBytes = (uri: string): number => {
+            const base64Str = uri.split(",")[1] || "";
+            return Math.round((base64Str.length * 3) / 4);
+          };
+
+          let currentBytes = computeBytes(dataUrl);
+
+          // If larger than maxBytes, progressively reduce quality
+          while (currentBytes > maxBytes && quality > 0.4) {
+            quality -= 0.1;
+            dataUrl = canvas.toDataURL(format, quality);
+            currentBytes = computeBytes(dataUrl);
+          }
+
+          const reduction = originalSize > 0 
+            ? Math.max(0, Math.round(((originalSize - currentBytes) / originalSize) * 100))
+            : 0;
+
+          resolve({
+            dataUrl,
+            originalSizeBytes: originalSize,
+            compressedSizeBytes: currentBytes,
+            reductionPercentage: reduction,
+            width: targetWidth,
+            height: targetHeight,
+            format,
+          });
+        } catch (err: any) {
+          reject(new Error(err?.message || "Error occurred during cover image compression."));
+        }
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}

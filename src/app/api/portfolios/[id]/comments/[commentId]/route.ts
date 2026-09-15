@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/auth/server-session";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { portfolioComments } from "@/lib/comments-store";
 import { pool } from "@/lib/auth/better-auth";
+import { invalidatePortfoliosCache } from "@/lib/dynamic-portfolios";
 
 export async function DELETE(
   req: NextRequest,
@@ -144,6 +145,8 @@ export async function DELETE(
     } catch (err) {
       console.warn("[DELETE comment] Database cleanup error:", err);
     }
+
+    invalidatePortfoliosCache();
 
     return NextResponse.json(
       {

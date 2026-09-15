@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/auth/better-auth";
 import { getDynamicPortfolios } from "@/lib/dynamic-portfolios";
 import { DeveloperSummary } from "@/types/profile";
+import { getCachedDevelopers, setCachedDevelopers } from "@/lib/developers-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,39 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const searchQuery = (searchParams.get("q") || searchParams.get("search") || "").trim();
     const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit")) || 12));
+
+    const ifNoneMatch = req.headers.get("if-none-match");
+    const isDefaultQuery = !searchQuery && limit <= 12;
+    const cached = getCachedDevelopers();
+    const isFresh = isDefaultQuery && cached.isFresh && cached.developers !== null;
+
+    // 304 Not Modified check: return 0 body bytes if cached and ETag matches
+    if (isFresh && ifNoneMatch && ifNoneMatch === cached.etag) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: {
+          ETag: cached.etag,
+          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+        },
+      });
+    }
+
+    if (isFresh && cached.developers) {
+      return NextResponse.json(
+        {
+          developers: cached.developers.slice(0, limit),
+          totalCount: cached.totalCount,
+          query: null,
+        },
+        {
+          status: 200,
+          headers: {
+            "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+            ETag: cached.etag,
+          },
+        }
+      );
+    }
 
     let developers: DeveloperSummary[] = [];
     let totalCount = 0;
@@ -28,6 +62,8 @@ export async function GET(req: NextRequest) {
         FROM public.profiles
         WHERE username IS NOT NULL 
           AND username != ''
+          AND username != 'developer'
+          AND username != 'guest'
           AND username NOT LIKE 'alpha_%'
           AND username NOT LIKE 'beta_%'
           AND username NOT LIKE 'gamma_%'
@@ -53,6 +89,8 @@ export async function GET(req: NextRequest) {
          FROM public.profiles 
          WHERE username IS NOT NULL 
            AND username != '' 
+           AND username != 'developer'
+           AND username != 'guest'
            AND username NOT LIKE 'alpha_%'
            AND username NOT LIKE 'beta_%'
            AND username NOT LIKE 'gamma_%'`
@@ -77,7 +115,12 @@ export async function GET(req: NextRequest) {
       const seen = new Set<string>();
 
       dynamicPortfolios.forEach((p) => {
-        if (p.author?.username && !seen.has(p.author.username.toLowerCase())) {
+        if (
+          p.author?.username &&
+          p.author.username.toLowerCase() !== "developer" &&
+          p.author.username.toLowerCase() !== "guest" &&
+          !seen.has(p.author.username.toLowerCase())
+        ) {
           seen.add(p.author.username.toLowerCase());
           if (
             !searchQuery ||
@@ -100,6 +143,22 @@ export async function GET(req: NextRequest) {
       totalCount = developers.length;
     }
 
+    let responseEtag = "";
+    if (isDefaultQuery) {
+      setCachedDevelopers(developers, totalCount);
+      responseEtag = getCachedDevelopers().etag;
+    }
+
+    const headers: Record<string, string> =
+      isDefaultQuery && responseEtag
+        ? {
+            "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+            ETag: responseEtag,
+          }
+        : {
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+          };
+
     return NextResponse.json(
       {
         developers,
@@ -108,9 +167,7 @@ export async function GET(req: NextRequest) {
       },
       {
         status: 200,
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate",
-        },
+        headers,
       }
     );
   } catch (error: any) {

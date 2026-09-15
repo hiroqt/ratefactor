@@ -8,6 +8,7 @@ import { DeveloperProfile } from "@/types/profile";
 import { Portfolio } from "@/types/portfolio";
 import { pool } from "@/lib/auth/better-auth";
 import { getDynamicPortfolios } from "@/lib/dynamic-portfolios";
+import { invalidateDevelopersCache } from "@/lib/developers-cache";
 
 type TechDomain = "Frontend" | "Backend" | "Database" | "Cloud" | "AI";
 
@@ -808,6 +809,8 @@ export async function PATCH(req: NextRequest) {
       ...updated,
       accolades,
     };
+
+    invalidateDevelopersCache();
 
     return NextResponse.json({
       message: "Profile updated successfully.",

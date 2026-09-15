@@ -36,6 +36,7 @@ import {
   validateImageUpload, 
   MIN_DESCRIPTION_CHARACTERS,
 } from "@/lib/guardrails";
+import { compressPortfolioCoverImage } from "@/lib/image-compression";
 
 export interface SubmitPortfolioModalProps {
   isOpen: boolean;
@@ -122,6 +123,7 @@ export function SubmitPortfolioModal({
   // Single image upload & quota tracking (Free tier standard: Max 2 MB, 1 image)
   const [uploadedFile, setUploadedFile] = useState<{ name: string; size: number; url: string } | null>(null);
   const [fileUploadError, setFileUploadError] = useState<string | null>(null);
+  const [isCompressingImage, setIsCompressingImage] = useState(false);
 
   const [copiedLink, setCopiedLink] = useState(false);
 
@@ -224,7 +226,7 @@ export function SubmitPortfolioModal({
     deps: [activeTab, uploadedFile, thumbnail, error],
   });
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -235,13 +237,25 @@ export function SubmitPortfolioModal({
     }
 
     setFileUploadError(null);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const url = event.target?.result as string;
-      setUploadedFile({ name: file.name, size: file.size, url });
-      setThumbnail(url);
-    };
-    reader.readAsDataURL(file);
+    setIsCompressingImage(true);
+
+    try {
+      // Compress to high-efficiency WebP/JPEG thumbnail downscaled to max 1200x675
+      const compressed = await compressPortfolioCoverImage(file);
+      setUploadedFile({ name: file.name, size: compressed.compressedSizeBytes, url: compressed.dataUrl });
+      setThumbnail(compressed.dataUrl);
+    } catch {
+      // Fallback to standard reader if offscreen canvas is unavailable
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const url = event.target?.result as string;
+        setUploadedFile({ name: file.name, size: file.size, url });
+        setThumbnail(url);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsCompressingImage(false);
+    }
   };
 
   const handleGithubUrlBlur = useCallback(async () => {
@@ -1005,14 +1019,23 @@ export function SubmitPortfolioModal({
                   </p>
                 )}
 
-                {uploadedFile && (
+                {isCompressingImage && (
+                  <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-2 text-xs">
+                    <RefreshCw className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 animate-spin shrink-0" />
+                    <span className="font-mono text-blue-800 dark:text-blue-300">Optimizing cover image...</span>
+                  </div>
+                )}
+
+                {uploadedFile && !isCompressingImage && (
                   <div className="mt-2 p-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2 truncate">
                       <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <span className="font-mono text-emerald-800 dark:text-emerald-300 truncate">{uploadedFile.name}</span>
                     </div>
                     <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 shrink-0">
-                      {(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB / 2.00 MB
+                      {uploadedFile.size < 1024 * 1024
+                        ? `${(uploadedFile.size / 1024).toFixed(0)} KB`
+                        : `${(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB`} (Optimized)
                     </span>
                   </div>
                 )}

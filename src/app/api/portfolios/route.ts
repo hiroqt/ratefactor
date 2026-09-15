@@ -5,8 +5,15 @@ import { getSessionUser } from "@/lib/auth/server-session";
 import { pool } from "@/lib/auth/better-auth";
 import { Portfolio } from "@/types/portfolio";
 import { portfolioComments } from "@/lib/comments-store";
-import { getDynamicPortfolios, setDynamicPortfolios } from "@/lib/dynamic-portfolios";
+import { 
+  getCachedPortfolios, 
+  setCachedPortfolios, 
+  invalidatePortfoliosCache, 
+  getDynamicPortfolios, 
+  setDynamicPortfolios 
+} from "@/lib/dynamic-portfolios";
 import { verifyGithubProjectRelationship } from "@/lib/github/repository-verification";
+import { invalidateDevelopersCache } from "@/lib/developers-cache";
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,9 +25,19 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit")) || 20));
     const offset = Math.max(0, Number(searchParams.get("offset")) || 0);
 
+    const ifNoneMatch = req.headers.get("if-none-match");
+    const isDefaultQuery =
+      category === "All" &&
+      (!hostParam || hostParam === "all") &&
+      !query &&
+      sort === "highest_rated" &&
+      offset === 0;
+    let cached = getCachedPortfolios();
+
     let dynamicPortfolios = [...getDynamicPortfolios()];
     let databasePortfolios: Portfolio[] | null = null;
     let databaseTotal = 0;
+    let totalDevelopers = 0;
 
     // Resolve authenticated user profile ID if present to determine isLiked
     let currentProfileId: string | null = null;
@@ -34,6 +51,59 @@ export async function GET(req: NextRequest) {
         if (pCheck.rows[0]) currentProfileId = String(pCheck.rows[0].id);
       }
     } catch {}
+
+    // HTTP 304 Not Modified check: if public feed hasn't changed and ETag matches, return 0 body bytes
+    if (isDefaultQuery && !currentProfileId && cached.isFresh && ifNoneMatch && ifNoneMatch === cached.etag) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: {
+          ETag: cached.etag,
+          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+        },
+      });
+    }
+
+    // Load user's likes if authenticated
+    const userLikedSet = new Set<string>();
+    if (currentProfileId) {
+      try {
+        const likesRes = await pool.query(
+          `SELECT portfolio_id FROM public.likes WHERE user_id = $1`,
+          [currentProfileId]
+        );
+        likesRes.rows.forEach((r) => userLikedSet.add(r.portfolio_id));
+      } catch {}
+    }
+
+    // If default query and cache is fresh, serve directly from L1 memory cache (0 database queries / 0 egress!)
+    if (isDefaultQuery && cached.isFresh) {
+      const sliced = cached.portfolios.slice(offset, offset + limit).map((p) => ({
+        ...p,
+        isLiked: userLikedSet.has(p.id),
+      }));
+      return NextResponse.json(
+        {
+          portfolios: sliced,
+          totalDevelopers: cached.developersCount,
+          developersCount: cached.developersCount,
+          pagination: {
+            total: cached.portfolios.length,
+            offset,
+            limit,
+            hasMore: offset + limit < cached.portfolios.length,
+          },
+        },
+        {
+          status: 200,
+          headers: {
+            ETag: cached.etag,
+            "Cache-Control": currentProfileId
+              ? "private, no-cache"
+              : "public, s-maxage=30, stale-while-revalidate=120",
+          },
+        }
+      );
+    }
 
     // Attempt to query PostgreSQL database if connection is available
     try {
@@ -176,9 +246,8 @@ export async function GET(req: NextRequest) {
         }
       } catch {}
 
-      // Batch load user's likes if authenticated
-      const userLikedSet = new Set<string>();
-      if (currentProfileId) {
+      // Batch load user's likes if authenticated (if not already loaded)
+      if (currentProfileId && userLikedSet.size === 0) {
         try {
           const likesRes = await pool.query(
             `SELECT portfolio_id FROM public.likes WHERE user_id = $1 AND portfolio_id::text = ANY($2::text[])`,
@@ -252,21 +321,31 @@ export async function GET(req: NextRequest) {
     }
 
     // Query real developer count from database
-    let totalDevelopers = 0;
     try {
-      const devRes = await pool.query(`SELECT COUNT(DISTINCT id) as count FROM public.profiles`);
+      const devRes = await pool.query(
+        `SELECT COUNT(DISTINCT id) as count FROM public.profiles WHERE username != 'developer' AND username != 'guest'`
+      );
       if (devRes.rows && devRes.rows.length > 0) {
         totalDevelopers = Number(devRes.rows[0].count) || 0;
       }
     } catch {
       const authorSet = new Set<string>();
-      dynamicPortfolios.forEach((p) => {
-        if (p.author?.username) authorSet.add(p.author.username.toLowerCase());
+      (databasePortfolios || dynamicPortfolios).forEach((p) => {
+        if (p.author?.username && p.author.username !== "developer" && p.author.username !== "guest") {
+          authorSet.add(p.author.username.toLowerCase());
+        }
       });
       totalDevelopers = authorSet.size;
     }
 
+    // Store in L1 cache if this was a default query
+    if (isDefaultQuery && databasePortfolios) {
+      setCachedPortfolios(databasePortfolios, totalDevelopers);
+      cached = getCachedPortfolios();
+    }
+
     if (databasePortfolios) {
+      const etag = cached.etag || `W/"${databaseTotal}-${Date.now().toString(36)}"`;
       return NextResponse.json(
         {
           portfolios: databasePortfolios,
@@ -282,9 +361,10 @@ export async function GET(req: NextRequest) {
         {
           status: 200,
           headers: {
-            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-            Pragma: "no-cache",
-            Expires: "0",
+            ETag: etag,
+            "Cache-Control": currentProfileId
+              ? "private, no-cache"
+              : "public, s-maxage=30, stale-while-revalidate=120",
           },
         }
       );
@@ -376,9 +456,10 @@ export async function GET(req: NextRequest) {
       {
         status: 200,
         headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-          Pragma: "no-cache",
-          Expires: "0",
+          ETag: cached.etag || `W/"${total}-${Date.now().toString(36)}"`,
+          "Cache-Control": currentProfileId
+            ? "private, no-cache"
+            : "public, s-maxage=30, stale-while-revalidate=120",
         },
       }
     );
@@ -579,6 +660,8 @@ export async function POST(req: NextRequest) {
     const currentPortfolios = getDynamicPortfolios();
     currentPortfolios.unshift(newPortfolio);
     setDynamicPortfolios(currentPortfolios);
+    invalidatePortfoliosCache();
+    invalidateDevelopersCache();
 
     return NextResponse.json(
       {

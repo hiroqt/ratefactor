@@ -5,6 +5,7 @@ import { validateCommentContent } from "@/lib/guardrails";
 import { getSessionUser } from "@/lib/auth/server-session";
 import { portfolioComments } from "@/lib/comments-store";
 import { pool } from "@/lib/auth/better-auth";
+import { invalidatePortfoliosCache } from "@/lib/dynamic-portfolios";
 
 export async function GET(
   req: NextRequest,
@@ -257,6 +258,7 @@ export async function POST(
       portfolioComments.set(portfolioId, list);
     }
     list.unshift(newComment);
+    invalidatePortfoliosCache();
 
     return NextResponse.json(
       {

@@ -85,7 +85,7 @@ export function HeroSection({
     let isMounted = true;
     async function loadDevelopers() {
       try {
-        const res = await fetch("/api/developers?limit=10", { cache: "no-store" });
+        const res = await fetch("/api/developers?limit=10");
         if (!res.ok) return;
         const data = await res.json();
         if (isMounted && data?.developers && Array.isArray(data.developers)) {
@@ -102,12 +102,12 @@ export function HeroSection({
     loadDevelopers();
 
     // Auto-update when new users join or create account:
-    // 1. Periodic poll (every 15 seconds) when tab is active
+    // 1. Periodic poll (every 60 seconds) when tab is active
     const pollInterval = setInterval(() => {
       if (!document.hidden) {
         loadDevelopers();
       }
-    }, 15000);
+    }, 60000);
 
     // 2. Refetch when window regains focus
     const onFocus = () => {

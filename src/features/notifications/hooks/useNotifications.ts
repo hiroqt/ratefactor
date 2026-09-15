@@ -12,6 +12,21 @@ function notifySubscribers() {
   subscribers.forEach((callback) => callback(globalNotifications, globalUnreadCount));
 }
 
+function hasActiveSession(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const savedUser = localStorage.getItem("ratefactor_auth_user");
+    if (savedUser) return true;
+    if (
+      document.cookie.includes("ratefactor_session_token") ||
+      document.cookie.includes("better-auth.session_token")
+    ) {
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
 export function useNotifications(initial?: NotificationItem[]) {
   const [notifications, setNotificationsState] = useState<NotificationItem[]>(() => {
     if (globalNotifications.length > 0) return globalNotifications;
@@ -36,15 +51,21 @@ export function useNotifications(initial?: NotificationItem[]) {
     };
   }, []);
 
-  // Fetch notifications from server API
+  // Fetch notifications from server API only if user has active session
   const refreshNotifications = useCallback(async () => {
     if (isFetchingRef.current) return;
+    if (!hasActiveSession()) {
+      if (globalNotifications.length > 0 || globalUnreadCount > 0) {
+        globalNotifications = [];
+        globalUnreadCount = 0;
+        notifySubscribers();
+      }
+      return;
+    }
+
     isFetchingRef.current = true;
     try {
-      const res = await fetch("/api/notifications", {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-store" },
-      });
+      const res = await fetch("/api/notifications");
       if (!res.ok) return;
       const data = await res.json();
       if (data && Array.isArray(data.notifications)) {
@@ -69,13 +90,13 @@ export function useNotifications(initial?: NotificationItem[]) {
 
     // Re-fetch on focus and network reconnection
     const handleFocus = () => {
-      if (document.visibilityState === "visible") {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
         refreshNotifications();
       }
     };
 
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === "ratefactor_notifs_sync") {
+      if (e.key === "ratefactor_notifs_sync" || e.key === "ratefactor_auth_user") {
         refreshNotifications();
       }
     };
@@ -83,19 +104,23 @@ export function useNotifications(initial?: NotificationItem[]) {
     window.addEventListener("focus", handleFocus);
     window.addEventListener("online", handleFocus);
     window.addEventListener("storage", handleStorage);
+    window.addEventListener("ratefactor:user-registered", handleFocus);
+    window.addEventListener("ratefactor:user-changed", handleFocus);
     document.addEventListener("visibilitychange", handleFocus);
 
-    // 5-second real-time heartbeat polling
+    // 30-second heartbeat polling for active, visible tab
     const interval = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
         refreshNotifications();
       }
-    }, 5000);
+    }, 30000);
 
     return () => {
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("online", handleFocus);
       window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("ratefactor:user-registered", handleFocus);
+      window.removeEventListener("ratefactor:user-changed", handleFocus);
       document.removeEventListener("visibilitychange", handleFocus);
       clearInterval(interval);
     };

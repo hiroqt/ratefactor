@@ -27,7 +27,7 @@ export const INITIAL_DEVELOPER_PROFILE: DeveloperProfile = {
   pinnedPortfolioIds: [],
   spotlightPortfolioId: undefined,
   skills: [],
-  joinedDate: "2026-09-13T00:00:00.000Z",
+  joinedDate: "",
 };
 
 export const STATUS_PRESETS = [
