@@ -70,6 +70,7 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
   const [visitedUser, setVisitedUser] = useState<DeveloperProfile | null>(null);
   const [hireInquiryOpen, setHireInquiryOpen] = useState(false);
   const [liveProfile, setLiveProfile] = useState<DeveloperProfile | null>(null);
+  const [livePortfolios, setLivePortfolios] = useState<Portfolio[]>([]);
 
   useEffect(() => {
     if (!rawUsername) return;
@@ -81,6 +82,7 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
           const data = await res.json();
           if (isMounted && data && (data.username || data.profile)) {
             setLiveProfile(data.profile || data);
+            setLivePortfolios(Array.isArray(data.portfolios) ? data.portfolios : []);
           }
         }
       } catch (err) {
@@ -144,6 +146,8 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
     handleSubmitPortfolio,
     handleSelectPortfolioById,
   } = usePortfolios({
+    enabled: false,
+    initialPortfolios: livePortfolios,
     currentUser,
     currentUsername: myDevProfile.username,
     onRequireAuth: requireAuth,

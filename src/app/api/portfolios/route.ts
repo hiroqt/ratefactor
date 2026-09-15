@@ -19,6 +19,8 @@ export async function GET(req: NextRequest) {
     const offset = Math.max(0, Number(searchParams.get("offset")) || 0);
 
     let dynamicPortfolios = [...getDynamicPortfolios()];
+    let databasePortfolios: Portfolio[] | null = null;
+    let databaseTotal = 0;
 
     // Resolve authenticated user profile ID if present to determine isLiked
     let currentProfileId: string | null = null;
@@ -35,6 +37,58 @@ export async function GET(req: NextRequest) {
 
     // Attempt to query PostgreSQL database if connection is available
     try {
+      const filters = ["p.status = 'published'"];
+      const filterValues: (string | number)[] = [];
+      const addFilter = (sql: string, value: string) => {
+        filterValues.push(value);
+        filters.push(sql.replace("?", `$${filterValues.length}`));
+      };
+      const hostname = "LOWER(REGEXP_REPLACE(SPLIT_PART(REGEXP_REPLACE(COALESCE(p.portfolio_url, ''), '^[a-zA-Z][a-zA-Z0-9+.-]*://', ''), '/', 1), ':[0-9]+$', ''))";
+      const likeValue = (value: string) => `%${value.replace(/[\\%_]/g, "\\$&")}%`;
+
+      if (category !== "All") addFilter("p.category::text = ?", category);
+      if (hostParam && hostParam !== "all") {
+        const hostValue = likeValue(hostParam);
+        if (hostParam.startsWith(".")) {
+          filterValues.push(hostValue, hostValue);
+          filters.push(`(${hostname} LIKE $${filterValues.length - 1} ESCAPE '\\' OR LOWER(COALESCE(p.portfolio_url, '')) LIKE $${filterValues.length} ESCAPE '\\')`);
+        } else {
+          addFilter(`${hostname} LIKE ? ESCAPE '\\'`, hostValue);
+        }
+      }
+      if (query) {
+        const queryValue = likeValue(query);
+        filterValues.push(queryValue);
+        const queryParam = `$${filterValues.length}`;
+        filters.push(`(
+          LOWER(COALESCE(p.title, '')) LIKE ${queryParam} ESCAPE '\\'
+          OR LOWER(COALESCE(p.tagline, '')) LIKE ${queryParam} ESCAPE '\\'
+          OR LOWER(COALESCE(p.description, '')) LIKE ${queryParam} ESCAPE '\\'
+          OR LOWER(COALESCE(pr.full_name, '')) LIKE ${queryParam} ESCAPE '\\'
+          OR LOWER(COALESCE(pr.username, '')) LIKE ${queryParam} ESCAPE '\\'
+          OR LOWER(COALESCE(p.category::text, '')) LIKE ${queryParam} ESCAPE '\\'
+          OR ${hostname} LIKE ${queryParam} ESCAPE '\\'
+          OR LOWER(COALESCE(p.portfolio_url, '')) LIKE ${queryParam} ESCAPE '\\'
+          OR LOWER(COALESCE(p.demo_url, '')) LIKE ${queryParam} ESCAPE '\\'
+          OR LOWER(COALESCE(p.tech_stack::text, '')) LIKE ${queryParam} ESCAPE '\\'
+        )`);
+      }
+
+      const whereClause = filters.join(" AND ");
+      const orderBy = sort === "most_liked"
+        ? '"likesCount" DESC, p.created_at DESC'
+        : sort === "most_discussed"
+          ? '"commentsCount" DESC, p.created_at DESC'
+          : sort === "showcase"
+            ? 'COALESCE(p.is_showcase, false) DESC, p.created_at DESC'
+            : sort === "highest_rated"
+              ? 'COALESCE(p.rating, 0) DESC, p.created_at DESC'
+              : "p.created_at DESC";
+      const countRes = await pool.query(
+        `SELECT COUNT(*)::int AS total FROM public.portfolios p LEFT JOIN public.profiles pr ON p.author_id = pr.id WHERE ${whereClause}`,
+        filterValues
+      );
+      databaseTotal = Number(countRes.rows[0]?.total) || 0;
       const dbRes = await pool.query(`
         SELECT 
           p.id,
@@ -75,14 +129,16 @@ export async function GET(req: NextRequest) {
           pr.created_at as "authorCreatedAt"
         FROM public.portfolios p
         LEFT JOIN public.profiles pr ON p.author_id = pr.id
-        WHERE p.status = 'published'
-        ORDER BY p.created_at DESC
-      `);
+        WHERE ${whereClause}
+        ORDER BY ${orderBy}
+        LIMIT $${filterValues.length + 1} OFFSET $${filterValues.length + 2}
+      `, [...filterValues, limit, offset]);
 
       // Batch load real approved comments from database
       const dbCommentsMap = new Map<string, any[]>();
       try {
-        const commentsQuery = await pool.query(`
+        const portfolioIds = dbRes.rows.map((row) => String(row.id));
+        const commentsQuery = portfolioIds.length ? await pool.query(`
           SELECT 
             c.id,
             c.portfolio_id as "portfolioId",
@@ -98,8 +154,9 @@ export async function GET(req: NextRequest) {
           FROM public.comments c
           LEFT JOIN public.profiles pr ON c.user_id = pr.id
           WHERE c.status = 'approved' AND c.is_reported = false
+            AND c.portfolio_id::text = ANY($1::text[])
           ORDER BY c.created_at DESC
-        `);
+        `, [portfolioIds]) : { rows: [] };
 
         for (const row of commentsQuery.rows) {
           const item = {
@@ -124,8 +181,8 @@ export async function GET(req: NextRequest) {
       if (currentProfileId) {
         try {
           const likesRes = await pool.query(
-            `SELECT portfolio_id FROM public.likes WHERE user_id = $1`,
-            [currentProfileId]
+            `SELECT portfolio_id FROM public.likes WHERE user_id = $1 AND portfolio_id::text = ANY($2::text[])`,
+            [currentProfileId, dbRes.rows.map((row) => String(row.id))]
           );
           likesRes.rows.forEach((r) => userLikedSet.add(r.portfolio_id));
         } catch {}
@@ -188,8 +245,7 @@ export async function GET(req: NextRequest) {
           };
         });
 
-        dynamicPortfolios = dbPortfolios;
-        setDynamicPortfolios(dynamicPortfolios);
+        databasePortfolios = dbPortfolios;
       }
     } catch {
       // Graceful fallback to dynamicPortfolios in-memory store
@@ -208,6 +264,30 @@ export async function GET(req: NextRequest) {
         if (p.author?.username) authorSet.add(p.author.username.toLowerCase());
       });
       totalDevelopers = authorSet.size;
+    }
+
+    if (databasePortfolios) {
+      return NextResponse.json(
+        {
+          portfolios: databasePortfolios,
+          totalDevelopers,
+          developersCount: totalDevelopers,
+          pagination: {
+            total: databaseTotal,
+            offset,
+            limit,
+            hasMore: offset + limit < databaseTotal,
+          },
+        },
+        {
+          status: 200,
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        }
+      );
     }
 
     let filtered = [...dynamicPortfolios];

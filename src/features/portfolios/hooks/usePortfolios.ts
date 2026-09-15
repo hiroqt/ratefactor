@@ -18,6 +18,8 @@ import { trackEvent } from "@/lib/analytics";
 import { AuthUser } from "@/features/auth/hooks/useAuth";
 
 export interface UsePortfoliosOptions {
+  enabled?: boolean;
+  initialPortfolios?: Portfolio[];
   currentUser?: AuthUser | null;
   currentUsername?: string;
   onRequireAuth?: (intent: string) => void;
@@ -88,6 +90,7 @@ function applyRatingDelta(
 
 export function usePortfolios(options?: UsePortfoliosOptions) {
   const [portfolios, setPortfolios] = useState<Portfolio[]>(() => {
+    if (options?.initialPortfolios) return options.initialPortfolios;
     if (memoryPortfoliosCache && memoryPortfoliosCache.length > 0) {
       return memoryPortfoliosCache;
     }
@@ -123,6 +126,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
 
   // Hydration-safe initial load from localStorage and dynamic fetch from server API
   const refreshPortfolios = useCallback(async () => {
+    if (options?.enabled === false) return;
     try {
       const res = await fetch("/api/portfolios?limit=50", { cache: "no-store" });
       if (!res.ok) return;
@@ -167,9 +171,14 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         } catch {}
       }
     } catch (e) {}
-  }, []);
+  }, [options?.enabled]);
 
   useEffect(() => {
+    if (options?.initialPortfolios) setPortfolios(options.initialPortfolios);
+  }, [options?.initialPortfolios]);
+
+  useEffect(() => {
+    if (options?.enabled === false) return;
     try {
       const saved = localStorage.getItem("ratefactor_portfolios");
       if (saved) {
@@ -208,21 +217,18 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
     // Re-fetch on tab focus and network reconnect to keep feed real-time across users
     window.addEventListener("focus", refreshPortfolios);
     window.addEventListener("online", refreshPortfolios);
-    const interval = setInterval(refreshPortfolios, 25000);
-
     return () => {
       window.removeEventListener("focus", refreshPortfolios);
       window.removeEventListener("online", refreshPortfolios);
-      clearInterval(interval);
     };
-  }, [refreshPortfolios]);
+  }, [options?.enabled, refreshPortfolios]);
 
   // Synchronize memory cache whenever state changes
   useEffect(() => {
-    if (portfolios) {
+    if (options?.enabled !== false && portfolios) {
       memoryPortfoliosCache = portfolios;
     }
-  }, [portfolios]);
+  }, [options?.enabled, portfolios]);
 
   const [selectedPortfolio, setSelectedPortfolio] = useState<Portfolio | null>(null);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
@@ -236,6 +242,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
 
   // Listen for cross-tab portfolio updates via localStorage
   useEffect(() => {
+    if (options?.enabled === false) return;
     const handleStorage = (e: StorageEvent) => {
       if (e.key === "ratefactor_portfolios" && e.newValue) {
         try {
@@ -254,14 +261,15 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
     return () => {
       window.removeEventListener("storage", handleStorage);
     };
-  }, []);
+  }, [options?.enabled]);
 
   // Persist portfolios changes to localStorage
   useEffect(() => {
+    if (options?.enabled === false) return;
     try {
       localStorage.setItem("ratefactor_portfolios", JSON.stringify(portfolios));
     } catch (e) {}
-  }, [portfolios]);
+  }, [options?.enabled, portfolios]);
 
   // Daily & Weekly showcases (only real elected showcases)
   const dailyShowcase = useMemo(() => {

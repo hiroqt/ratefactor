@@ -306,9 +306,11 @@ export async function GET(req: NextRequest) {
              p.request_critique as "requestCritique", p.created_at as "createdAt"
            FROM public.portfolios p
            JOIN public.profiles pr ON p.author_id = pr.id
-           WHERE pr.id = md5('ratefactor:' || $1)::uuid 
-              OR pr.id::text = $1 
-              OR LOWER(pr.username) = LOWER($2)
+           WHERE p.status = 'published' AND (
+             pr.id = md5('ratefactor:' || $1)::uuid
+             OR pr.id::text = $1
+             OR LOWER(pr.username) = LOWER($2)
+           )
            ORDER BY p.created_at DESC`,
           [profile.id, targetUser]
         );
@@ -339,11 +341,29 @@ export async function GET(req: NextRequest) {
       }
     } catch {}
 
+    if (authUser && userPortfolios.length) {
+      try {
+        const profileRes = await pool.query(
+          `SELECT id FROM public.profiles WHERE id::text = $1 OR LOWER(username) = LOWER($2) LIMIT 1`,
+          [authUser.id, authUser.username || ""]
+        );
+        const currentProfileId = profileRes.rows[0]?.id;
+        if (currentProfileId) {
+          const likesRes = await pool.query(
+            `SELECT portfolio_id FROM public.likes WHERE user_id = $1 AND portfolio_id::text = ANY($2::text[])`,
+            [currentProfileId, userPortfolios.map((portfolio) => portfolio.id)]
+          );
+          const likedIds = new Set(likesRes.rows.map((row) => String(row.portfolio_id)));
+          userPortfolios = userPortfolios.map((portfolio) => ({ ...portfolio, isLiked: likedIds.has(portfolio.id) }));
+        }
+      } catch {}
+    }
+
     // In-memory dynamicPortfolios fallback
     if (userPortfolios.length === 0 && targetUser) {
       userPortfolios = getDynamicPortfolios().filter((p) => {
         const pAuthor = (p.author?.username || "").toLowerCase().trim();
-        return pAuthor === targetUser;
+        return pAuthor === targetUser && (!("status" in p) || (p as Portfolio & { status?: string }).status === "published");
       });
     }
 
@@ -360,6 +380,7 @@ export async function GET(req: NextRequest) {
       ...fullProfile,
       accolades,
       techStackDistribution,
+      portfolios: userPortfolios,
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -739,9 +760,11 @@ export async function PATCH(req: NextRequest) {
              p.request_critique as "requestCritique", p.created_at as "createdAt"
             FROM public.portfolios p
             JOIN public.profiles pr ON p.author_id = pr.id
-            WHERE pr.id = md5('ratefactor:' || $1)::uuid 
-               OR pr.id::text = $1 
-               OR LOWER(pr.username) = LOWER($2)
+           WHERE p.status = 'published' AND (
+             pr.id = md5('ratefactor:' || $1)::uuid
+             OR pr.id::text = $1
+             OR LOWER(pr.username) = LOWER($2)
+           )
             ORDER BY p.created_at DESC`,
           [updated.id, targetUser]
         );
@@ -775,7 +798,7 @@ export async function PATCH(req: NextRequest) {
     if (userPortfolios.length === 0 && targetUser) {
       userPortfolios = getDynamicPortfolios().filter((p) => {
         const pAuthor = (p.author?.username || "").toLowerCase().trim();
-        return pAuthor === targetUser;
+        return pAuthor === targetUser && (!("status" in p) || (p as Portfolio & { status?: string }).status === "published");
       });
     }
 
