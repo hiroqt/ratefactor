@@ -148,9 +148,11 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
                   ? p.joinedDate
                   : (currentUser.createdAt || (prev.joinedDate !== "2026" ? prev.joinedDate : undefined));
 
-              const serverPins = Array.isArray(p.pinnedPortfolioIds) ? p.pinnedPortfolioIds : [];
-              const authoritativePins = serverPins.length > 0 ? serverPins : (prev.pinnedPortfolioIds || []);
-              const authoritativeSpotlight = p.spotlightPortfolioId || prev.spotlightPortfolioId;
+              const authoritativePins = Array.isArray(p.pinnedPortfolioIds)
+                ? p.pinnedPortfolioIds
+                : (prev.pinnedPortfolioIds || []);
+              const authoritativeSpotlight =
+                p.spotlightPortfolioId !== undefined ? p.spotlightPortfolioId : prev.spotlightPortfolioId;
 
               const merged: DeveloperProfile = {
                 ...prev,
@@ -296,7 +298,7 @@ export function useDeveloperProfile(currentUser?: AuthUser | null) {
       const updated = {
         ...prev,
         pinnedPortfolioIds,
-        spotlightPortfolioId: spotlightPortfolioId !== undefined ? spotlightPortfolioId : prev.spotlightPortfolioId,
+        spotlightPortfolioId: validSpotlight ?? undefined,
       };
       try {
         localStorage.setItem("ratefactor_dev_profile", JSON.stringify(updated));
