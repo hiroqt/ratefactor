@@ -1769,6 +1769,7 @@ function ProfilePageContent() {
         onAddComment={handleAddComment}
         onDeleteComment={handleDeleteComment}
         onRatePortfolio={handleRatePortfolio}
+        onDeletePortfolio={handleDeletePortfolio}
         currentUser={currentUser}
         onRequireAuth={requireAuth}
       />

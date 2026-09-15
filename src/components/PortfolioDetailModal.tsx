@@ -52,6 +52,7 @@ interface PortfolioDetailModalProps {
   onAddComment: (portfolioId: string, content: string, critiqueTag?: CritiqueTag | null) => void;
   onDeleteComment: (portfolioId: string, commentId: string) => void;
   onRatePortfolio: (portfolioId: string, rating: number, breakdown: RatingBreakdown) => void;
+  onDeletePortfolio?: (portfolioId: string) => void | Promise<void>;
   currentUser?: any;
   onRequireAuth?: (intent: string) => void;
 }
@@ -64,10 +65,14 @@ export function PortfolioDetailModal({
   onAddComment,
   onDeleteComment,
   onRatePortfolio,
+  onDeletePortfolio,
   currentUser,
   onRequireAuth,
 }: PortfolioDetailModalProps) {
   const [commentText, setCommentText] = useState("");
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [selectedCritiqueTag, setSelectedCritiqueTag] = useState<CritiqueTag | null>(null);
   const [isLiked, setIsLiked] = useState(false);
@@ -100,6 +105,9 @@ export function PortfolioDetailModal({
         setCriteria(DEFAULT_CRITERIA);
       }
       setCommentText("");
+      setIsConfirmingDelete(false);
+      setIsDeleting(false);
+      setDeleteError(null);
       trackEvent("portfolio_view", {
         portfolioId: portfolio.id,
         title: portfolio.title,
@@ -270,6 +278,24 @@ export function PortfolioDetailModal({
 
   const handleReportComment = (commentId: string) => {
     setReportedComments((prev) => ({ ...prev, [commentId]: true }));
+  };
+
+  const handleDeletePortfolio = async () => {
+    if (!onDeletePortfolio) return;
+    if (!isConfirmingDelete) {
+      setIsConfirmingDelete(true);
+      return;
+    }
+    setDeleteError(null);
+    setIsDeleting(true);
+    try {
+      await onDeletePortfolio(portfolio.id);
+      // Success: the parent clears selectedPortfolio, which closes this modal.
+    } catch (err: any) {
+      setIsDeleting(false);
+      setIsConfirmingDelete(false);
+      setDeleteError(err?.message || "Failed to delete portfolio. Please try again.");
+    }
   };
 
   return (
@@ -952,17 +978,50 @@ export function PortfolioDetailModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-3.5 border-t border-slate-100 dark:border-white/10 bg-slate-50/80 dark:bg-zinc-900/80 flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 shrink-0">
-          <span className="font-mono text-[11px]">
-            Registry ID: {portfolio.id} • Indexed {timeAgo(portfolio.createdAt)}
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 transition-colors font-medium text-xs cursor-pointer"
-          >
-            Close Blueprint
-          </button>
+        <div className="px-6 py-3.5 border-t border-slate-100 dark:border-white/10 bg-slate-50/80 dark:bg-zinc-900/80 flex flex-col gap-2 text-xs text-slate-500 dark:text-zinc-400 shrink-0">
+          {deleteError && (
+            <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{deleteError}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-[11px]">
+              Registry ID: {portfolio.id} • Indexed {timeAgo(portfolio.createdAt)}
+            </span>
+            <div className="flex items-center gap-2">
+              {isOwnPortfolio && onDeletePortfolio && (
+                <button
+                  type="button"
+                  onClick={handleDeletePortfolio}
+                  disabled={isDeleting}
+                  className="px-4 py-1.5 rounded-full bg-rose-600 hover:bg-rose-700 disabled:opacity-60 disabled:pointer-events-none text-white border border-rose-600 transition-colors font-medium text-xs cursor-pointer"
+                >
+                  {isDeleting
+                    ? "Deleting…"
+                    : isConfirmingDelete
+                      ? "Confirm Delete?"
+                      : "Delete Portfolio"}
+                </button>
+              )}
+              {isConfirmingDelete && !isDeleting && (
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmingDelete(false)}
+                  className="px-3 py-1.5 rounded-full text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 border border-slate-200 dark:border-zinc-700 transition-colors font-medium text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 transition-colors font-medium text-xs cursor-pointer"
+              >
+                Close Blueprint
+              </button>
+            </div>
+          </div>
         </div>
 
       </motion.div>

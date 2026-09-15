@@ -47,7 +47,7 @@ interface DeveloperDashboardProps {
   onUpdateProfile?: (updatedProfile: DeveloperProfile) => void;
   myPortfolios: Portfolio[];
   onSelectPortfolio: (p: Portfolio) => void;
-  onDeletePortfolio: (id: string) => void;
+  onDeletePortfolio: (id: string) => void | Promise<void>;
   onOpenSubmitModal: () => void;
   onRequireAuth?: (intent: string) => void;
   onClose?: () => void;
@@ -85,6 +85,22 @@ export function DeveloperDashboard({
 
   // Success message toast
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
+
+  // Inline two-step delete confirmation, keyed by portfolio id
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const handleDeleteClick = async (portfolioId: string) => {
+    if (confirmDeleteId !== portfolioId) {
+      setConfirmDeleteId(portfolioId);
+      return;
+    }
+    setConfirmDeleteId(null);
+    try {
+      await onDeletePortfolio(portfolioId);
+    } catch {
+      // onDeletePortfolio already surfaces its own toast on failure.
+    }
+  };
 
   const showToast = (msg: string) => {
     setFeedbackToast(msg);
@@ -702,15 +718,34 @@ export function DeveloperDashboard({
                         Inspect
                       </button>
 
-                      {/* Delete */}
-                      <button
-                        type="button"
-                        onClick={() => onDeletePortfolio(portfolio.id)}
-                        className="p-1.5 rounded-full text-slate-400 dark:text-zinc-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
-                        title="Delete project"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {/* Delete (two-step inline confirm) */}
+                      {confirmDeleteId === portfolio.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteClick(portfolio.id)}
+                            className="px-2.5 py-1 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-colors cursor-pointer"
+                          >
+                            Confirm Delete?
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="px-2 py-1 rounded-full text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs font-medium transition-colors cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClick(portfolio.id)}
+                          className="p-1.5 rounded-full text-slate-400 dark:text-zinc-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                          title="Delete project"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
