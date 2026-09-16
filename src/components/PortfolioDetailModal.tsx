@@ -129,8 +129,9 @@ export function PortfolioDetailModal({
     }
   }, [portfolio]);
 
-  // Handle ESC key & lock body scrolling
+  // Handle ESC key & lock body scrolling only when modal is actively open
   useEffect(() => {
+    if (!portfolio) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         onClose();
@@ -142,7 +143,7 @@ export function PortfolioDetailModal({
       document.body.style.overflow = "unset";
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose]);
+  }, [portfolio, onClose]);
 
   if (!portfolio) return null;
 

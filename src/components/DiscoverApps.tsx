@@ -291,7 +291,7 @@ export function DiscoverApps({
           </div>
 
           {/* Gooey Navigation Bar */}
-          <div className="overflow-x-auto pb-2 scrollbar-none no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="overflow-x-auto pb-2 scrollbar-none no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 overscroll-x-contain touch-pan-x">
             <GooeyNav
               items={gooeyNavItems}
               value={activeCategoryIndex}
@@ -314,7 +314,7 @@ export function DiscoverApps({
         {/* ========================================================================= */}
         <div className="bg-slate-50 dark:bg-zinc-900/60 rounded-2xl border border-slate-200 dark:border-white/10 p-3 sm:p-4 mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-2xs">
           {/* Search input */}
-          <div className="relative flex-1 min-w-[240px]">
+          <div className="relative flex-1 min-w-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-zinc-500 pointer-events-none" />
             <input
               id="discover-search-input"

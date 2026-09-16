@@ -720,7 +720,7 @@ function ProfilePageContent() {
             </div>
 
             {/* Quick View Mode Switcher */}
-            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold self-start sm:self-auto">
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-semibold self-start sm:self-auto overflow-x-auto max-w-full no-scrollbar scrollbar-none overscroll-x-contain touch-pan-x">
               <button
                 type="button"
                 onClick={() => setActiveTab("dashboard")}

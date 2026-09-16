@@ -95,23 +95,26 @@ export function ProfileShareMenu({
     setIsOpen(false);
     const url = getProfileUrl();
     const quote = getFacebookQuote();
+    if (typeof window !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(quote);
+      toast.success("Catchy description copied and opening Facebook post composer.");
+    }
     const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(quote)}`;
     window.open(fbUrl, "_blank", "width=600,height=500,location=no,menubar=no,toolbar=no");
   };
 
   const handleShareLinkedIn = () => {
     setIsOpen(false);
-    const url = getProfileUrl();
     const text = getLinkedInText();
     
-    // Copy professional text to clipboard as convenience for the LinkedIn post creator
     if (typeof window !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(text);
-      toast.success("Professional description copied to clipboard for your LinkedIn post.");
+      toast.success("Professional description pre-set and copied for your LinkedIn post.");
     }
 
-    const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
-    window.open(linkedInUrl, "_blank", "width=600,height=600,location=no,menubar=no,toolbar=no");
+    // Opens LinkedIn feed with pre-filled caption text
+    const linkedInUrl = `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(text)}`;
+    window.open(linkedInUrl, "_blank", "width=650,height=650,location=no,menubar=no,toolbar=no");
   };
 
   const handleShareTwitter = () => {

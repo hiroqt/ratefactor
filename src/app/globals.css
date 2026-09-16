@@ -45,13 +45,20 @@
 
   html {
     color-scheme: light;
-    scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
     text-rendering: optimizeLegibility;
+    overflow-x: hidden;
   }
 
   html.dark {
     color-scheme: dark;
+  }
+
+  /* Enable smooth scrolling on desktop, preserving native momentum touch on mobile devices */
+  @media (pointer: fine) {
+    html:not(.lenis):not(.lenis-smooth) {
+      scroll-behavior: smooth;
+    }
   }
 
   html.lenis,
@@ -66,6 +73,9 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
+    min-height: 100vh;
+    min-height: 100dvh;
+    touch-action: pan-y;
   }
 
   /* Refined editorial scrollbar */

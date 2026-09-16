@@ -235,6 +235,16 @@ export function Navbar({
     }
   }, [isProfileDropdownOpen]);
 
+  // Lock body scrolling when mobile menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = "unset";
+      };
+    }
+  }, [isMobileMenuOpen]);
+
   // Click outside and touch handler for mobile navigation menu
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {

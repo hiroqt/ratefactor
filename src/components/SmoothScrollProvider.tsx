@@ -25,10 +25,8 @@ export function SmoothScrollProvider({ children }: { children: React.ReactNode }
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     if (prefersReducedMotion || isTouch) {
-      document.documentElement.style.scrollBehavior = prefersReducedMotion ? "auto" : "smooth";
-      return () => {
-        document.documentElement.style.scrollBehavior = "";
-      };
+      // For mobile touch & reduced-motion devices, rely strictly on native GPU-composited scrolling
+      return;
     }
 
     // 2. High-performance desktop trackpad & mouse wheel Lenis instance

@@ -48,6 +48,8 @@ export const metadata: Metadata = {
 export const viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover" as const,
 };
 
 export default function RootLayout({
@@ -56,12 +58,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`scroll-smooth ${inter.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <head>
         <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://images.unsplash.com" />
       </head>
-      <body suppressHydrationWarning className="min-h-screen bg-background text-foreground selection:bg-slate-900 selection:text-white relative overflow-x-hidden">
+      <body suppressHydrationWarning className="min-h-screen min-h-[100dvh] bg-background text-foreground selection:bg-slate-900 selection:text-white relative overflow-x-hidden">
         <AppProviders>
           <div className="relative z-10">
             {children}

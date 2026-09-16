@@ -537,7 +537,7 @@ export function LeaderboardContent({
           </div>
 
           {/* Gooey Navigation Bar — exact same design as DiscoverApps */}
-          <div className="overflow-x-auto pb-2 scrollbar-none no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="overflow-x-auto pb-2 scrollbar-none no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 overscroll-x-contain touch-pan-x">
             <GooeyNav
               items={gooeyNavItems}
               value={activeCategoryIndex}
