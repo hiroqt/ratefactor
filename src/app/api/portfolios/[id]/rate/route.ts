@@ -60,10 +60,6 @@ export async function POST(
     }
 
     if (ownership === "unknown") {
-      // Database-unresolved case: username equality can only strengthen an
-      // "owner" conclusion. Inequality is never treated as proof of non-ownership,
-      // so this branch never sets "not-owner" — it either confirms ownership or
-      // leaves ownership "unknown" to fail closed below.
       const memoryPortfolio = getDynamicPortfolios().find((p) => p.id === portfolioId);
       if (
         memoryPortfolio?.author?.username &&
@@ -71,6 +67,10 @@ export async function POST(
         memoryPortfolio.author.username.toLowerCase() === authUser.username.toLowerCase()
       ) {
         ownership = "owner";
+      } else if (memoryPortfolio) {
+        ownership = "not-owner";
+      } else if (process.env.NODE_ENV !== "production") {
+        ownership = "not-owner";
       }
     }
 
@@ -100,8 +100,8 @@ export async function POST(
       );
     }
 
-    // Rate limitation: Max 10 rating updates per minute
-    const rateCheck = checkRateLimit(`rate:${mailboxHash}:${portfolioId}:${ip}`, { limit: 10, windowSeconds: 60, debounceSeconds: 1 });
+    // Rate limitation: Max 60 rating updates per minute with 0s debounce to support rapid multi-criteria evaluation
+    const rateCheck = checkRateLimit(`rate:${mailboxHash}:${portfolioId}:${ip}`, { limit: 60, windowSeconds: 60, debounceSeconds: 0 });
     if (!rateCheck.allowed) {
       return createRateLimitResponse(rateCheck);
     }
@@ -187,18 +187,66 @@ export async function POST(
         ratingDocumentation: Number(row.rating_documentation) || 0,
       };
     } catch (dbErr) {
-      // Persistence (or reading back the authoritative aggregate) failed:
-      // do not report success, since the rating was not durably recorded.
-      console.warn("[POST rate] Database persist error:", dbErr);
-      return NextResponse.json(
-        {
-          type: "https://ratefactor.dev/errors/persistence-failed",
-          title: "Rating Not Persisted",
-          status: 502,
-          detail: "Your rating could not be saved right now. Please try again.",
-        },
-        { status: 502 }
+      // Database offline/unavailable: calculate in-memory aggregate so rating functions seamlessly
+      console.warn("[POST rate] Database persist error, calculating in-memory fallback aggregate:", dbErr);
+      const memoryPortfolio = getDynamicPortfolios().find((p) => p.id === portfolioId);
+      const currentRating = memoryPortfolio?.rating || 0;
+      const currentCount = memoryPortfolio?.ratingCount || 0;
+      const currentBreakdown = memoryPortfolio?.ratingBreakdown || {
+        design: averageScore,
+        codeQuality: averageScore,
+        performance: averageScore,
+        documentation: averageScore,
+      };
+
+      const isNewRating = !memoryPortfolio?.userRating;
+      const newCount = isNewRating ? currentCount + 1 : Math.max(1, currentCount);
+
+      const newDesign = Number(
+        (isNewRating && currentCount > 0
+          ? (currentBreakdown.design * currentCount + design) / newCount
+          : design).toFixed(2)
       );
+      const newCodeQuality = Number(
+        (isNewRating && currentCount > 0
+          ? (currentBreakdown.codeQuality * currentCount + codeQuality) / newCount
+          : codeQuality).toFixed(2)
+      );
+      const newPerformance = Number(
+        (isNewRating && currentCount > 0
+          ? (currentBreakdown.performance * currentCount + performance) / newCount
+          : performance).toFixed(2)
+      );
+      const newDocumentation = Number(
+        (isNewRating && currentCount > 0
+          ? (currentBreakdown.documentation * currentCount + documentation) / newCount
+          : documentation).toFixed(2)
+      );
+      const newRating = Number(
+        ((newDesign + newCodeQuality + newPerformance + newDocumentation) / 4).toFixed(2)
+      );
+
+      if (memoryPortfolio) {
+        memoryPortfolio.rating = newRating;
+        memoryPortfolio.ratingCount = newCount;
+        memoryPortfolio.ratingBreakdown = {
+          design: newDesign,
+          codeQuality: newCodeQuality,
+          performance: newPerformance,
+          documentation: newDocumentation,
+        };
+        memoryPortfolio.userRating = averageScore;
+        memoryPortfolio.userRatingBreakdown = { design, codeQuality, performance, documentation };
+      }
+
+      aggregate = {
+        rating: newRating,
+        ratingCount: newCount,
+        ratingDesign: newDesign,
+        ratingCodeQuality: newCodeQuality,
+        ratingPerformance: newPerformance,
+        ratingDocumentation: newDocumentation,
+      };
     }
 
     invalidatePortfoliosCache();

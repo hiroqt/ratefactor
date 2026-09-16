@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "./better-auth";
-import { normalizeUsername } from "./client";
+import { normalizeUsername } from "./username";
 import { AppRole } from "./rbac";
 
 export interface AuthenticatedUser {

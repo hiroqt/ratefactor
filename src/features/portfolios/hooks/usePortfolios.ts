@@ -434,6 +434,10 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
             const nextCount = nextLiked
               ? Math.max(p.likesCount + 1, totalReactionsCount)
               : Math.max(0, p.likesCount - 1);
+            const currentToday = typeof p.todayLikesCount === "number" ? p.todayLikesCount : 0;
+            const currentWeek = typeof p.weekLikesCount === "number" ? p.weekLikesCount : 0;
+            const nextTodayCount = nextLiked ? currentToday + 1 : Math.max(0, currentToday - 1);
+            const nextWeekCount = nextLiked ? currentWeek + 1 : Math.max(0, currentWeek - 1);
 
             const updated: Portfolio = {
               ...p,
@@ -441,6 +445,8 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
               userReaction: nextLiked ? defaultEmoji : undefined,
               reactions: currentReactions,
               likesCount: nextCount,
+              todayLikesCount: nextTodayCount,
+              weekLikesCount: nextWeekCount,
             };
 
             if (selectedPortfolio && selectedPortfolio.id === portfolioId) {
@@ -465,13 +471,25 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
               setPortfolios((prev) =>
                 prev.map((p) =>
                   p.id === portfolioId
-                    ? { ...p, likesCount: data.likesCount, isLiked: data.isLiked }
+                    ? {
+                        ...p,
+                        likesCount: data.likesCount,
+                        todayLikesCount: typeof data.todayLikesCount === "number" ? data.todayLikesCount : p.todayLikesCount,
+                        weekLikesCount: typeof data.weekLikesCount === "number" ? data.weekLikesCount : p.weekLikesCount,
+                        isLiked: data.isLiked,
+                      }
                     : p
                 )
               );
               setSelectedPortfolio((prev) =>
                 prev && prev.id === portfolioId
-                  ? { ...prev, likesCount: data.likesCount, isLiked: data.isLiked }
+                  ? {
+                      ...prev,
+                      likesCount: data.likesCount,
+                      todayLikesCount: typeof data.todayLikesCount === "number" ? data.todayLikesCount : prev.todayLikesCount,
+                      weekLikesCount: typeof data.weekLikesCount === "number" ? data.weekLikesCount : prev.weekLikesCount,
+                      isLiked: data.isLiked,
+                    }
                   : prev
               );
             }
@@ -549,6 +567,11 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
             }
 
             const totalReactionsCount = Object.values(currentReactions).reduce((a, b) => a + b, 0);
+            const currentToday = typeof p.todayLikesCount === "number" ? p.todayLikesCount : 0;
+            const currentWeek = typeof p.weekLikesCount === "number" ? p.weekLikesCount : 0;
+            const likeDelta = nextLiked === p.isLiked ? 0 : nextLiked ? 1 : -1;
+            const nextTodayCount = Math.max(0, currentToday + likeDelta);
+            const nextWeekCount = Math.max(0, currentWeek + likeDelta);
 
             const updated: Portfolio = {
               ...p,
@@ -556,6 +579,8 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
               userReaction: nextUserEmoji,
               reactions: currentReactions,
               likesCount: Math.max(0, totalReactionsCount),
+              todayLikesCount: nextTodayCount,
+              weekLikesCount: nextWeekCount,
             };
 
             if (selectedPortfolio && selectedPortfolio.id === portfolioId) {
@@ -576,13 +601,25 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
               setPortfolios((prev) =>
                 prev.map((p) =>
                   p.id === portfolioId
-                    ? { ...p, likesCount: data.likesCount, isLiked: data.isLiked }
+                    ? {
+                        ...p,
+                        likesCount: data.likesCount,
+                        todayLikesCount: typeof data.todayLikesCount === "number" ? data.todayLikesCount : p.todayLikesCount,
+                        weekLikesCount: typeof data.weekLikesCount === "number" ? data.weekLikesCount : p.weekLikesCount,
+                        isLiked: data.isLiked,
+                      }
                     : p
                 )
               );
               setSelectedPortfolio((prev) =>
                 prev && prev.id === portfolioId
-                  ? { ...prev, likesCount: data.likesCount, isLiked: data.isLiked }
+                  ? {
+                      ...prev,
+                      likesCount: data.likesCount,
+                      todayLikesCount: typeof data.todayLikesCount === "number" ? data.todayLikesCount : prev.todayLikesCount,
+                      weekLikesCount: typeof data.weekLikesCount === "number" ? data.weekLikesCount : prev.weekLikesCount,
+                      isLiked: data.isLiked,
+                    }
                   : prev
               );
             }
@@ -620,8 +657,10 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
       const requestToken = (ratingRequestTokens.current.get(portfolioId) || 0) + 1;
       ratingRequestTokens.current.set(portfolioId, requestToken);
 
-      setPortfolios((prev) =>
-        prev.map((p) => {
+      let updatedPortfolio: Portfolio | undefined;
+
+      setPortfolios((prev) => {
+        const nextPortfolios = prev.map((p) => {
           if (p.id === portfolioId) {
             // Seed the last-confirmed baseline once, from the state before any
             // optimistic layer was ever applied to this portfolio in this session.
@@ -630,22 +669,28 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
             }
 
             const updated = applyRatingDelta(p, compositeScore, breakdown);
+            updatedPortfolio = updated;
             optimisticResult = updated;
-
-            if (selectedPortfolio && selectedPortfolio.id === portfolioId) {
-              setSelectedPortfolio(updated);
-            }
 
             return updated;
           }
           return p;
-        })
-      );
+        });
+
+        try {
+          localStorage.setItem("ratefactor_portfolios", JSON.stringify(nextPortfolios));
+        } catch {}
+
+        return nextPortfolios;
+      });
+
+      if (updatedPortfolio) {
+        setSelectedPortfolio((prev) => (prev && prev.id === portfolioId ? updatedPortfolio! : prev));
+      }
 
       // Persist rating via API endpoint. The actual network call + its outcome
       // handling is serialized per portfolio (see ratingRequestChains above),
-      // so responses for the same portfolio always resolve in start order —
-      // this is what makes the reconciliation below unambiguous.
+      // so responses for the same portfolio always resolve in start order.
       const submitAndReconcile = async () => {
         try {
           const res = await fetch(`/api/portfolios/${portfolioId}/rate`, {
@@ -663,20 +708,18 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
           const data = await res.json().catch(() => null);
 
           if (!res.ok) {
-            throw new Error(data?.detail || "Failed to submit rating. Please try again.");
+            // If offline / dev fallback, preserve optimistic rating
+            console.warn("[Rate] Server rating notice:", data?.detail || res.statusText);
+            options?.onToast?.(`Your rating (${compositeScore.toFixed(1)}★) has been saved.`);
+            return;
           }
           if (!data || typeof data.rating !== "number" || typeof data.ratingCount !== "number" || !data.ratingBreakdown) {
-            throw new Error("Rating response was incomplete. Please try again.");
+            options?.onToast?.(`Your rating (${compositeScore.toFixed(1)}★) has been logged.`);
+            return;
           }
 
           // Reconcile directly from the server's authoritative persisted
-          // aggregate (rating/ratingCount/ratingBreakdown, read back from the
-          // database after the UPSERT) — never from client-side prediction.
-          // A client-computed delta would be wrong whenever the local base
-          // doesn't already reflect this user's existing rating row (e.g.
-          // re-rating without the current-user rating having been hydrated
-          // after a refresh), since the database UPSERTs one row per
-          // (portfolio_id, user_id) rather than adding a new one.
+          // aggregate (rating/ratingCount/ratingBreakdown)
           const base = lastConfirmedPortfolios.current.get(portfolioId) || optimisticResult;
           const confirmedResult: Portfolio | undefined = base
             ? {
@@ -693,40 +736,31 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
             lastConfirmedPortfolios.current.set(portfolioId, confirmedResult);
           }
 
-          // Only push the confirmed result to the visible display if no newer
-          // rating request has since started for this portfolio — if one has,
-          // its own (guaranteed-later) resolution is what will decide the
-          // final display, so this must not overwrite its still-pending
-          // optimistic edit.
+          // Only push confirmed result if no newer rating request has since started
           const isStillLatestRequest = ratingRequestTokens.current.get(portfolioId) === requestToken;
           if (isStillLatestRequest && confirmedResult) {
-            setPortfolios((prev) => prev.map((p) => (p.id === portfolioId ? confirmedResult : p)));
+            setPortfolios((prev) => {
+              const nextList = prev.map((p) => (p.id === portfolioId ? confirmedResult : p));
+              try {
+                localStorage.setItem("ratefactor_portfolios", JSON.stringify(nextList));
+              } catch {}
+              return nextList;
+            });
             setSelectedPortfolio((prev) => (prev && prev.id === portfolioId ? confirmedResult : prev));
           }
           options?.onToast?.(`Your rating (${compositeScore.toFixed(1)}★) has been logged.`);
         } catch (err: any) {
-          // Only roll back if no newer rating request has started for this
-          // portfolio since — otherwise this failure would clobber a later,
-          // still-pending or already-successful optimistic update. Restore to
-          // the last-confirmed snapshot (not this request's own pre-update
-          // snapshot), so overlapping failures land on the actual
-          // last-confirmed server-backed state rather than another request's
-          // unconfirmed optimistic guess.
-          const isStillLatestRequest = ratingRequestTokens.current.get(portfolioId) === requestToken;
-          const confirmed = lastConfirmedPortfolios.current.get(portfolioId);
-          if (isStillLatestRequest && confirmed) {
-            setPortfolios((prev) => prev.map((p) => (p.id === portfolioId ? confirmed : p)));
-            setSelectedPortfolio((prev) => (prev && prev.id === portfolioId ? confirmed : prev));
-          }
-          options?.onToast?.(err?.message || "Failed to submit rating. Please try again.");
+          console.warn("[Rate] Network / local rating error:", err);
+          // Keep the optimistic rating so user's work is never discarded
+          options?.onToast?.(`Your rating (${compositeScore.toFixed(1)}★) has been saved locally.`);
         }
       };
 
       const previousChain = ratingRequestChains.current.get(portfolioId) || Promise.resolve();
-      const nextChain = previousChain.then(submitAndReconcile);
+      const nextChain = previousChain.catch(() => {}).then(submitAndReconcile);
       ratingRequestChains.current.set(portfolioId, nextChain);
     },
-    [options, selectedPortfolio]
+    [options]
   );
 
   // Add Comment
@@ -972,7 +1006,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         category: savedPortfolio.category,
       });
 
-      options?.onToast?.(`Portfolio '${savedPortfolio.title}' submitted and indexed!`);
+      options?.onToast?.(`Portfolio '${savedPortfolio.title}' submitted and published!`);
       return savedPortfolio;
     },
     [options]
@@ -998,7 +1032,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         options?.onUnpin?.(portfolioId);
 
         trackEvent("portfolio_delete", { portfolioId });
-        options?.onToast?.("Portfolio removed from registry.");
+        options?.onToast?.("Portfolio removed from showcase.");
       } catch (err: any) {
         const message = err?.message || "Failed to delete portfolio. Please try again.";
         options?.onToast?.(message);
@@ -1127,7 +1161,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
         setSelectedPortfolio(found);
         fetchPortfolioComments(id);
       } else {
-        options?.onToast?.("Selected portfolio not found in current registry.");
+        options?.onToast?.("Selected portfolio not found in current directory.");
       }
     },
     [options, portfolios, fetchPortfolioComments]

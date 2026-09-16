@@ -1134,7 +1134,7 @@ export function Navbar({
 
               <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/10 flex items-center justify-between text-[11px] font-mono text-slate-400 dark:text-slate-500">
                 <span>Press <kbd className="px-1 py-0.5 rounded bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10">ESC</kbd> to close</span>
-                <span>RateFactor Registry</span>
+                <span>RateFactor Showcase</span>
               </div>
             </motion.div>
           </div>

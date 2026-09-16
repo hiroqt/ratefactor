@@ -94,6 +94,8 @@ export interface Portfolio {
   ratingCount: number;
   ratingBreakdown: RatingBreakdown;
   likesCount: number;
+  todayLikesCount?: number;
+  weekLikesCount?: number;
   isLiked?: boolean;
   userReaction?: string;
   reactions?: Record<string, number>;

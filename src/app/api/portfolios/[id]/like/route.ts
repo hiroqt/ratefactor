@@ -5,9 +5,10 @@ import { getCanonicalEmailHash } from "@/lib/auth/email";
 import { pool } from "@/lib/auth/better-auth";
 import { getDynamicPortfolios, invalidatePortfoliosCache } from "@/lib/dynamic-portfolios";
 import { resolveCanonicalProfileId } from "@/lib/auth/profile-id";
+import { getStartOfTodayUtc, getStartOfWeekUtc } from "@/lib/leaderboard-utils";
 
 // In-memory like tracker keyed by canonical mailbox hash to prevent multi-account like manipulation
-const userLikes = new Map<string, Set<string>>(); // mailboxHash -> Set of portfolioIds
+const userLikes = new Map<string, Map<string, number>>(); // mailboxHash -> Map<portfolioId, timestamp>
 
 export async function POST(
   req: NextRequest,
@@ -106,26 +107,37 @@ export async function POST(
       return createRateLimitResponse(rateCheck);
     }
 
-    let likedSet = userLikes.get(mailboxHash);
-    if (!likedSet) {
-      likedSet = new Set();
-      userLikes.set(mailboxHash, likedSet);
+    let userLikedMap = userLikes.get(mailboxHash);
+    if (!userLikedMap) {
+      userLikedMap = new Map();
+      userLikes.set(mailboxHash, userLikedMap);
     }
 
-    const currentlyLiked = likedSet.has(portfolioId);
+    const currentlyLiked = userLikedMap.has(portfolioId);
     const newLikedState = !currentlyLiked;
 
     if (newLikedState) {
-      likedSet.add(portfolioId);
+      userLikedMap.set(portfolioId, Date.now());
     } else {
-      likedSet.delete(portfolioId);
+      userLikedMap.delete(portfolioId);
     }
 
     // Attempt PostgreSQL database persistence and exact count synchronization,
     // keyed by the same canonical profile id used for the ownership check above.
+    const startOfDayMs = getStartOfTodayUtc();
+    const startOfWeekMs = getStartOfWeekUtc();
+
     let finalLikesCount = 0;
-    for (const set of userLikes.values()) {
-      if (set.has(portfolioId)) finalLikesCount++;
+    let finalTodayLikesCount = 0;
+    let finalWeekLikesCount = 0;
+
+    for (const map of userLikes.values()) {
+      const ts = map.get(portfolioId);
+      if (ts !== undefined) {
+        finalLikesCount++;
+        if (ts >= startOfDayMs) finalTodayLikesCount++;
+        if (ts >= startOfWeekMs) finalWeekLikesCount++;
+      }
     }
 
     try {
@@ -180,12 +192,18 @@ export async function POST(
         }
       }
 
-      // Strictly recalculate exact count from database to prevent drift
+      // Strictly recalculate exact counts from database to prevent drift
       const countRes = await pool.query(
-        `SELECT COUNT(*)::int as count FROM public.likes WHERE portfolio_id = $1`,
+        `SELECT 
+           COUNT(*)::int as count,
+           COUNT(*) FILTER (WHERE created_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC'))::int as "todayCount",
+           COUNT(*) FILTER (WHERE created_at >= date_trunc('week', NOW() AT TIME ZONE 'UTC'))::int as "weekCount"
+         FROM public.likes WHERE portfolio_id = $1`,
         [portfolioId]
       );
       finalLikesCount = countRes.rows[0]?.count ?? 0;
+      finalTodayLikesCount = countRes.rows[0]?.todayCount ?? 0;
+      finalWeekLikesCount = countRes.rows[0]?.weekCount ?? 0;
 
       await pool.query(
         `UPDATE public.portfolios SET likes_count = $1, updated_at = NOW() WHERE id = $2`,
@@ -195,12 +213,22 @@ export async function POST(
       console.warn("[POST like] Database persist notice:", dbErr);
     }
 
+    // Synchronize in-memory dynamic portfolio cache
+    const memP = getDynamicPortfolios().find((p) => p.id === portfolioId);
+    if (memP) {
+      memP.likesCount = finalLikesCount;
+      memP.todayLikesCount = finalTodayLikesCount;
+      memP.weekLikesCount = finalWeekLikesCount;
+    }
+
     invalidatePortfoliosCache();
 
     return NextResponse.json({
       portfolioId,
       isLiked: newLikedState,
       likesCount: finalLikesCount,
+      todayLikesCount: finalTodayLikesCount,
+      weekLikesCount: finalWeekLikesCount,
       message: newLikedState ? "Portfolio liked." : "Portfolio unliked.",
     });
   } catch (error: any) {

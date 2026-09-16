@@ -14,6 +14,7 @@ import {
 } from "@/lib/dynamic-portfolios";
 import { verifyGithubProjectRelationship } from "@/lib/github/repository-verification";
 import { invalidateDevelopersCache } from "@/lib/developers-cache";
+import { isWithinCurrentDay, isWithinCurrentWeek } from "@/lib/leaderboard-utils";
 import {
   deletePortfolioAsset,
   getCloudinaryConfig,
@@ -187,6 +188,8 @@ export async function GET(req: NextRequest) {
           p.rating_performance as "ratingPerformance",
           p.rating_documentation as "ratingDocumentation",
           COALESCE((SELECT COUNT(*)::int FROM public.likes l WHERE l.portfolio_id = p.id), p.likes_count, 0) as "likesCount",
+          COALESCE((SELECT COUNT(*)::int FROM public.likes l WHERE l.portfolio_id = p.id AND l.created_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')), 0) as "todayLikesCount",
+          COALESCE((SELECT COUNT(*)::int FROM public.likes l WHERE l.portfolio_id = p.id AND l.created_at >= date_trunc('week', NOW() AT TIME ZONE 'UTC')), 0) as "weekLikesCount",
           COALESCE((SELECT COUNT(*)::int FROM public.comments c WHERE c.portfolio_id = p.id AND c.status = 'approved' AND c.is_reported = false), p.comments_count, 0) as "commentsCount",
           p.is_showcase as "isShowcase",
           p.showcase_type as "showcaseType",
@@ -293,6 +296,8 @@ export async function GET(req: NextRequest) {
               documentation: Number(row.ratingDocumentation) || 0,
             },
             likesCount,
+            todayLikesCount: Number(row.todayLikesCount) || 0,
+            weekLikesCount: Number(row.weekLikesCount) || 0,
             isLiked: userLikedSet.has(pid),
             commentsCount,
             comments,
@@ -447,7 +452,11 @@ export async function GET(req: NextRequest) {
     }
 
     const total = filtered.length;
-    const paginated = filtered.slice(offset, offset + limit);
+    const paginated = filtered.slice(offset, offset + limit).map((p) => ({
+      ...p,
+      todayLikesCount: typeof p.todayLikesCount === "number" ? p.todayLikesCount : (isWithinCurrentDay(p.createdAt) ? p.likesCount : 0),
+      weekLikesCount: typeof p.weekLikesCount === "number" ? p.weekLikesCount : (isWithinCurrentWeek(p.createdAt) ? p.likesCount : 0),
+    }));
 
     return NextResponse.json(
       {
@@ -697,7 +706,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(
       {
-        message: "Portfolio successfully submitted and indexed.",
+        message: "Portfolio successfully submitted and published.",
         portfolio: newPortfolio,
       },
       { status: 201 }

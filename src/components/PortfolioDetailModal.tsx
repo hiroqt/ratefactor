@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useModalSmoothScroll } from "@/hooks/useModalSmoothScroll";
 import { 
   X, 
   ExternalLink, 
@@ -131,7 +130,6 @@ export function PortfolioDetailModal({
 
   // Handle ESC key & lock body scrolling
   useEffect(() => {
-    if (!portfolio) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         onClose();
@@ -143,14 +141,7 @@ export function PortfolioDetailModal({
       document.body.style.overflow = "unset";
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [portfolio, onClose]);
-
-  useModalSmoothScroll({
-    isOpen: !!portfolio,
-    modalRef,
-    scrollRef,
-    deps: [activeTab, portfolio?.id],
-  });
+  }, [onClose]);
 
   if (!portfolio) return null;
 
@@ -350,7 +341,7 @@ export function PortfolioDetailModal({
         </div>
 
         {/* Modal Scrollable Body */}
-        <div ref={scrollRef} data-lenis-prevent="true" className="flex-1 overflow-y-auto overscroll-contain scroll-smooth p-4 sm:p-6 space-y-5">
+        <div ref={scrollRef} data-lenis-prevent="true" className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5">
           
           {/* Top Showcase Spotlight Banner if present */}
           {portfolio.isShowcase && (
@@ -987,7 +978,7 @@ export function PortfolioDetailModal({
           )}
           <div className="flex items-center justify-between">
             <span className="font-mono text-[11px]">
-              Registry ID: {portfolio.id} • Indexed {timeAgo(portfolio.createdAt)}
+              Portfolio ID: {portfolio.id} • Published {timeAgo(portfolio.createdAt)}
             </span>
             <div className="flex items-center gap-2">
               {isOwnPortfolio && onDeletePortfolio && (

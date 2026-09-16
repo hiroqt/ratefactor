@@ -20,6 +20,7 @@ import { formatRating, formatNumber, timeAgo, getOptimizedImageUrl } from "@/lib
 import { trackEvent } from "@/lib/analytics";
 import { getEmojiDisplay } from "@/lib/emoji-utils";
 import { createProfileFromAuthor } from "@/lib/profile-utils";
+import { sortLeaderboardItems, getDisplayUpvotes } from "@/lib/leaderboard-utils";
 
 interface ShowcaseBannerProps {
   portfolios?: Portfolio[];
@@ -92,31 +93,7 @@ export function ShowcaseBanner({
     : weeklyShowcase || dailyShowcase || portfolios[0] || null;
 
   const leaderboardItems = useMemo(() => {
-    if (!portfolios || portfolios.length === 0) return [];
-    const pool = [...portfolios];
-
-    if (boardTab === "today") {
-      return pool
-        .sort((a, b) => {
-          if (b.rating !== a.rating) return b.rating - a.rating;
-          return b.likesCount - a.likesCount;
-        })
-        .slice(0, 5);
-    }
-
-    if (boardTab === "week") {
-      return pool
-        .sort((a, b) => {
-          const aScore = a.rating * 10 + a.likesCount * 2 + a.commentsCount;
-          const bScore = b.rating * 10 + b.likesCount * 2 + b.commentsCount;
-          return bScore - aScore;
-        })
-        .slice(0, 5);
-    }
-
-    return pool
-      .sort((a, b) => b.likesCount - a.likesCount)
-      .slice(0, 5);
+    return sortLeaderboardItems(portfolios, boardTab, 5);
   }, [portfolios, boardTab]);
 
   const latestSubmissions = useMemo(() => {
@@ -262,7 +239,7 @@ export function ShowcaseBanner({
               <Award className="w-6 h-6 text-slate-400 dark:text-slate-500" />
             </div>
             <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
-              No developer portfolios indexed yet
+              No developer portfolios published yet
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1.5 leading-relaxed">
               Be the first to showcase your codebases, receive peer critiques across our 3-factor rubric, and compete for the Daily and Weekly Showcase!
@@ -504,9 +481,18 @@ export function ShowcaseBanner({
             <div>
               {/* Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-100 dark:border-white/10">
-                <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                  Community Leaderboard
-                </h3>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                    Community Leaderboard
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    {boardTab === "today"
+                      ? "Top-voted architectures today"
+                      : boardTab === "week"
+                        ? "Top-voted architectures this week"
+                        : "Most upvoted architectures of all time"}
+                  </p>
+                </div>
 
                 {/* Range Tabs */}
                 <div 
@@ -571,6 +557,12 @@ export function ShowcaseBanner({
                   leaderboardItems.map((item, idx) => {
                   const rank = idx + 1;
                   const isGold = rank === 1;
+                  const displayUpvotes = getDisplayUpvotes(item, boardTab);
+                  const upvotesLabel = boardTab === "today"
+                    ? "today"
+                    : boardTab === "week"
+                      ? "this week"
+                      : "all time";
 
                   return (
                     <div
@@ -615,7 +607,8 @@ export function ShowcaseBanner({
                         <button
                           type="button"
                           onClick={(e) => handleVote(e, item)}
-                          aria-label={`React to ${item.title}`}
+                          aria-label={`Upvote ${item.title} (${displayUpvotes} upvotes ${upvotesLabel})`}
+                          title={`${displayUpvotes} upvotes ${upvotesLabel}`}
                           className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-xs font-mono transition-colors cursor-pointer min-h-[28px] sm:min-h-0 ${
                             item.isLiked
                               ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-300 font-semibold shadow-xs"
@@ -623,7 +616,11 @@ export function ShowcaseBanner({
                           }`}
                         >
                           <span className="text-xs">{getEmojiDisplay(item.userReaction || "star-struck")}</span>
-                          {item.likesCount > 0 && <span>{formatNumber(item.likesCount)}</span>}
+                          {displayUpvotes > 0 ? (
+                            <span>{formatNumber(displayUpvotes)}</span>
+                          ) : (
+                            <span className={item.isLiked ? "" : "text-slate-400 dark:text-slate-500"}>0</span>
+                          )}
                         </button>
                       </div>
                     </div>

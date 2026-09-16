@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { otpRequestSchema, otpVerifySchema } from "@/lib/validations/portfolio";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { createOTPChallenge, verifyOTPChallenge } from "@/lib/auth/otp";
-import { normalizeUsername } from "@/lib/auth/client";
+import { normalizeUsername } from "@/lib/auth/username";
 import { canonicalizeEmail, registerCanonicalEmail, isCanonicalEmailRegistered } from "@/lib/auth/email";
 import { sendOtpEmail } from "@/lib/email/sender";
 import { auth } from "@/lib/auth/better-auth";

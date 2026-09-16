@@ -358,7 +358,7 @@ export function SubmitPortfolioModal({
     );
 
     if (isDuplicate) {
-      setError("Duplicate submission detected: A portfolio with this title or repository URL has already been indexed.");
+      setError("Duplicate submission detected: A portfolio with this title or repository URL has already been published.");
       return;
     }
 
@@ -511,7 +511,7 @@ export function SubmitPortfolioModal({
                 ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60" 
                 : "bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white border-slate-200 dark:border-zinc-700"
             )}>
-              {isSuccess ? <CheckCircle2 className="w-4 h-4" /> : <Terminal className="w-4 h-4" />}
+              <Terminal className="w-4 h-4" />
             </div>
             <h3 id="submit-modal-title" className="font-bold text-slate-900 dark:text-white text-sm truncate">
               {isSuccess ? (
@@ -576,29 +576,18 @@ export function SubmitPortfolioModal({
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
               className="py-2 sm:py-4 flex flex-col items-center text-center w-full max-w-xl mx-auto"
             >
-              {/* Celebratory badge icon */}
-              <div className="relative mb-4">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-xl shadow-emerald-500/10">
-                  <CheckCircle2 className="w-8 h-8 sm:w-10 sm:h-10" />
-                </div>
-                <span className="absolute -top-1 -right-1 flex h-4 w-4">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500"></span>
-                </span>
-              </div>
-
-              {/* Status Badge (No Sparkles) */}
+              {/* Status Badge */}
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.05, duration: 0.25 }}
-                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-xs font-mono font-medium mb-3 border border-emerald-200 dark:border-emerald-800/60"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-xs font-mono font-medium mb-3 border border-emerald-200 dark:border-emerald-800/60 shadow-xs"
               >
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <span>INDEXED &bull; LIVE ON REGISTRY</span>
+                <span>PUBLISHED &bull; LIVE ON RATEFACTOR</span>
               </motion.div>
 
               <motion.h3
@@ -616,7 +605,7 @@ export function SubmitPortfolioModal({
                 transition={{ delay: 0.15, duration: 0.3 }}
                 className="text-xs sm:text-sm text-slate-600 dark:text-zinc-400 max-w-md leading-relaxed mb-6"
               >
-                Your portfolio <span className="font-semibold text-slate-900 dark:text-white">“{submittedPortfolio.title}”</span> has been indexed and published to the global directory. It is now open for ratings, peer reviews, and technical feedback.
+                Your portfolio <span className="font-semibold text-slate-900 dark:text-white">“{submittedPortfolio.title}”</span> is now published and live in the community showcase! It is open for ratings, peer reviews, and technical feedback.
               </motion.p>
 
               {/* Unboxed Editorial Portfolio Showcase (NO Cards) */}
@@ -724,7 +713,7 @@ export function SubmitPortfolioModal({
                 </div>
               </motion.div>
 
-              {/* Borderless Live Registry Milestones Tracker */}
+              {/* Borderless Live Milestones Tracker */}
               <motion.div
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -736,7 +725,7 @@ export function SubmitPortfolioModal({
                     <CheckCircle2 className="w-3.5 h-3.5" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-slate-900 dark:text-white leading-none">Indexed</p>
+                    <p className="text-xs font-semibold text-slate-900 dark:text-white leading-none">Published</p>
                     <p className="text-[10px] font-mono text-slate-500 dark:text-zinc-400 mt-0.5">#{submittedPortfolio.id.slice(0, 8)}</p>
                   </div>
                 </div>
@@ -761,63 +750,51 @@ export function SubmitPortfolioModal({
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-slate-900 dark:text-white leading-none">Live</p>
-                    <p className="text-[10px] font-mono text-slate-500 dark:text-zinc-400 mt-0.5">Global registry</p>
+                    <p className="text-[10px] font-mono text-slate-500 dark:text-zinc-400 mt-0.5">Community showcase</p>
                   </div>
                 </div>
               </motion.div>
 
-              {/* Engagement Toolbar: Copy Link, Share on X, Confetti Blast */}
+              {/* Engagement Toolbar: Copy Link, Share on X */}
               <motion.div
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3, duration: 0.3 }}
-                className="w-full flex items-center justify-between gap-2 pb-4"
+                className="w-full flex items-center justify-center gap-2.5 pb-4 flex-wrap"
               >
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={handleCopyShareLink}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer text-xs font-medium"
-                  >
-                    {copiedLink ? (
-                      <>
-                        <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />
-                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Copied Link</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-400" />
-                        <span>Copy Link</span>
-                      </>
-                    )}
-                  </button>
-
-                  <a
-                    href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-                      `I just published "${submittedPortfolio.title}" on @RateFactor for peer review! Check it out:`
-                    )}&url=${encodeURIComponent(
-                      typeof window !== "undefined"
-                        ? `${window.location.origin}/u/${submittedPortfolio.author.username}`
-                        : `https://ratefactor.dev/u/${submittedPortfolio.author.username}`
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer text-xs font-medium"
-                  >
-                    <Twitter className="w-3.5 h-3.5 text-sky-500" />
-                    <span>Share to X</span>
-                  </a>
-                </div>
-
                 <button
                   type="button"
-                  onClick={triggerCelebration}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 font-mono text-xs font-medium hover:bg-emerald-100 dark:hover:bg-emerald-950/70 transition-colors cursor-pointer"
-                  title="Fire celebratory confetti"
+                  onClick={handleCopyShareLink}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer text-xs font-medium"
                 >
-                  <span>🎉</span>
-                  <span>Confetti</span>
+                  {copiedLink ? (
+                    <>
+                      <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Copied Link</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-400" />
+                      <span>Copy Link</span>
+                    </>
+                  )}
                 </button>
+
+                <a
+                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+                    `I just published "${submittedPortfolio.title}" on @RateFactor for peer review! Check it out:`
+                  )}&url=${encodeURIComponent(
+                    typeof window !== "undefined"
+                      ? `${window.location.origin}/u/${submittedPortfolio.author.username}`
+                      : `https://ratefactor.dev/u/${submittedPortfolio.author.username}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer text-xs font-medium"
+                >
+                  <Twitter className="w-3.5 h-3.5 text-sky-500" />
+                  <span>Share to X</span>
+                </a>
               </motion.div>
 
               {/* Main Action CTAs */}
@@ -863,7 +840,7 @@ export function SubmitPortfolioModal({
             <div className="space-y-4">
               <div className="text-xs text-slate-500 dark:text-zinc-400 font-mono flex items-center gap-1.5">
                 <Eye className="w-3.5 h-3.5 text-amber-500" />
-                Live registry rendering preview:
+                Live showcase rendering preview:
               </div>
               <div className="max-w-md mx-auto">
                 <PortfolioCard
