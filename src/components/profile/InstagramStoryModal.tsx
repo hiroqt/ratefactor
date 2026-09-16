@@ -363,7 +363,7 @@ export function InstagramStoryModal({
     }
   };
 
-  const handleNativeShare = async () => {
+  const handleShareToStory = async () => {
     try {
       setIsGenerating(true);
       const canvas = await generateStoryCanvas();
@@ -372,44 +372,55 @@ export function InstagramStoryModal({
       if (!blob) throw new Error("Could not create image blob");
 
       const file = new File([blob], `ratefactor-story-${username}.png`, { type: "image/png" });
+      const url = getProfileUrl();
 
+      // Automatically copy profile URL to clipboard for the Link Sticker
+      if (typeof window !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(url).catch(() => {});
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 3000);
+      }
+
+      // Check if native Web Share API with files is supported (mobile iOS / Android)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
-          title: `${displayName}'s Architecture Portfolio on RateFactor`,
-          text: catchyDescription,
+          title: `${displayName}'s Architecture Portfolio`,
+          text: `Explore on RateFactor: ${url}`,
           files: [file],
         });
-        toast.success("Shared directly to Instagram Stories!");
-      } else if (navigator.share) {
-        await navigator.share({
-          title: `${displayName}'s Architecture Portfolio on RateFactor`,
-          text: catchyDescription,
-          url: getProfileUrl(),
-        });
-        toast.success("Link shared!");
+        toast.success("Opening Instagram Story creator...");
+        return;
+      }
+
+      // Mobile app deep-link specifically to Instagram Stories camera/composer
+      const isMobile = typeof window !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
+      // Always trigger download so the card is in camera roll
+      const dataUrl = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.download = `ratefactor-story-${username}.png`;
+      link.href = dataUrl;
+      link.click();
+
+      if (isMobile) {
+        toast.success("Story card saved & link copied! Opening Instagram Stories...");
+        setTimeout(() => {
+          // Official Instagram Stories deep-link scheme
+          window.location.href = "instagram-stories://share";
+        }, 600);
       } else {
-        await handleDownloadStoryImage();
+        toast.success("Story card saved & link copied! Opening Instagram...");
+        window.open("https://www.instagram.com/stories/", "_blank");
       }
     } catch (err: any) {
       if (err.name !== "AbortError") {
-        console.error("Native share error:", err);
+        console.error("Story share error:", err);
         await handleDownloadStoryImage();
       }
     } finally {
       setIsGenerating(false);
     }
   };
-
-  // Automatically trigger native Instagram Story share on mobile when modal opens
-  useEffect(() => {
-    if (isOpen && typeof window !== "undefined") {
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      if (isMobile && typeof navigator.share === "function") {
-        // Auto-run share for mobile users
-        handleNativeShare();
-      }
-    }
-  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -588,25 +599,23 @@ export function InstagramStoryModal({
             <div className="space-y-2.5">
               <button
                 type="button"
-                onClick={handleDownloadStoryImage}
+                onClick={handleShareToStory}
                 disabled={isGenerating}
-                className="w-full flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-xs font-bold shadow-xl shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all cursor-pointer disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 hover:opacity-95 text-white text-xs font-bold shadow-xl shadow-rose-500/20 transition-all cursor-pointer disabled:opacity-50"
               >
-                <Download className="w-4 h-4" />
-                <span>{isGenerating ? "Rendering High-Res Story Card..." : "Download Story Card (PNG)"}</span>
+                <Instagram className="w-4 h-4" />
+                <span>{isGenerating ? "Preparing Story..." : "Share Directly to Instagram Story"}</span>
               </button>
 
-              {canNativeShare && (
-                <button
-                  type="button"
-                  onClick={handleNativeShare}
-                  disabled={isGenerating}
-                  className="w-full flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 hover:opacity-95 text-white text-xs font-bold shadow-xl shadow-rose-500/20 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  <Instagram className="w-4 h-4" />
-                  <span>Share Directly to Instagram / Stories</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleDownloadStoryImage}
+                disabled={isGenerating}
+                className="w-full flex items-center justify-center gap-2.5 px-5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-slate-600 text-slate-200 text-xs font-semibold shadow-md transition-all cursor-pointer disabled:opacity-50"
+              >
+                <Download className="w-4 h-4 text-slate-400" />
+                <span>Download Story Card (PNG)</span>
+              </button>
             </div>
 
             {/* Profile Link Sticker Copy Box */}
