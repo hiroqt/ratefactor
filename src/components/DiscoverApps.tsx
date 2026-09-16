@@ -11,7 +11,9 @@ import {
   ListFilter,
   ArrowUpDown,
   X,
-  ArrowRight
+  ArrowRight,
+  RotateCcw,
+  Plus
 } from "@/components/ui/icons";
 import { motion } from "framer-motion";
 import { Portfolio, PortfolioCategory, SortOption } from "@/types/portfolio";
@@ -419,6 +421,7 @@ export function DiscoverApps({
                   ? {
                       label: "Submit Portfolio",
                       onClick: onOpenSubmitModal,
+                      icon: <Plus className="w-3.5 h-3.5" />,
                     }
                   : undefined
                 : {
@@ -428,7 +431,48 @@ export function DiscoverApps({
                       setSearchQuery("");
                       setCurrentPage(1);
                     },
+                    icon: <RotateCcw className="w-3.5 h-3.5" />,
                   }
+            }
+            secondaryAction={
+              portfolios.length > 0 && onOpenSubmitModal ? (
+                <button
+                  type="button"
+                  onClick={onOpenSubmitModal}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium border border-slate-200 dark:border-zinc-700/80 bg-white/80 dark:bg-zinc-800/80 text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-750 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Submit Architecture</span>
+                </button>
+              ) : undefined
+            }
+            filterBadges={
+              portfolios.length > 0 && (activeCategory !== "All" || searchQuery.trim().length > 0)
+                ? [
+                    ...(activeCategory !== "All"
+                      ? [
+                          {
+                            label: `Domain: ${activeCategory}`,
+                            onRemove: () => {
+                              setActiveCategory("All");
+                              setCurrentPage(1);
+                            },
+                          },
+                        ]
+                      : []),
+                    ...(searchQuery.trim().length > 0
+                      ? [
+                          {
+                            label: `Query: "${searchQuery}"`,
+                            onRemove: () => {
+                              setSearchQuery("");
+                              setCurrentPage(1);
+                            },
+                          },
+                        ]
+                      : []),
+                  ]
+                : undefined
             }
             className="my-8"
           />

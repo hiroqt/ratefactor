@@ -1,6 +1,8 @@
 /**
  * Content Guardrails & Free-Tier Quota Enforcers
- * Implements anti-spam heuristics, word count validation, and image upload standards.
+ * Implements anti-spam heuristics, word count validation, image upload standards,
+ * and comprehensive Tagalog/Filipino + English profanity detection with
+ * leet-speak normalization.
  */
 
 // Maximum image size: 2 MB strictly
@@ -17,6 +19,10 @@ export const ALLOWED_IMAGE_MIME_TYPES = [
   "image/png",
   "image/webp",
 ];
+
+// ─────────────────────────────────────────────────────────────
+// LOW-EFFORT FILLER PHRASES
+// ─────────────────────────────────────────────────────────────
 
 // Unnecessary / low-effort filler phrases that don't constitute constructive developer feedback
 const LOW_EFFORT_PHRASES = [
@@ -39,7 +45,23 @@ const LOW_EFFORT_PHRASES = [
   /^nice project$/i,
   /^good job$/i,
   /^great work$/i,
+  // Tagalog low-effort
+  /^aye?s+$/i,
+  /^ayos$/i,
+  /^sige$/i,
+  /^ge$/i,
+  /^oks?$/i,
+  /^lodi$/i,
+  /^idol$/i,
+  /^ang galing$/i,
+  /^galing$/i,
+  /^naks$/i,
+  /^astig$/i,
 ];
+
+// ─────────────────────────────────────────────────────────────
+// SPAM PATTERNS
+// ─────────────────────────────────────────────────────────────
 
 // Spam patterns (suspicious links, crypto pump, telegram bots)
 const SPAM_PATTERNS = [
@@ -50,15 +72,256 @@ const SPAM_PATTERNS = [
   /earn\s*\$?\d+/i,
   /bit\.ly\//i,
   /tinyurl\.com\//i,
+  /discord\.gg\//i,
+  /wa\.me\//i,
+  /viber:\/\//i,
+  /click\s+here\s+to\s+(win|earn|claim)/i,
+  /send\s+(me\s+)?(dm|message|pm)/i,
+  /free\s*(money|cash|gift)/i,
+  /subscribe\s+to\s+my/i,
 ];
 
 // Repetitive character regex: matches 4 or more identical consecutive characters (e.g. 'aaaa', 'oooooo')
-const REPETITIVE_CHARS_REGEX = /(.)\1{3,}/;
+const REPETITIVE_CHARS_REGEX = /(.)(\1){3,}/;
 
-// Generic profanity / abuse words to maintain professional developer community standards
-const PROFANITY_LIST = [
-  "idiot", "moron", "trash", "garbage dev", "scam", "shitty", "bitch", "asshole", "fuck", "shit"
+// ─────────────────────────────────────────────────────────────
+// LEET-SPEAK NORMALIZER
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Character substitution map for leet-speak normalization.
+ * Covers common number/symbol → letter replacements used to evade filters.
+ */
+const LEET_MAP: Record<string, string> = {
+  "0": "o",
+  "1": "i",
+  "2": "z",
+  "3": "e",
+  "4": "a",
+  "5": "s",
+  "6": "g",
+  "7": "t",
+  "8": "b",
+  "9": "g",
+  "@": "a",
+  "!": "i",
+  "$": "s",
+  "+": "t",
+  "¡": "i",
+  "€": "e",
+  "£": "e",
+};
+
+/**
+ * Normalizes text by:
+ * 1. Lowercasing
+ * 2. Replacing leet-speak characters with their letter equivalents
+ * 3. Stripping separator characters (dots, underscores, dashes, asterisks) used to break up words
+ * 4. Collapsing repeated characters (e.g. "puuuuuta" → "puta")
+ *
+ * This turns "p0t4ng 1n4 m0" into "potang ina mo" for accurate matching.
+ */
+export function normalizeLeetSpeak(text: string): string {
+  let result = text.toLowerCase();
+
+  // Replace leet characters
+  result = result
+    .split("")
+    .map((ch) => LEET_MAP[ch] || ch)
+    .join("");
+
+  // Strip common separator characters used to evade filters
+  // e.g., "p.u.t.a", "p_u_t_a", "p-u-t-a", "p*u*t*a"
+  result = result.replace(/[.\-_*~`^]/g, "");
+
+  // Collapse repeated characters: "puuuuta" → "puta", "gaaago" → "gago"
+  // Keep at most 2 consecutive identical characters (some legit words double letters)
+  result = result.replace(/(.)\1{2,}/g, "$1$1");
+
+  return result;
+}
+
+// ─────────────────────────────────────────────────────────────
+// PROFANITY DICTIONARIES
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * English profanity / abuse words to maintain professional developer community standards.
+ * Extended from the original 10-word list.
+ */
+const ENGLISH_PROFANITY: string[] = [
+  // Original list
+  "idiot", "moron", "trash", "garbage dev", "scam", "shitty",
+  "bitch", "asshole", "fuck", "shit",
+  // Extended
+  "bastard", "damn", "crap", "dick", "cock", "pussy",
+  "whore", "slut", "retard", "faggot", "nigger", "nigga",
+  "cunt", "motherfucker", "dumbass", "dipshit", "bullshit",
+  "stfu", "gtfo", "lmfao", "wtf",
+  "kill yourself", "kys",
 ];
+
+/**
+ * Comprehensive Tagalog/Filipino profanity dictionary.
+ * These are matched AFTER leet-speak normalization, so "g4g0" becomes "gago".
+ *
+ * Categories:
+ * - Sexual slurs and vulgar terms
+ * - Personal insults and derogatory terms
+ * - Compound abuse phrases
+ * - Threat language
+ */
+const TAGALOG_PROFANITY: string[] = [
+  // ── Sexual slurs ──
+  "putangina",
+  "putanginamo",
+  "putragis",
+  "puta",
+  "pokpok",
+  "malibog",
+  "libog",
+  "kantot",
+  "kantotin",
+  "kinantot",
+  "jakol",
+  "jakulero",
+  "jakulera",
+  "tite",
+  "titi",
+  "pepe",
+  "puke",
+  "pekpek",
+  "betlog",
+  "bayag",
+  "tamod",
+  "hindot",
+  "hindutan",
+  "iyot",
+  "iyotin",
+  "burat",
+  "bolitas",
+  "chupa",
+  "chupahin",
+  "tsupa",
+  "tsupahin",
+  "kupal",
+  "kepyas",
+
+  // ── Personal insults ──
+  "gago",
+  "gaga",
+  "bobo",
+  "boba",
+  "tanga",
+  "tangina",
+  "tanginamo",
+  "ulol",
+  "olol",
+  "ungas",
+  "inutil",
+  "engot",
+  "gunggong",
+  "tarantado",
+  "siraulo",
+  "hayop",
+  "hayopka",
+  "salot",
+  "peste",
+  "bruha",
+  "bruhilda",
+  "punyeta",
+  "leche",
+  "letse",
+  "gagi",              // softened gago, still derogatory
+  "pakyu",             // Tagalog phonetic "fuck you"
+  "pakshet",           // phonetic "fuckshit"
+  "demonyita",
+  "demonyito",
+  "demonyo",
+  "satanas",
+  "bwisit",
+  "walanghiya",
+  "walang hiya",
+  "shunga",
+  "tukmol",
+  "kinginamo",         // shortened tangina mo
+
+  // ── Compound abuse phrases (after normalization, spaces stripped) ──
+  "tangamo",
+  "ulolmo",
+  "bobomo",
+  "gagomo",
+  "hayopmo",
+  "tangina mo",
+  "potang ina mo",
+  "potang ina",
+  "tang ina",
+  "tang inamo",
+  "pota",              // shortened putangina
+  "potangina",
+  "potanginamo",
+  "putang ina",
+  "putang ina mo",
+  "anak ng puta",
+  "anak ng pating",    // evasion for anak ng puta
+  "supalpal",
+  "supot",
+  "bakla",             // derogatory when used as insult
+  "bading",            // derogatory when used as insult
+  "bayot",             // Bisaya variant, derogatory
+
+  // ── Threats / malicious intent ──
+  "papatayin",
+  "patayin",
+  "patay ka",
+  "patay kana",
+  "sasaksakin",
+  "saksak",
+  "saksakin",
+  "susunugin",
+  "sunugin",
+  "bobombahin",
+  "ipapapatay",
+  "pupugutan",
+  "puputulin",
+  "sisipain",
+  "sasampalin",
+  "babasagin",
+  "wawasakin",
+  "sasabog",
+];
+
+/**
+ * Regex patterns for catching spaced-out or separator-evaded profanity.
+ * These match even when characters have spaces, dots, or other separators between them.
+ * Applied AFTER normalization.
+ */
+const PROFANITY_REGEX_PATTERNS: RegExp[] = [
+  // Tagalog — flexible spacing
+  /p\s*u\s*t\s*a\s*n\s*g\s*i\s*n\s*a/i,
+  /p\s*u\s*t\s*a/i,
+  /t\s*a\s*n\s*g\s*i\s*n\s*a/i,
+  /g\s*a\s*g\s*o/i,
+  /g\s*a\s*g\s*a/i,
+  /b\s*o\s*b\s*o/i,
+  /t\s*a\s*n\s*g\s*a/i,
+  /u\s*l\s*o\s*l/i,
+  /k\s*a\s*n\s*t\s*o\s*t/i,
+  /h\s*i\s*n\s*d\s*o\s*t/i,
+  /p\s*a\s*k\s*y\s*u/i,
+  /p\s*a\s*k\s*s\s*h\s*e\s*t/i,
+  /p\s*u\s*n\s*y\s*e\s*t\s*a/i,
+
+  // English — flexible spacing
+  /f\s*u\s*c\s*k/i,
+  /s\s*h\s*i\s*t/i,
+  /a\s*s\s*s\s*h\s*o\s*l\s*e/i,
+  /b\s*i\s*t\s*c\s*h/i,
+];
+
+// ─────────────────────────────────────────────────────────────
+// VALIDATION FUNCTIONS
+// ─────────────────────────────────────────────────────────────
 
 /**
  * Counts words accurately across whitespace, punctuation, and newlines
@@ -148,7 +411,95 @@ export function validateImageUpload(file: { size: number; type: string; name?: s
 }
 
 /**
- * Validates comment against low-effort, spam, repetition, and abuse guardrails
+ * Checks whether text contains profanity using a three-layer detection strategy:
+ *
+ * Layer 1: Exact normalized word match — split into words, check each against dictionaries
+ * Layer 2: Substring containment — catch compound variants like "putanginamo", "gagoka"
+ * Layer 3: Regex patterns — catch spaced/separator evasion like "g a g o", "p.u.t.a"
+ *
+ * @returns true if profanity is detected
+ */
+function containsProfanity(rawText: string): boolean {
+  const normalized = normalizeLeetSpeak(rawText);
+  const normalizedNoSpaces = normalized.replace(/\s+/g, "");
+
+  // ── Layer 1: Exact word-level match ──
+  const words = normalized.split(/\s+/);
+  for (const word of words) {
+    // Strip trailing punctuation for matching
+    const clean = word.replace(/[.,!?;:'"()[\]{}]+$/g, "").replace(/^[.,!?;:'"()[\]{}]+/g, "");
+    if (!clean) continue;
+
+    for (const profanity of TAGALOG_PROFANITY) {
+      if (clean === profanity.replace(/\s+/g, "")) return true;
+    }
+    for (const profanity of ENGLISH_PROFANITY) {
+      if (clean === profanity.replace(/\s+/g, "")) return true;
+    }
+  }
+
+  // ── Layer 2: Safe substring containment for unmistakable compound profanity ──
+  // Only high-confidence terms that never legitimately appear inside innocent words
+  const COMPOUND_PROFANITY_SUBSTRINGS = [
+    "putangina",
+    "potangina",
+    "tangina",
+    "tanginamo",
+    "kingina",
+    "kinginamo",
+    "putragis",
+    "tarantado",
+    "siraulo",
+    "punyeta",
+    "pakshet",
+    "pakyu",
+    "motherfucker",
+    "asshole",
+    "dumbass",
+    "dipshit",
+    "bullshit",
+    "kantot",
+    "hindot",
+    "kupal",
+    "papatayin",
+    "sasaksakin",
+    "susunugin",
+    "bobombahin",
+    "jakulero",
+    "jakulera",
+    "walanghiya",
+  ];
+
+  for (const compound of COMPOUND_PROFANITY_SUBSTRINGS) {
+    if (normalizedNoSpaces.includes(compound)) {
+      return true;
+    }
+  }
+
+  // Common insult + enclitic combinations without spaces (e.g. "gagoka", "bobomo", "tangaka")
+  const ENCLITIC_ROOTS = ["gago", "gaga", "bobo", "boba", "tanga", "ulol", "inutil", "leche", "letse", "hayop", "salot", "ungas", "engot", "gunggong"];
+  const ENCLITIC_SUFFIXES = ["ka", "mo", "ba", "nga", "kayo", "nyo", "niyo", "to", "yan"];
+  for (const root of ENCLITIC_ROOTS) {
+    for (const suffix of ENCLITIC_SUFFIXES) {
+      if (normalizedNoSpaces.includes(root + suffix)) {
+        return true;
+      }
+    }
+  }
+
+  // ── Layer 3: Regex patterns (catches spaced-out evasion) ──
+  for (const pattern of PROFANITY_REGEX_PATTERNS) {
+    if (pattern.test(rawText)) return true;
+    if (pattern.test(normalized)) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Validates comment against low-effort, spam, repetition, and abuse guardrails.
+ * Now includes comprehensive Tagalog/Filipino profanity detection with leet-speak
+ * normalization to catch evasion attempts like "p0t4ng 1n4 m0".
  */
 export function validateCommentContent(content: string): GuardrailValidationResult {
   if (!content || typeof content !== "string") {
@@ -200,15 +551,12 @@ export function validateCommentContent(content: string): GuardrailValidationResu
     }
   }
 
-  // 5. Profanity / toxic language check
-  const lower = trimmed.toLowerCase();
-  for (const word of PROFANITY_LIST) {
-    if (lower.includes(word)) {
-      return {
-        isValid: false,
-        error: "Comment violates community guidelines. Please keep feedback respectful and constructive.",
-      };
-    }
+  // 5. Profanity / toxic language check — 3-layer Tagalog + English detection
+  if (containsProfanity(trimmed)) {
+    return {
+      isValid: false,
+      error: "Comment violates community guidelines. Offensive language (including Tagalog/Filipino) is not permitted. Please keep feedback respectful and constructive.",
+    };
   }
 
   return { isValid: true };

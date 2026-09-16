@@ -17,6 +17,18 @@ export const RATE_LIMIT_PRESETS: Record<string, RateLimitConfig> = {
     windowSeconds: 60,
     debounceSeconds: 10,
   },
+  // Comments hourly burst cap: Max 10 per hour, 30s cooldown
+  COMMENT_BURST: {
+    limit: 10,
+    windowSeconds: 3600,
+    debounceSeconds: 30,
+  },
+  // Throttled rate for users who repeatedly trigger guardrail violations (3+ strikes)
+  COMMENT_FLAGGED: {
+    limit: 1,
+    windowSeconds: 300,
+    debounceSeconds: 60,
+  },
   // Submissions: Max 5 portfolios per 24 hours to protect 500MB DB
   SUBMIT_PORTFOLIO: {
     limit: 5,

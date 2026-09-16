@@ -17,15 +17,15 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    "bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold shadow-sm shadow-emerald-950/40 hover:shadow-emerald-500/20 active:translate-y-0.5",
+    "bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold shadow-xs hover:shadow-emerald-500/20 active:translate-y-0.5",
   secondary:
-    "bg-zinc-800/90 hover:bg-zinc-750 text-zinc-200 border border-zinc-750 hover:border-zinc-650 hover:text-white active:translate-y-0.5",
+    "bg-slate-100 hover:bg-slate-200/80 text-slate-800 border border-slate-200 dark:bg-zinc-800/90 dark:hover:bg-zinc-750 dark:text-zinc-200 dark:border-zinc-750 dark:hover:border-zinc-650 dark:hover:text-white active:translate-y-0.5",
   outline:
-    "bg-transparent hover:bg-zinc-800/60 text-zinc-300 border border-zinc-750 hover:border-zinc-600 hover:text-white active:translate-y-0.5",
+    "bg-transparent hover:bg-slate-100 text-slate-700 border border-slate-200 dark:hover:bg-zinc-800/60 dark:text-zinc-300 dark:border-zinc-750 dark:hover:border-zinc-600 dark:hover:text-white active:translate-y-0.5",
   ghost:
-    "bg-transparent hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 active:bg-zinc-800/80",
+    "bg-transparent hover:bg-slate-100 text-slate-600 hover:text-slate-900 dark:hover:bg-zinc-800/50 dark:text-zinc-400 dark:hover:text-zinc-200 active:bg-slate-200 dark:active:bg-zinc-800/80",
   danger:
-    "bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/30 hover:border-rose-500/50 active:translate-y-0.5",
+    "bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 dark:text-rose-400 dark:hover:text-rose-300 dark:border-rose-500/30 dark:hover:border-rose-500/50 active:translate-y-0.5",
 };
 
 const sizeStyles: Record<ButtonSize, string> = {

@@ -28,6 +28,7 @@ import { GithubVerificationMark } from "./GithubVerifiedBadge";
 import { cn, formatNumber, timeAgo, formatRating, normalizeAvatarUrl } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
 import { validateCommentContent, MIN_COMMENT_LENGTH } from "@/lib/guardrails";
+import { sanitizeCommentInput } from "@/lib/sanitize";
 import { EmojiReaction } from "@/components/ui/emoji-reaction";
 import { EMOJI_MAP, getEmojiDisplay } from "@/lib/emoji-utils";
 
@@ -216,8 +217,15 @@ export function PortfolioDetailModal({
 
     if (!commentText.trim()) return;
 
+    // Client-side sanitization against XSS, injection markers, control chars
+    const sanitized = sanitizeCommentInput(commentText);
+    if (!sanitized) {
+      setCommentError("Comment contains invalid or prohibited content.");
+      return;
+    }
+
     // Strict guardrails check
-    const check = validateCommentContent(commentText);
+    const check = validateCommentContent(sanitized);
     if (!check.isValid) {
       setCommentError(check.error || `Comments must be at least ${MIN_COMMENT_LENGTH} characters of constructive feedback.`);
       return;
@@ -230,7 +238,7 @@ export function PortfolioDetailModal({
       authorAvatar:
         currentUser.avatar ||
         "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
-      content: commentText.trim(),
+      content: sanitized,
       createdAt: new Date().toISOString(),
       likes: 0,
       isUserOwner: true,
@@ -238,7 +246,7 @@ export function PortfolioDetailModal({
     };
     setCommentsList((prev) => [optimisticComment, ...prev]);
 
-    onAddComment(portfolio.id, commentText.trim(), selectedCritiqueTag);
+    onAddComment(portfolio.id, sanitized, selectedCritiqueTag);
     trackEvent("portfolio_comment", {
       portfolioId: portfolio.id,
       critiqueTag: selectedCritiqueTag,

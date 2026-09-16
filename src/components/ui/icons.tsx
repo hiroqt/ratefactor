@@ -85,6 +85,8 @@ import {
   Sun01Icon,
   Moon01Icon,
   Camera01Icon,
+  AiSparklesIcon,
+  RefreshCcwIcon,
 } from "@hugeicons/core-free-icons";
 
 export interface IconProps extends Omit<HugeiconsProps, "icon"> {
@@ -265,5 +267,7 @@ export const Cookie = React.forwardRef<SVGSVGElement, IconProps>(
   )
 );
 export const Camera = createIcon(Camera01Icon, "Camera");
+export const Sparkles = createIcon(AiSparklesIcon, "Sparkles");
+export const RotateCcw = createIcon(RefreshCcwIcon, "RotateCcw");
 
 

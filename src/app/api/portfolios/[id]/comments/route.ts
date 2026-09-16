@@ -2,10 +2,46 @@ import { NextRequest, NextResponse } from "next/server";
 import { commentSubmissionSchema } from "@/lib/validations/portfolio";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { validateCommentContent } from "@/lib/guardrails";
+import { sanitizeCommentInput, isPayloadSizeAcceptable } from "@/lib/sanitize";
 import { getSessionUser } from "@/lib/auth/server-session";
 import { portfolioComments } from "@/lib/comments-store";
 import { pool } from "@/lib/auth/better-auth";
 import { invalidatePortfoliosCache } from "@/lib/dynamic-portfolios";
+
+/**
+ * In-memory guardrail strike tracker.
+ * Tracks how many times a user has triggered profanity/spam guardrails.
+ * After 3+ strikes, they get auto-throttled to the COMMENT_FLAGGED rate.
+ */
+const guardrailStrikes = new Map<string, { count: number; lastStrikeAt: number }>();
+
+/** Strike threshold before auto-throttling kicks in */
+const STRIKE_THRESHOLD = 3;
+/** Strike decay window: strikes reset after 1 hour of no violations */
+const STRIKE_DECAY_MS = 60 * 60 * 1000;
+
+function recordGuardrailStrike(actorId: string): number {
+  const now = Date.now();
+  const existing = guardrailStrikes.get(actorId);
+  if (existing && now - existing.lastStrikeAt > STRIKE_DECAY_MS) {
+    // Strikes decayed — reset
+    guardrailStrikes.set(actorId, { count: 1, lastStrikeAt: now });
+    return 1;
+  }
+  const newCount = (existing?.count || 0) + 1;
+  guardrailStrikes.set(actorId, { count: newCount, lastStrikeAt: now });
+  return newCount;
+}
+
+function getStrikeCount(actorId: string): number {
+  const existing = guardrailStrikes.get(actorId);
+  if (!existing) return 0;
+  if (Date.now() - existing.lastStrikeAt > STRIKE_DECAY_MS) {
+    guardrailStrikes.delete(actorId);
+    return 0;
+  }
+  return existing.count;
+}
 
 export async function GET(
   req: NextRequest,
@@ -127,21 +163,70 @@ export async function POST(
       );
     }
 
+    // Payload Size Check to prevent large body DDoS payloads
+    const contentLength = req.headers.get("content-length");
+    if (!isPayloadSizeAcceptable(contentLength, 10 * 1024)) {
+      return NextResponse.json(
+        {
+          type: "https://ratefactor.dev/errors/payload-too-large",
+          title: "Payload Too Large",
+          status: 413,
+          detail: "Comment payload exceeds maximum allowed size (10 KB).",
+        },
+        { status: 413 }
+      );
+    }
+
     const actorId = authUser.id;
 
-    // Anti-Abuse Rate Limitation: Max 3 comments per minute, min 10s cooldown
-    const rateCheck = checkRateLimit(`comment:${actorId}:${ip}`, "COMMENT");
+    // Rate Limiting Tier 1: Check user guardrail strikes to determine preset
+    const strikes = getStrikeCount(actorId);
+    const ratePreset = strikes >= STRIKE_THRESHOLD ? "COMMENT_FLAGGED" : "COMMENT";
+
+    // Rate Limiting Tier 2: Per-user & IP cooldown rate limit
+    const rateCheck = checkRateLimit(`comment:${actorId}:${ip}`, ratePreset);
     if (!rateCheck.allowed) {
       return createRateLimitResponse(rateCheck);
     }
 
+    // Rate Limiting Tier 3: Hourly burst cap (max 10 comments/hour)
+    const burstCheck = checkRateLimit(`comment_burst:${actorId}`, "COMMENT_BURST");
+    if (!burstCheck.allowed) {
+      return createRateLimitResponse(burstCheck);
+    }
+
+    // Rate Limiting Tier 4: IP-level anti-DDoS flood protection (max 25 comments/hour across accounts)
+    const ipCheck = checkRateLimit(`comment_ip:${ip}`, {
+      limit: 25,
+      windowSeconds: 3600,
+      debounceSeconds: 2,
+    });
+    if (!ipCheck.allowed) {
+      return createRateLimitResponse(ipCheck);
+    }
+
     const body = await req.json();
-    const parseResult = commentSubmissionSchema.safeParse({ ...body, portfolioId });
+
+    // Input Sanitization: Strip dangerous HTML/scripts, SQL injection patterns, control characters
+    const rawContent = typeof body?.content === "string" ? body.content : "";
+    const sanitizedContent = sanitizeCommentInput(rawContent);
+
+    const parseResult = commentSubmissionSchema.safeParse({
+      ...body,
+      portfolioId,
+      content: sanitizedContent,
+    });
 
     if (!parseResult.success) {
       const firstIssue = parseResult.error.issues[0];
       const isContentIssue = firstIssue?.path.includes("content");
-      const guardrail = isContentIssue ? validateCommentContent((body.content || "").trim()) : null;
+      const guardrail = isContentIssue ? validateCommentContent(sanitizedContent) : null;
+
+      // Track strikes if abusive or toxic language was detected
+      if (guardrail && !guardrail.isValid) {
+        recordGuardrailStrike(actorId);
+      }
+
       return NextResponse.json(
         {
           type: isContentIssue

@@ -44,7 +44,7 @@ export function PortfolioGrid({
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="rounded-2xl bg-zinc-900/60 border border-zinc-800 p-5 flex flex-col gap-4"
+            className="rounded-2xl bg-white dark:bg-[#121215] border border-slate-200 dark:border-white/10 p-5 flex flex-col gap-4"
           >
             <Skeleton className="w-full h-48 rounded-xl" />
             <Skeleton className="w-3/4 h-6 rounded-lg" />

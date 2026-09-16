@@ -255,11 +255,20 @@ export function Navbar({
     }
   }, [isMobileMenuOpen]);
 
-  // Close menus on route change
+  // Close menus on route change and sync active tab with pathname
   useEffect(() => {
     setIsMobileMenuOpen(false);
     setIsProfileDropdownOpen(false);
-  }, [pathname]);
+    if (pathname === "/leaderboard") {
+      setActiveNavTab("leaderboard");
+    } else if (pathname === "/showcase") {
+      setActiveNavTab("showcase");
+    } else if (pathname === "/apps") {
+      setActiveNavTab("apps");
+    } else if (pathname === "/profile") {
+      setActiveNavTab("dashboard");
+    }
+  }, [pathname, setActiveNavTab]);
 
   const handleNavClick = (tab: string) => {
     setActiveNavTab(tab);
@@ -292,11 +301,16 @@ export function Navbar({
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
     } else if (tab === "showcase") {
-      if (pathname !== "/") {
-        router.push("/#showcase-section");
+      if (pathname !== "/showcase") {
+        router.push("/showcase");
       } else {
-        const el = document.getElementById("showcase-section");
-        el?.scrollIntoView({ behavior: "smooth" });
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    } else if (tab === "leaderboard") {
+      if (pathname !== "/leaderboard") {
+        router.push("/leaderboard");
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }
     }
   };
@@ -443,15 +457,11 @@ export function Navbar({
             {/* Leaderboard Link */}
             <button
               type="button"
-              onClick={() => {
-                if (onSelectSort) {
-                  onSelectSort("highest_rated");
-                }
-                setActiveNavTab("discover");
-                const el = document.getElementById("showcase-bento");
-                el?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className="whitespace-nowrap text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors py-1.5 px-3 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer"
+              onClick={() => handleNavClick("leaderboard")}
+              className={cn(
+                "whitespace-nowrap text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors py-1.5 px-3 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer",
+                activeNavTab === "leaderboard" && "text-slate-950 dark:text-white font-semibold bg-slate-100 dark:bg-white/10"
+              )}
             >
               Leaderboard
             </button>
@@ -898,15 +908,17 @@ export function Navbar({
                   type="button"
                   onClick={() => {
                     setIsMobileMenuOpen(false);
-                    if (onSelectSort) onSelectSort("highest_rated");
-                    setActiveNavTab("discover");
-                    const el = document.getElementById("showcase-bento");
-                    el?.scrollIntoView({ behavior: "smooth" });
+                    handleNavClick("leaderboard");
                   }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left cursor-pointer"
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left cursor-pointer",
+                    activeNavTab === "leaderboard" 
+                      ? "bg-slate-900 dark:bg-white text-white dark:text-slate-950" 
+                      : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5"
+                  )}
                 >
                   <span className="font-semibold whitespace-nowrap">Leaderboard</span>
-                  <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">Top Rated</span>
+                  <span className="text-[10px] font-mono opacity-80 whitespace-nowrap">Top Rated</span>
                 </button>
 
                 <button
