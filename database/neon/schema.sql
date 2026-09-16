@@ -2,12 +2,12 @@
 -- RateFactor — Portable Neon PostgreSQL 17 Schema
 -- ==========================================================
 -- Generated from a live read-only pg_dump --schema-only of the production
--- Supabase database (see docs/infrastructure/LIVE-DB-INVENTORY.md, Phase 0B),
+-- Supabase database (see docs/database.md for the current schema reference),
 -- with Supabase-platform-only objects stripped. This file is the source of
 -- truth for the Neon target schema — NOT supabase/schema.sql, which is a
--- stale baseline predating three migrations (see Phase 0B §1).
+-- stale baseline predating three migrations.
 --
--- Excluded vs. live Supabase (see database/neon/README.md for full rationale):
+-- Excluded vs. live Supabase (see docs/database.md for full rationale):
 --   - auth.*/storage.*/realtime.*/graphql*/pgbouncer/vault schemas
 --   - auth.users dependency, on_auth_user_created trigger, handle_new_user()
 --   - Supabase event triggers (ensure_rls/rls_auto_enable(), pgrst_*, pg_graphql/pg_cron/pg_net grants)
@@ -15,7 +15,7 @@
 --   - Unused RLS-helper functions current_user_role(), is_admin(), is_moderator()
 --   - prevent_role_escalation() / tr_prevent_role_escalation — calls auth.uid()
 --     unconditionally; would hard-error on Neon (schema "auth" doesn't exist)
---     instead of Supabase's silent NULL. See README.md "Unresolved decisions".
+--     instead of Supabase's silent NULL. See docs/database.md.
 --   - auth_challenges_user_id_fkey → auth.users(id) — FK dropped; table kept.
 --
 -- Idempotent: safe to re-run against an empty or partially-created database.
@@ -34,7 +34,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 -- Orphaned on live production (profiles.role/user.role were converted to
 -- TEXT by 20260915000000_roles_onboarding_and_performance_indexes.sql) but
--- kept here for compatibility — see README.md "Unresolved decisions".
+-- kept here for compatibility — see docs/database.md.
 
 DO $$ BEGIN
   CREATE TYPE public.content_status AS ENUM ('published', 'draft', 'flagged', 'hidden');
@@ -512,7 +512,7 @@ CREATE TABLE IF NOT EXISTS public.showcases (
 );
 
 -- ---- Legacy / unresolved tables (kept per Phase 0A/0B — do not drop merely
---      because currently empty; see README.md "Unresolved decisions") ----
+--      because currently empty; see docs/database.md) ----
 
 -- auth_challenges: FK to auth.users(id) dropped (Supabase-only, not portable).
 -- Table + all other columns/constraints kept unchanged; app code does not
@@ -616,7 +616,7 @@ CREATE INDEX IF NOT EXISTS idx_verification_identifier ON public.verification US
 -- 5. Triggers
 -- ==========================================================
 -- tr_prevent_role_escalation is intentionally NOT created here — see the
--- header comment and README.md "Unresolved decisions".
+-- header comment and docs/database.md.
 
 DROP TRIGGER IF EXISTS tr_account_updated_at ON public.account;
 CREATE TRIGGER tr_account_updated_at BEFORE UPDATE ON public.account FOR EACH ROW EXECUTE FUNCTION public.set_better_auth_updated_at();
