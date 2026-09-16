@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight } from "@/components/ui/icons";
+import { HeroInteractiveBackground } from "@/components/ui/HeroInteractiveBackground";
 import { Portfolio } from "@/types/portfolio";
 import { DeveloperProfile, DeveloperSummary } from "@/types/profile";
 import { normalizeAvatarUrl, getOptimizedImageUrl } from "@/lib/utils";
@@ -181,7 +182,7 @@ export function HeroSection({
         role: dev.role,
         bio: "",
         status: {
-          emoji: "🚀",
+          emoji: "",
           message: "Showcasing on RateFactor",
           statusType: "available",
         },
@@ -201,11 +202,14 @@ export function HeroSection({
 
   return (
     <section className="relative w-full min-h-[85vh] lg:min-h-[90vh] flex flex-col justify-between overflow-hidden select-none bg-background text-foreground">
+      {/* Interactive Hero Background (Nodes, mesh grid, and click ripples) */}
+      <HeroInteractiveBackground />
+
       {/* Top spacing to account for floating nav */}
       <div className="h-20 sm:h-24" />
 
       {/* Main Content Area */}
-      <div className="flex-1 w-full max-w-[1380px] mx-auto px-4 sm:px-8 lg:px-12 flex flex-col justify-end pb-12 sm:pb-16 lg:pb-20 z-10">
+      <div className="flex-1 w-full max-w-[1380px] mx-auto px-4 sm:px-8 lg:px-12 flex flex-col justify-end pb-12 sm:pb-16 lg:pb-20 z-10 relative">
         
         {/* Content Grid: Headline shifted left + Right Subtitle & Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 lg:gap-12 xl:gap-16 items-end">

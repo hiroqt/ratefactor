@@ -29,6 +29,7 @@ import { formatRating, formatJoinedDate } from "@/lib/utils";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { ActivityHeatmap } from "./ActivityHeatmap";
 import { getEmojiDisplay } from "@/lib/emoji-utils";
+import { ProfileShareMenu } from "@/components/profile/ProfileShareMenu";
 
 interface PublicProfilePreviewProps {
   profile: DeveloperProfile;
@@ -85,23 +86,11 @@ export function PublicProfilePreview({
             <ExternalLink className="w-3.5 h-3.5" />
           </Link>
 
-          <button
-            type="button"
-            onClick={handleCopyLink}
-            className="px-3.5 py-1.5 rounded-full bg-white text-slate-900 hover:bg-slate-100 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            {copied ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
-                <span>Link Copied!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5" />
-                <span>Copy Link</span>
-              </>
-            )}
-          </button>
+          <ProfileShareMenu
+            profile={profile}
+            portfolios={myPortfolios}
+            buttonVariant="pill-white"
+          />
         </div>
       </div>
 

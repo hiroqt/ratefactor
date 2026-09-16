@@ -8,4 +8,5 @@ export * from "./Toast";
 export * from "./Tabs";
 export * from "./GrainyGradient";
 export * from "./HireSwitch";
+export * from "./HeroInteractiveBackground";
 export * from "./icons";

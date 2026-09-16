@@ -54,6 +54,7 @@ import { formatRating, formatNumber, timeAgo, formatJoinedDate, cn, normalizeAva
 import { Portfolio, PortfolioCategory } from "@/types/portfolio";
 import { DeveloperProfile, ShowcaseAccolade } from "@/types/profile";
 import { deriveDeveloperAccolades } from "@/lib/accolades";
+import { ProfileShareMenu } from "@/components/profile/ProfileShareMenu";
 
 interface PublicProfilePageProps {
   params: Promise<{ username: string }>;
@@ -534,14 +535,10 @@ export default function PublicDeveloperProfilePage({ params }: PublicProfilePage
                 )}
               </button>
 
-              <button
-                type="button"
-                onClick={handleShareTwitter}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0f1419] hover:bg-black text-white text-xs font-semibold shadow-2xs transition-all cursor-pointer"
-              >
-                <Twitter className="w-3.5 h-3.5 text-sky-400" />
-                <span>Share</span>
-              </button>
+              <ProfileShareMenu
+                profile={targetProfile}
+                portfolios={targetAuthorPortfolios}
+              />
             </div>
           </div>
 
