@@ -3,6 +3,8 @@ import { commentReportSchema } from "@/lib/validations/portfolio";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { getSessionUser } from "@/lib/auth/server-session";
 import { pool } from "@/lib/auth/better-auth";
+import { resolveCanonicalProfileId } from "@/lib/auth/profile-id";
+import { invalidatePortfoliosCache } from "@/lib/dynamic-portfolios";
 
 export async function POST(
   req: NextRequest,
@@ -27,6 +29,9 @@ export async function POST(
     }
 
     const actorId = authUser.id;
+    // reporter_id is a UUID FK to profiles.id, not the raw Better Auth user id -
+    // resolve it the same way every other mutation route does (likes, ratings).
+    const canonicalActorProfileId = resolveCanonicalProfileId(actorId);
 
     // Rate limit reporting: max 5 reports per 10 minutes
     const rateCheck = checkRateLimit(`report:${actorId}:${ip}`, { limit: 5, windowSeconds: 600 });
@@ -56,13 +61,27 @@ export async function POST(
       await pool.query(
         `INSERT INTO public.comment_reports (comment_id, reporter_id, reason, details)
          VALUES ($1, $2, $3, $4)
-         ON CONFLICT (comment_id, reporter_id) 
+         ON CONFLICT (comment_id, reporter_id)
          DO UPDATE SET details = EXCLUDED.details, created_at = NOW()`,
-        [commentId, actorId, reason, details]
+        [commentId, canonicalActorProfileId, reason, details]
       );
-    } catch (dbErr) {
-      console.warn("[Comment Report] DB insert fallback:", dbErr);
+    } catch (dbErr: any) {
+      console.warn("[Comment Report] DB insert failed:", dbErr);
+      return NextResponse.json(
+        {
+          type: "https://ratefactor.dev/errors/persistence-failed",
+          title: "Report Not Persisted",
+          status: 502,
+          detail: "The report could not be saved right now. Please try again.",
+        },
+        { status: 502 }
+      );
     }
+
+    // The tr_sync_comment_reports trigger just bumped the comment's
+    // report_count/is_reported/status, so the portfolio/feed cache must be
+    // invalidated after a confirmed insert - never on a failed one.
+    invalidatePortfoliosCache();
 
     return NextResponse.json({
       message: "Thank you. The comment has been flagged for platform moderator review.",

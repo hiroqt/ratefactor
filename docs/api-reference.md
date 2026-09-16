@@ -34,7 +34,7 @@ Implementation: `src/app/api/profile/route.ts`, `src/app/api/developers/route.ts
 | GET | `/api/portfolios/{id}/comments` | Optional | List approved comments for a portfolio. | Read-only, `no-store`. |
 | POST | `/api/portfolios/{id}/comments` | Required | Post a comment. | Inserts `comments`; recomputes and writes `comments_count`; inserts a `comment` notification; invalidates portfolio cache. Rate-limited (`COMMENT`, 3/min). |
 | DELETE | `/api/portfolios/{id}/comments/{commentId}` | Required, author or moderator/admin | Delete a comment. | Deletes `comments` row; recomputes and writes `comments_count`; invalidates portfolio cache. Rate-limited (15/min). |
-| POST | `/api/portfolios/{id}/comments/{commentId}/report` | Required | Report a comment for moderation. | Upserts `comment_reports` (trigger bumps `comments.report_count`/`is_reported`/auto-flags at 3; does not touch `comment_reports.status`). Does not invalidate the portfolio cache. Rate-limited (5/10min). Known debt: does not resolve `reporter_id` via `resolveCanonicalProfileId` first — see [portfolio-system.md](./portfolio-system.md#reports). |
+| POST | `/api/portfolios/{id}/comments/{commentId}/report` | Required | Report a comment for moderation. | Resolves `reporter_id` via `resolveCanonicalProfileId` first; upserts `comment_reports` (trigger bumps `comments.report_count`/`is_reported`/auto-flags at 3; does not touch `comment_reports.status`); a DB persistence failure returns `502` instead of a false-success `200`. Invalidates the portfolio cache after a confirmed insert. Rate-limited (5/10min). See [portfolio-system.md](./portfolio-system.md#reports). |
 
 Implementation: `src/app/api/portfolios/route.ts`, `.../[id]/route.ts`, `.../[id]/like/route.ts`, `.../[id]/rate/route.ts`, `.../[id]/comments/route.ts`, `.../[id]/comments/[commentId]/route.ts`, `.../[id]/comments/[commentId]/report/route.ts`. Details: [portfolio-system.md](./portfolio-system.md).
 
@@ -43,7 +43,7 @@ Implementation: `src/app/api/portfolios/route.ts`, `.../[id]/route.ts`, `.../[id
 | Method | Route | Auth | Purpose | Persistence / side effects |
 |---|---|---|---|---|
 | POST | `/api/uploads/portfolio` | Required | Issue a signed Cloudinary upload payload for a portfolio cover. | No Postgres write. Calls Cloudinary's signing utility (no network call). Rate-limited (10/hour). |
-| DELETE | `/api/uploads/portfolio` | Required | Clean up an abandoned (never-submitted) upload. | Verifies the receipt, checks no portfolio references the public id, then calls Cloudinary `destroy`. **Known debt**: reads Cloudinary config outside any `try/catch`, so a missing-config environment surfaces as an unhandled `500` here, unlike the `POST` route's clean `503` — see [portfolio-system.md](./portfolio-system.md#media). |
+| DELETE | `/api/uploads/portfolio` | Required | Clean up an abandoned (never-submitted) upload. | Reads Cloudinary config inside a `try/catch` (same as `POST`), returning a clean `503` if unconfigured; verifies the receipt, checks no portfolio references the public id, then calls Cloudinary `destroy` — see [portfolio-system.md](./portfolio-system.md#media). |
 
 Implementation: `src/app/api/uploads/portfolio/route.ts`. Details: [portfolio-system.md](./portfolio-system.md#media).
 
@@ -78,7 +78,7 @@ Implementation: `src/app/api/notifications/route.ts`.
 | GET | `/api/monitoring/uptime` | Public (heartbeat); admin/moderator or dev-only for `?action=simulate-outage` | Detailed heartbeat / manual outage simulation. | Calls `checkSystemHealth()` (via `trackUptimeHeartbeat`), same as `/api/health`. `?action=simulate-outage` instead logs a simulated downtime incident and does not call `checkSystemHealth()`. |
 | POST | `/api/monitoring/uptime` | Admin/moderator (dev bypass) | Report a downtime incident or a custom heartbeat ping. | Emits PostHog/Sentry events only from the request body; no Postgres write; does **not** call `checkSystemHealth()`. |
 
-Implementation: `src/app/api/health/route.ts`, `src/app/api/monitoring/uptime/route.ts`, `src/lib/uptime.ts`. See [deployment-operations.md](./deployment-operations.md#monitoring) for the known Supabase-check debt in `checkSystemHealth`.
+Implementation: `src/app/api/health/route.ts`, `src/app/api/monitoring/uptime/route.ts`, `src/lib/uptime.ts`. See [deployment-operations.md](./deployment-operations.md#monitoring) for how the database dependency check works (`SELECT 1` via the shared pool).
 
 ## Not present
 

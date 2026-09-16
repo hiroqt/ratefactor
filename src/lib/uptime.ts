@@ -3,8 +3,9 @@
  * Implements continuous health check evaluation, heartbeat telemetry, and incident alerting.
  */
 
-import { captureServerEvent, captureClientEvent } from "./posthog";
+import { captureServerEvent } from "./posthog";
 import * as Sentry from "@sentry/nextjs";
+import { pool } from "./auth/better-auth";
 
 export type HealthStatus = "healthy" | "degraded" | "down";
 
@@ -30,7 +31,6 @@ export interface SystemHealthReport {
   };
   dependencies: {
     database: DependencyStatus;
-    supabase: DependencyStatus;
     betterAuth: DependencyStatus;
     showcaseEngine: DependencyStatus;
   };
@@ -54,39 +54,25 @@ export async function checkSystemHealth(): Promise<SystemHealthReport> {
   const timestamp = new Date().toISOString();
   const uptimeSeconds = process.uptime ? process.uptime() : 0;
 
-  // 1. Check Database
+  // 1. Check Database (Neon/PostgreSQL is the active runtime datastore) with a
+  // cheap read-only query via the shared pg Pool, not just env-var presence.
   const dbStart = Date.now();
   let dbStatus: HealthStatus = "healthy";
   let dbMessage = "Database connection pool operational";
-  try {
-    if (process.env.DATABASE_URL) {
-      // In production/active environment verify URL format
-      const isPostgres = process.env.DATABASE_URL.startsWith("postgres");
-      if (!isPostgres) {
-        dbStatus = "degraded";
-        dbMessage = "Invalid connection protocol";
-      }
-    } else {
-      dbStatus = "degraded";
-      dbMessage = "DATABASE_URL not configured";
+  if (!process.env.DATABASE_URL) {
+    dbStatus = "degraded";
+    dbMessage = "DATABASE_URL not configured";
+  } else {
+    try {
+      await pool.query("SELECT 1");
+    } catch (err) {
+      dbStatus = "down";
+      dbMessage = err instanceof Error ? err.message : "Database check failed";
     }
-  } catch (err) {
-    dbStatus = "down";
-    dbMessage = err instanceof Error ? err.message : "Database check failed";
   }
   const dbLatency = Date.now() - dbStart;
 
-  // 2. Check Supabase
-  const sbStart = Date.now();
-  let sbStatus: HealthStatus = "healthy";
-  let sbMessage = "Supabase client configured";
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    sbStatus = "degraded";
-    sbMessage = "Supabase keys missing";
-  }
-  const sbLatency = Date.now() - sbStart;
-
-  // 3. Check Better-Auth
+  // 2. Check Better-Auth
   const authStart = Date.now();
   let authStatus: HealthStatus = "healthy";
   let authMessage = "Better Auth infrastructure active";
@@ -96,13 +82,13 @@ export async function checkSystemHealth(): Promise<SystemHealthReport> {
   }
   const authLatency = Date.now() - authStart;
 
-  // 4. Check Showcase Engine
+  // 3. Check Showcase Engine
   const showcaseLatency = 1;
   const showcaseStatus: HealthStatus = "healthy";
   const showcaseMessage = "Showcase scoring engine ready";
 
   // Overall status
-  const statuses = [dbStatus, sbStatus, authStatus, showcaseStatus];
+  const statuses = [dbStatus, authStatus, showcaseStatus];
   let overallStatus: HealthStatus = "healthy";
   if (statuses.includes("down")) {
     overallStatus = "down";
@@ -134,13 +120,6 @@ export async function checkSystemHealth(): Promise<SystemHealthReport> {
         status: dbStatus,
         latencyMs: dbLatency,
         message: dbMessage,
-        lastChecked: timestamp,
-      },
-      supabase: {
-        name: "Supabase Service",
-        status: sbStatus,
-        latencyMs: sbLatency,
-        message: sbMessage,
         lastChecked: timestamp,
       },
       betterAuth: {
@@ -176,7 +155,6 @@ export async function trackUptimeHeartbeat(
     uptimeSeconds: health.uptimeSeconds,
     memoryUsage: health.memoryUsage,
     databaseStatus: health.dependencies.database.status,
-    supabaseStatus: health.dependencies.supabase.status,
     authStatus: health.dependencies.betterAuth.status,
     timestamp: health.timestamp,
   });
@@ -186,7 +164,7 @@ export async function trackUptimeHeartbeat(
     trackDowntimeIncident({
       service: "ratefactor-api",
       status: health.status,
-      reason: `System health status degraded: DB ${health.dependencies.database.status}, Supabase ${health.dependencies.supabase.status}, Auth ${health.dependencies.betterAuth.status}`,
+      reason: `System health status degraded: DB ${health.dependencies.database.status}, Auth ${health.dependencies.betterAuth.status}`,
       severity: health.status === "down" ? "critical" : "medium",
       affectedEndpoints: ["/api/health", "/api/portfolios"],
     });
@@ -229,23 +207,5 @@ export function trackDowntimeIncident(incident: DowntimeIncidentPayload): void {
         },
       }
     );
-  }
-}
-
-/**
- * Tracks client-side network uptime / connection loss.
- */
-export function trackClientNetworkStatus(online: boolean, durationOfflineMs?: number): void {
-  if (online) {
-    captureClientEvent("uptime_client_online", {
-      status: "online",
-      downtimeDurationMs: durationOfflineMs,
-      timestamp: new Date().toISOString(),
-    });
-  } else {
-    captureClientEvent("downtime_client_offline", {
-      status: "offline",
-      timestamp: new Date().toISOString(),
-    });
   }
 }

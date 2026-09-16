@@ -23,7 +23,7 @@ Categories, not values — see `.env.example` for the current variable list (unc
 - `DATABASE_URL` — Neon pooled connection string.
 - `BETTER_AUTH_SECRET` — Better Auth session/cookie signing secret.
 - `BETTER_AUTH_URL` and/or `NEXT_PUBLIC_APP_URL` — canonical production origin. Set at least one explicitly; do not rely solely on Vercel's `VERCEL_URL`/`VERCEL_PROJECT_PRODUCTION_URL` fallbacks in `better-auth.ts`, since those track whatever URL Vercel assigns a given deployment rather than a fixed canonical domain.
-- `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_UPLOAD_FOLDER` — all four required together; `getCloudinaryConfig()` throws if any is missing. `POST /api/uploads/portfolio` (signature issuance) catches this and returns a clean `503`. `DELETE /api/uploads/portfolio` (cleanup) calls `getCloudinaryConfig()` outside any `try/catch`, so a missing-config environment surfaces there as an unhandled `500`, not a graceful `502`/`503` — see [portfolio-system.md](./portfolio-system.md#media). Note these variables are **not currently listed in `.env.example`** — see [development.md](./development.md#environment-setup).
+- `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_UPLOAD_FOLDER` — all four required together; `getCloudinaryConfig()` throws if any is missing. Both `POST /api/uploads/portfolio` (signature issuance) and `DELETE /api/uploads/portfolio` (cleanup) catch this and return a clean `503` — see [portfolio-system.md](./portfolio-system.md#media). Note these variables are **not currently listed in `.env.example`** — see [development.md](./development.md#environment-setup).
 
 **Optional integrations (feature degrades gracefully if unset):**
 - `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` — OAuth sign-in for that provider; without them, Better Auth falls back to placeholder strings and that provider's sign-in will fail, but the app still boots.
@@ -34,7 +34,7 @@ Categories, not values — see `.env.example` for the current variable list (unc
 
 **Migration/admin-only (never needed by the running application):**
 - `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` — build-time source-map upload configuration for `withSentryConfig`, not read by any request-handling code path.
-- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — legacy, retained in `.env.example` from before the Neon migration. **Not required by any current runtime code path** except the stale health-check debt noted under [Monitoring](#monitoring). See [Rollback](#rollback).
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — legacy, retained in `.env.example` from before the Neon migration. **Not required by any current runtime code path.** See [Rollback](#rollback).
 
 `NEXT_PUBLIC_*` variables are browser-visible; every other credential (database URL, Cloudinary secret, GitHub/Google OAuth secrets, Resend key, Better Auth secret) must remain server-only.
 
@@ -73,11 +73,11 @@ Also confirm operationally:
 - **Sentry**: initialized for both the Node and Edge runtimes (`sentry.server.config.ts`, `sentry.edge.config.ts`, wired through `src/instrumentation.ts`); receives downtime-incident messages from `src/lib/uptime.ts` at `critical`/`high` severity.
 - **PostHog**: receives an `uptime_heartbeat` event on every `/api/health` and `/api/monitoring/uptime` call, plus `downtime_incident` events when a dependency check fails.
 - **Health endpoints**: `GET /api/health` and the heartbeat path of `GET /api/monitoring/uptime` call `checkSystemHealth()` in `src/lib/uptime.ts`. `POST /api/monitoring/uptime` (admin/moderator-gated incident reporting / custom heartbeat ping) does **not** call `checkSystemHealth()` — it only emits a PostHog/Sentry event built from the request body.
-- **Known health-route debt**: `checkSystemHealth()` reports a `supabase` dependency, marked `degraded` whenever `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` are unset. No code path in the application actually imports a Supabase client for request handling — this is monitoring debt left over from before the Neon migration, not evidence that Supabase is an active runtime dependency. A `degraded` Supabase entry in the health response should be ignored, not treated as an incident, until this check is removed or replaced with a real Neon connectivity check.
+- **Database dependency check**: `checkSystemHealth()` checks the `database` dependency with a real, lightweight `SELECT 1` against the shared `pg.Pool` (`src/lib/auth/better-auth.ts`) — not just `DATABASE_URL` env-var presence — and reports `down` if that query throws. No credentials or connection details are included in the response. There is no Supabase dependency in the health report; Supabase is not an active runtime dependency.
 
 ## Rollback
 
-Supabase is retained **temporarily** as a historical rollback source while production validation of the Neon/Cloudinary migration remains open. Production must not write to Supabase under any circumstance during this window — it is not an active runtime dependency (see [Monitoring](#monitoring) above for the one stale exception, which reads env-var presence only and never connects). This section should be removed once the observation window closes and the responsible operator confirms Neon/Cloudinary recovery is no longer needed as a fallback; at that point Supabase can be decommissioned. Do not treat this as a migration roadmap or checklist — it exists solely to record the current temporary state.
+Supabase is retained **temporarily** as a historical rollback source while production validation of the Neon/Cloudinary migration remains open. Production must not write to Supabase under any circumstance during this window — it is not an active runtime dependency. This section should be removed once the observation window closes and the responsible operator confirms Neon/Cloudinary recovery is no longer needed as a fallback; at that point Supabase can be decommissioned. Do not treat this as a migration roadmap or checklist — it exists solely to record the current temporary state.
 
 ## Related documentation
 

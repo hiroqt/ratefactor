@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { initPostHog } from "@/lib/posthog";
-import { trackClientNetworkStatus } from "@/lib/uptime";
+import { trackClientNetworkStatus } from "@/lib/uptime-client";
 import { trackEvent } from "@/lib/analytics";
 import { getClientCookieConsent } from "@/lib/cookies";
 

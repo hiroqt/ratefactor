@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-`npm run dev` runs `next dev`. `npm run build` / `npm run start` build and serve the production bundle. `npm run lint` runs `next lint`. These four scripts (`dev`, `build`, `start`, `lint`) are the only ones guaranteed to work as documented — see [Known Development Issues](#known-development-issues) for `test`.
+`npm run dev` runs `next dev`. `npm run build` / `npm run start` build and serve the production bundle. `npm run lint` runs `next lint`. `npm test` runs `tsc --noEmit` followed by Node's built-in test runner over `src/**/*.test.ts` — see [Known Development Issues](#known-development-issues) for what that currently covers.
 
 ## Environment setup
 
@@ -27,19 +27,13 @@ Do not apply schema or migration SQL to a shared or production database from a l
 
 ## Validation
 
-The package scripts actually available are `dev`, `build`, `start`, `lint`, and `test` (see `package.json`). For documentation-only changes, `git diff --check` plus verifying relative links is sufficient. For code changes, run `npm run build` (and `npm run lint`) at minimum; there is no configured unit/integration test runner beyond the chain described below.
+The package scripts actually available are `dev`, `build`, `start`, `lint`, and `test` (see `package.json`). For documentation-only changes, `git diff --check` plus verifying relative links is sufficient. For code changes, run `npm test` and `npm run build` (and `npm run lint`) at minimum.
 
 ## Known Development Issues
 
-`npm run test` is defined as a chain of nine `tsx` script invocations:
+`npm test` runs `tsc --noEmit && node --test "src/**/*.test.ts"` — a project-wide typecheck followed by Node's built-in test runner over every `*.test.ts` file in `src/`. This does not require a database connection or any external credentials.
 
-```
-verify-backend.ts, verify-better-auth.ts, verify-monitoring.ts, verify-contributions-e2e.ts,
-verify-discover-apps.ts, verify-edgecases.ts, verify-email-otp-registration.ts,
-verify-accurate-counts-and-notifications.ts, verify-oauth-only.ts
-```
-
-**None of these files exist in `scripts/` on this branch.** `scripts/` currently contains only `verify-github-project-verification.ts` and `verify-rating-integrity.ts`, neither of which is referenced by `test`. Running `npm run test` will fail immediately on the first missing file. Treat `npm run test` as broken until either the missing scripts are restored or the script is corrected — this documentation does not fix `package.json`. The two scripts that do exist can be run individually with `npx tsx scripts/verify-github-project-verification.ts` / `npx tsx scripts/verify-rating-integrity.ts` against a database you're willing to write test data into.
+Coverage is currently narrow: two test files exist, `src/lib/auth/profile-id.test.ts` (covering `resolveCanonicalProfileId`'s UUID-passthrough and non-UUID hashing behavior) and `src/lib/cloudinary.test.ts` (covering upload-URL/folder validation and upload-receipt/signature verification). `scripts/verify-github-project-verification.ts` and `scripts/verify-rating-integrity.ts` also exist but are standalone scripts, not part of `npm test` or the `*.test.ts` pattern — they can be run individually with `npx tsx scripts/<name>.ts` against a database you're willing to write test data into.
 
 ## Code organization
 
