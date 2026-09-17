@@ -54,6 +54,13 @@ export interface CommentItem {
   createdAt: string;
   likes: number;
   isUserOwner?: boolean;
+  /**
+   * Immutable author profile id, used to derive isUserOwner fresh per
+   * viewer at response time. This field (not isUserOwner) is what the
+   * shared portfolio cache should treat as the source of truth — isUserOwner
+   * is viewer-specific and must never be trusted once read back from cache.
+   */
+  authorProfileId?: string | null;
   critiqueTag?: CritiqueTag | null;
 }
 

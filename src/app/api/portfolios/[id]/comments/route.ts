@@ -254,6 +254,11 @@ export async function POST(
       critiqueTag: critiqueTag || null,
       createdAt: new Date().toISOString(),
       likes: 0,
+      // Immutable id backing ownership checks wherever this comment is later
+      // re-read (e.g. the GET /api/portfolios in-memory fallback, which feeds
+      // the shared L1 portfolio cache and must re-derive isUserOwner per
+      // viewer rather than trust this baked value).
+      authorProfileId: null as string | null,
       isUserOwner: true,
       status: "approved",
       isReported: false,
@@ -274,6 +279,7 @@ export async function POST(
         newComment.authorName = profileCheck.rows[0].full_name || newComment.authorName;
         newComment.authorUsername = profileCheck.rows[0].username || newComment.authorUsername;
         newComment.authorAvatar = profileCheck.rows[0].avatar_url || newComment.authorAvatar;
+        newComment.authorProfileId = String(actorProfileId);
       }
 
       // Check portfolio details

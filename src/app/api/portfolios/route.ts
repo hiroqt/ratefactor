@@ -4,7 +4,7 @@ import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { getSessionUser } from "@/lib/auth/server-session";
 import { pool } from "@/lib/auth/better-auth";
 import { Portfolio } from "@/types/portfolio";
-import { portfolioComments } from "@/lib/comments-store";
+import { portfolioComments, decorateCommentsForViewer } from "@/lib/comments-store";
 import { 
   getCachedPortfolios, 
   setCachedPortfolios, 
@@ -89,6 +89,7 @@ export async function GET(req: NextRequest) {
       const sliced = cached.portfolios.slice(offset, offset + limit).map((p) => ({
         ...p,
         isLiked: userLikedSet.has(p.id),
+        comments: decorateCommentsForViewer(p.comments, currentProfileId),
       }));
       return NextResponse.json(
         {
@@ -248,7 +249,13 @@ export async function GET(req: NextRequest) {
             content: row.content,
             createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : new Date().toISOString(),
             likes: 0,
-            isUserOwner: Boolean(currentProfileId && String(row.userId) === currentProfileId),
+            // Viewer-neutral: this object may be written into the shared L1 cache
+            // and read back by other viewers. isUserOwner is derived fresh per
+            // viewer at response-decoration time via decorateCommentsForViewer,
+            // never baked in here against whichever request happened to populate
+            // the cache.
+            authorProfileId: row.userId ? String(row.userId) : null,
+            isUserOwner: false,
             critiqueTag: row.critiqueTag || null,
           };
           const existing = dbCommentsMap.get(row.portfolioId) || [];
@@ -359,9 +366,13 @@ export async function GET(req: NextRequest) {
 
     if (databasePortfolios) {
       const etag = cached.etag || `W/"${databaseTotal}-${Date.now().toString(36)}"`;
+      const decoratedPortfolios = databasePortfolios.map((p) => ({
+        ...p,
+        comments: decorateCommentsForViewer(p.comments, currentProfileId),
+      }));
       return NextResponse.json(
         {
-          portfolios: databasePortfolios,
+          portfolios: decoratedPortfolios,
           totalDevelopers,
           developersCount: totalDevelopers,
           pagination: {
@@ -456,6 +467,7 @@ export async function GET(req: NextRequest) {
       ...p,
       todayLikesCount: typeof p.todayLikesCount === "number" ? p.todayLikesCount : (isWithinCurrentDay(p.createdAt) ? p.likesCount : 0),
       weekLikesCount: typeof p.weekLikesCount === "number" ? p.weekLikesCount : (isWithinCurrentWeek(p.createdAt) ? p.likesCount : 0),
+      comments: decorateCommentsForViewer(p.comments, currentProfileId),
     }));
 
     return NextResponse.json(
