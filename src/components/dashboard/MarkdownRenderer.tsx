@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import { marked } from "marked";
 import { Code, Eye, Copy, Check } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
+import { sanitizeReadmeHtml } from "@/lib/github/sanitize-readme-html";
 
 interface MarkdownRendererProps {
   content?: string;
@@ -17,24 +18,6 @@ marked.setOptions({
   breaks: true,
 });
 
-/**
- * Sanitizes markdown/HTML string to strip malicious execution scripts
- * while preserving styling, alignments, badges, images, SVGs, tables, and links.
- */
-function sanitizeHtmlOutput(html: string): string {
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
-    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, "")
-    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, "")
-    .replace(/<meta\b[^>]*\/?>/gi, "")
-    .replace(/<base\b[^>]*\/?>/gi, "")
-    .replace(/<link\b[^>]*\/?>/gi, "")
-    .replace(/<\/?form\b[^>]*>/gi, "")
-    .replace(/\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "") // strip event handlers (onclick, onerror, onload, etc)
-    .replace(/(?:href|src|action|xlink:href|formaction)\s*=\s*["']?\s*(?:javascript|vbscript):[^"'>]+/gi, 'href="#"');
-}
-
 export function MarkdownRenderer({
   content = "",
   className = "",
@@ -47,9 +30,9 @@ export function MarkdownRenderer({
     if (!content || !content.trim()) return "";
     try {
       const rawHtml = marked.parse(content) as string;
-      return sanitizeHtmlOutput(rawHtml);
+      return sanitizeReadmeHtml(rawHtml);
     } catch {
-      return sanitizeHtmlOutput(content);
+      return sanitizeReadmeHtml(content);
     }
   }, [content]);
 
