@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/server-session";
 import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
-import { portfolioComments } from "@/lib/comments-store";
+import { portfolioComments, commentAuthorProfileIds } from "@/lib/comments-store";
 import { pool } from "@/lib/auth/better-auth";
+import { resolveCanonicalProfileId } from "@/lib/auth/profile-id";
+import { isCommentDeletionAuthorized } from "@/lib/auth/comment-authorization";
 import { invalidatePortfoliosCache } from "@/lib/dynamic-portfolios";
 
 export async function DELETE(
@@ -41,14 +43,14 @@ export async function DELETE(
 
     let isAuthorized = false;
     const isStaff = authUser.role === "moderator" || authUser.role === "admin";
+    const actorProfileId = resolveCanonicalProfileId(authUser.id);
     let dbFound = false;
 
     // Check PostgreSQL database first
     try {
       const dbCheck = await pool.query(
-        `SELECT c.id, c.user_id, pr.username as author_username, pr.full_name as author_name
+        `SELECT c.id, c.user_id
          FROM public.comments c
-         LEFT JOIN public.profiles pr ON c.user_id = pr.id
          WHERE c.id::text = $1 AND c.portfolio_id = $2
          LIMIT 1`,
         [commentId, portfolioId]
@@ -57,14 +59,14 @@ export async function DELETE(
       if (dbCheck.rows && dbCheck.rows.length > 0) {
         dbFound = true;
         const row = dbCheck.rows[0];
-        const isDbAuthor =
-          (row.author_username &&
-            row.author_username.toLowerCase() === authUser.username.toLowerCase()) ||
-          (row.author_name &&
-            row.author_name.toLowerCase() === authUser.name.toLowerCase()) ||
-          String(row.user_id) === String(authUser.id);
 
-        if (isDbAuthor || isStaff) {
+        if (
+          isCommentDeletionAuthorized({
+            actorProfileId,
+            commentAuthorProfileId: String(row.user_id),
+            isStaff,
+          })
+        ) {
           isAuthorized = true;
         }
       }
@@ -88,16 +90,14 @@ export async function DELETE(
       );
     }
 
-    if (!isAuthorized && commentIndex !== -1 && comments) {
-      const memComment = comments[commentIndex];
-      const isMemAuthor =
-        (memComment.authorUsername &&
-          memComment.authorUsername.toLowerCase() === authUser.username.toLowerCase()) ||
-        (memComment.authorName &&
-          memComment.authorName.toLowerCase() === authUser.name.toLowerCase()) ||
-        memComment.isUserOwner;
-
-      if (isMemAuthor || isStaff) {
+    if (!isAuthorized && commentIndex !== -1) {
+      if (
+        isCommentDeletionAuthorized({
+          actorProfileId,
+          commentAuthorProfileId: commentAuthorProfileIds.get(commentId),
+          isStaff,
+        })
+      ) {
         isAuthorized = true;
       }
     }
@@ -120,6 +120,7 @@ export async function DELETE(
     // Remove from in-memory cache if present
     if (comments && commentIndex !== -1) {
       comments.splice(commentIndex, 1);
+      commentAuthorProfileIds.delete(commentId);
     }
 
     let finalCommentsCount = comments ? comments.length : 0;

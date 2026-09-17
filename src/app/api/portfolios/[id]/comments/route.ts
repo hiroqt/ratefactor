@@ -4,7 +4,8 @@ import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { validateCommentContent } from "@/lib/guardrails";
 import { sanitizeCommentInput, isPayloadSizeAcceptable } from "@/lib/sanitize";
 import { getSessionUser } from "@/lib/auth/server-session";
-import { portfolioComments } from "@/lib/comments-store";
+import { resolveCanonicalProfileId } from "@/lib/auth/profile-id";
+import { portfolioComments, commentAuthorProfileIds } from "@/lib/comments-store";
 import { pool } from "@/lib/auth/better-auth";
 import { invalidatePortfoliosCache } from "@/lib/dynamic-portfolios";
 
@@ -343,6 +344,11 @@ export async function POST(
       portfolioComments.set(portfolioId, list);
     }
     list.unshift(newComment);
+    // Record the immutable canonical author identity server-side only (never
+    // put on newComment itself, which is returned directly in this response
+    // and in the GET listing) so DELETE authorization can't be spoofed via
+    // display name/username.
+    commentAuthorProfileIds.set(newComment.id, resolveCanonicalProfileId(authUser.id));
     invalidatePortfoliosCache();
 
     return NextResponse.json(
