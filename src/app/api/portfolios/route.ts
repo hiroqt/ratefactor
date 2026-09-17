@@ -4,6 +4,8 @@ import { checkRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 import { getSessionUser } from "@/lib/auth/server-session";
 import { pool } from "@/lib/auth/better-auth";
 import { Portfolio } from "@/types/portfolio";
+import { isPortfolioDomain, mapDomainsColumn } from "@/lib/portfolio-domains";
+import { buildPortfolioWhereClause } from "@/lib/portfolio-query";
 import { portfolioComments } from "@/lib/comments-store";
 import { 
   getCachedPortfolios, 
@@ -27,6 +29,8 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category") || "All";
+    const domainParam = searchParams.get("domain") || "";
+    const domain = isPortfolioDomain(domainParam) ? domainParam : "";
     const hostParam = (searchParams.get("host") || "").toLowerCase().trim();
     const sort = searchParams.get("sort") || "highest_rated";
     const query = (searchParams.get("q") || "").toLowerCase().trim();
@@ -36,6 +40,7 @@ export async function GET(req: NextRequest) {
     const ifNoneMatch = req.headers.get("if-none-match");
     const isDefaultQuery =
       category === "All" &&
+      !domain &&
       (!hostParam || hostParam === "all") &&
       !query &&
       sort === "highest_rated" &&
@@ -116,44 +121,7 @@ export async function GET(req: NextRequest) {
 
     // Attempt to query PostgreSQL database if connection is available
     try {
-      const filters = ["p.status = 'published'"];
-      const filterValues: (string | number)[] = [];
-      const addFilter = (sql: string, value: string) => {
-        filterValues.push(value);
-        filters.push(sql.replace("?", `$${filterValues.length}`));
-      };
-      const hostname = "LOWER(REGEXP_REPLACE(SPLIT_PART(REGEXP_REPLACE(COALESCE(p.portfolio_url, ''), '^[a-zA-Z][a-zA-Z0-9+.-]*://', ''), '/', 1), ':[0-9]+$', ''))";
-      const likeValue = (value: string) => `%${value.replace(/[\\%_]/g, "\\$&")}%`;
-
-      if (category !== "All") addFilter("p.category::text = ?", category);
-      if (hostParam && hostParam !== "all") {
-        const hostValue = likeValue(hostParam);
-        if (hostParam.startsWith(".")) {
-          filterValues.push(hostValue, hostValue);
-          filters.push(`(${hostname} LIKE $${filterValues.length - 1} ESCAPE '\\' OR LOWER(COALESCE(p.portfolio_url, '')) LIKE $${filterValues.length} ESCAPE '\\')`);
-        } else {
-          addFilter(`${hostname} LIKE ? ESCAPE '\\'`, hostValue);
-        }
-      }
-      if (query) {
-        const queryValue = likeValue(query);
-        filterValues.push(queryValue);
-        const queryParam = `$${filterValues.length}`;
-        filters.push(`(
-          LOWER(COALESCE(p.title, '')) LIKE ${queryParam} ESCAPE '\\'
-          OR LOWER(COALESCE(p.tagline, '')) LIKE ${queryParam} ESCAPE '\\'
-          OR LOWER(COALESCE(p.description, '')) LIKE ${queryParam} ESCAPE '\\'
-          OR LOWER(COALESCE(pr.full_name, '')) LIKE ${queryParam} ESCAPE '\\'
-          OR LOWER(COALESCE(pr.username, '')) LIKE ${queryParam} ESCAPE '\\'
-          OR LOWER(COALESCE(p.category::text, '')) LIKE ${queryParam} ESCAPE '\\'
-          OR ${hostname} LIKE ${queryParam} ESCAPE '\\'
-          OR LOWER(COALESCE(p.portfolio_url, '')) LIKE ${queryParam} ESCAPE '\\'
-          OR LOWER(COALESCE(p.demo_url, '')) LIKE ${queryParam} ESCAPE '\\'
-          OR LOWER(COALESCE(p.tech_stack::text, '')) LIKE ${queryParam} ESCAPE '\\'
-        )`);
-      }
-
-      const whereClause = filters.join(" AND ");
+      const { whereClause, filterValues } = buildPortfolioWhereClause({ category, domain, hostParam, query });
       const orderBy = sort === "most_liked"
         ? '"likesCount" DESC, p.created_at DESC'
         : sort === "most_discussed"
@@ -181,6 +149,7 @@ export async function GET(req: NextRequest) {
           p.image_size_bytes as "imageSizeBytes",
           p.category,
           p.tech_stack as "techStack",
+          p.domains,
           p.rating,
           p.rating_count as "ratingCount",
           p.rating_design as "ratingDesign",
@@ -287,6 +256,7 @@ export async function GET(req: NextRequest) {
             imageSizeBytes: row.imageSizeBytes || 1024 * 500,
             category: row.category,
             techStack: Array.isArray(row.techStack) ? row.techStack : [],
+            domains: mapDomainsColumn(row.domains),
             rating: Number(row.rating) || 0,
             ratingCount: Number(row.ratingCount) || 0,
             ratingBreakdown: {
@@ -388,6 +358,9 @@ export async function GET(req: NextRequest) {
     // Filter by Category / Domain
     if (category !== "All") {
       filtered = filtered.filter((p) => p.category === category);
+    }
+    if (domain) {
+      filtered = filtered.filter((p) => Array.isArray(p.domains) && p.domains.includes(domain));
     }
 
     // Filter by Host / TLD
@@ -592,6 +565,7 @@ export async function POST(req: NextRequest) {
       },
       techStack: data.techStack,
       category: data.category,
+      domains: data.domains,
       rating: 0,
       ratingCount: 0,
       ratingBreakdown: {
@@ -665,10 +639,10 @@ export async function POST(req: NextRequest) {
         await pool.query(
           `INSERT INTO public.portfolios (
             id, author_id, title, tagline, description, portfolio_url, github_url, demo_url,
-            thumbnail_url, thumbnail_public_id, image_size_bytes, category, tech_stack, comments_count, is_showcase,
+            thumbnail_url, thumbnail_public_id, image_size_bytes, category, tech_stack, domains, comments_count, is_showcase,
             status, request_critique, github_verification_status, github_verified_login,
             github_repository_full_name, github_verified_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::public.portfolio_category, $13, 0, false, 'published', $14, $15, $16, $17, $18)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::public.portfolio_category, $13, $14, 0, false, 'published', $15, $16, $17, $18, $19)
           ON CONFLICT (id) DO NOTHING`,
           [
             id,
@@ -684,6 +658,7 @@ export async function POST(req: NextRequest) {
             data.imageSizeBytes || 1024 * 500,
             data.category,
             data.techStack,
+            data.domains,
             Boolean(data.requestCritique),
             githubVerification.status,
             githubVerification.status ? githubVerification.githubLogin : null,

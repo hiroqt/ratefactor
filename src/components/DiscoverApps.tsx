@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/icons";
 import { motion } from "framer-motion";
 import { Portfolio, PortfolioCategory, SortOption } from "@/types/portfolio";
+import { PORTFOLIO_DOMAINS, PortfolioDomain, isPortfolioDomain } from "@/lib/portfolio-domains";
 import { AppCard } from "./AppCard";
 import { PortfolioCard } from "./PortfolioCard";
 import { EmptyState } from "./feedback/EmptyState";
@@ -38,18 +39,12 @@ export interface DiscoverAppsProps {
   id?: string;
 }
 
-// Domain categories strictly aligned with the submitting portfolio modal options
-export const DOMAIN_CATEGORIES: { label: string; value: PortfolioCategory }[] = [
+// Portfolio Domains filter — describes a portfolio's visual/interaction/
+// technical experience (Three.js, GSAP, ...), independent of `category`.
+// Sourced from the shared allowlist so this never drifts from validation.
+export const DOMAIN_FILTERS: { label: string; value: PortfolioDomain | "All" }[] = [
   { label: "All Domains", value: "All" },
-  { label: "Developer", value: "Developer" },
-  { label: "AI / ML", value: "AI / ML" },
-  { label: "Frontend", value: "Frontend" },
-  { label: "Fullstack", value: "Fullstack" },
-  { label: "Systems", value: "Systems" },
-  { label: "Design Engineer", value: "Design Engineer" },
-  { label: "Mobile", value: "Mobile" },
-  { label: "Client", value: "Client" },
-  { label: "Arts", value: "Arts" },
+  ...PORTFOLIO_DOMAINS.map((d) => ({ label: d, value: d })),
 ];
 
 export function DiscoverApps({
@@ -65,7 +60,20 @@ export function DiscoverApps({
   className,
   id = "discover-apps-section",
 }: DiscoverAppsProps) {
+  // Category filtering is driven externally (Navbar's category selector) via
+  // `initialCategory`; kept in sync here so it still composes with the
+  // in-component domain filter below instead of being silently dropped.
   const [activeCategory, setActiveCategory] = useState<PortfolioCategory>(initialCategory);
+  useEffect(() => {
+    setActiveCategory(initialCategory);
+    setCurrentPage(1);
+  }, [initialCategory]);
+
+  const [activeDomain, setActiveDomain] = useState<PortfolioDomain | "All">("All");
+  // Server-filtered results for the active domain (null while "All" / not yet loaded,
+  // in which case `portfolios` — already fetched by the caller — is used directly).
+  const [domainResults, setDomainResults] = useState<Portfolio[] | null>(null);
+  const [isDomainLoading, setIsDomainLoading] = useState(false);
   const [internalSearchQuery, setInternalSearchQuery] = useState("");
   const [sortOption, setSortOption] = useState<SortOption>("highest_rated");
   const [viewMode, setViewMode] = useState<"grid3" | "grouped" | "list">("grid3");
@@ -86,25 +94,50 @@ export function DiscoverApps({
 
   const sectionRef = useRef<HTMLDivElement>(null);
 
-  // Sync initialCategory if prop changes
+  // Fetch server-side whenever the active domain filter changes. Selecting a
+  // specific domain must return portfolios whose `domains` array contains it
+  // (filtered by Postgres via ?domain=, not by scanning the already-loaded
+  // `portfolios` prop client-side). "All Domains" clears this and falls back
+  // to `portfolios` as already fetched by the caller.
   useEffect(() => {
-    if (initialCategory) {
-      setActiveCategory(initialCategory);
-      setCurrentPage(1);
+    if (activeDomain === "All") {
+      setDomainResults(null);
+      return;
     }
-  }, [initialCategory]);
+    let cancelled = false;
+    setIsDomainLoading(true);
+    fetch(`/api/portfolios?domain=${encodeURIComponent(activeDomain)}&limit=50`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.portfolios && Array.isArray(data.portfolios)) {
+          setDomainResults(data.portfolios);
+        } else {
+          setDomainResults([]);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setDomainResults([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsDomainLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeDomain]);
 
-  // Compute active category index for GooeyNav
-  const activeCategoryIndex = useMemo(() => {
-    const idx = DOMAIN_CATEGORIES.findIndex((c) => c.value === activeCategory);
+  // Compute active domain index for GooeyNav
+  const activeDomainIndex = useMemo(() => {
+    const idx = DOMAIN_FILTERS.findIndex((c) => c.value === activeDomain);
     return idx === -1 ? 0 : idx;
-  }, [activeCategory]);
+  }, [activeDomain]);
 
   // Reset pagination to page 1 whenever filters change
-  const handleCategoryChange = (category: PortfolioCategory) => {
-    setActiveCategory(category);
+  const handleDomainChange = (domain: PortfolioDomain | "All") => {
+    setActiveDomain(domain);
     setCurrentPage(1);
-    trackEvent("discover_apps_category_filter", { category });
+    trackEvent("discover_apps_domain_filter", { domain });
   };
 
   const handleSearchChange = (q: string) => {
@@ -118,27 +151,26 @@ export function DiscoverApps({
     trackEvent("discover_apps_sort_change", { sort });
   };
 
-  // Compute domain count badges dynamically from all portfolios
-  const domainCounts = useMemo(() => {
-    const counts: Record<string, number> = { All: portfolios.length };
-    DOMAIN_CATEGORIES.forEach((c) => {
-      if (c.value !== "All") {
-        counts[c.value] = portfolios.filter((p) => p.category === c.value).length;
-      }
-    });
-    return counts;
-  }, [portfolios]);
+  // Base list this view operates on: the caller's already-fetched portfolios
+  // for "All Domains", or the server-filtered result set for a specific
+  // domain (see the fetch effect above).
+  const baseApps = activeDomain === "All" ? portfolios : domainResults || [];
 
-  // Filter & Sort portfolios
+  // Count badge for "All Domains" only — per-domain counts would require a
+  // separate query per domain, so only the cheap, already-available total is shown.
+  const domainCounts = useMemo(() => ({ All: portfolios.length }), [portfolios]);
+
+  // Filter & Sort portfolios (domain filtering already happened server-side;
+  // this only applies search/sort on top of the resulting base list)
   const filteredApps = useMemo(() => {
-    let result = [...portfolios];
+    let result = [...baseApps];
 
-    // 1. Filter by Domain Category
+    // 0. Category Filter (independent of, and composes with, domain filtering above)
     if (activeCategory !== "All") {
       result = result.filter((p) => p.category === activeCategory);
     }
 
-    // 2. Search Query Filter (Title, Tagline, Tech, Author, Category)
+    // 1. Search Query Filter (Title, Tagline, Tech, Author, Category)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       result = result.filter((p) => {
@@ -170,13 +202,17 @@ export function DiscoverApps({
     }
 
     return result;
-  }, [portfolios, activeCategory, searchQuery, sortOption]);
+  }, [baseApps, activeCategory, searchQuery, sortOption]);
 
-  // Grouped by Domain mapping (for grouped view)
+  // Grouped-by-domain mapping (for grouped view). A portfolio can belong to
+  // several domains at once; here it's grouped under its first domain (or
+  // "Uncategorized" if it has none yet) purely for this display grouping —
+  // the actual domain filter above already returns it under every domain
+  // it lists.
   const groupedApps = useMemo(() => {
-    const map = new Map<PortfolioCategory, Portfolio[]>();
+    const map = new Map<string, Portfolio[]>();
     filteredApps.forEach((app) => {
-      const cat = app.category;
+      const cat = app.domains?.[0] || "Uncategorized";
       if (!map.has(cat)) {
         map.set(cat, []);
       }
@@ -227,8 +263,8 @@ export function DiscoverApps({
 
   // Prepare items for GooeyNav
   const gooeyNavItems = useMemo(() => {
-    return DOMAIN_CATEGORIES.map((cat) => ({
-      label: cat.label,
+    return DOMAIN_FILTERS.map((d) => ({
+      label: d.label,
     }));
   }, []);
 
@@ -283,10 +319,10 @@ export function DiscoverApps({
           <div className="flex items-center justify-between gap-2 mb-3">
             <span className="text-xs font-mono font-semibold uppercase text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-              <span>Category Domains</span>
+              <span>Portfolio Domains</span>
             </span>
             <span suppressHydrationWarning className="text-xs font-mono text-slate-400 dark:text-slate-500">
-              {totalApps} {totalApps === 1 ? "portfolio" : "portfolios"} found
+              {isDomainLoading ? "Loading…" : `${totalApps} ${totalApps === 1 ? "portfolio" : "portfolios"} found`}
             </span>
           </div>
 
@@ -294,11 +330,11 @@ export function DiscoverApps({
           <div className="overflow-x-auto pb-2 scrollbar-none no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 overscroll-x-contain touch-pan-x">
             <GooeyNav
               items={gooeyNavItems}
-              value={activeCategoryIndex}
+              value={activeDomainIndex}
               onChange={(index) => {
-                const targetCat = DOMAIN_CATEGORIES[index];
-                if (targetCat) {
-                  handleCategoryChange(targetCat.value);
+                const target = DOMAIN_FILTERS[index];
+                if (target) {
+                  handleDomainChange(target.value);
                 }
               }}
               size="sm"
@@ -413,7 +449,7 @@ export function DiscoverApps({
             description={
               portfolios.length === 0
                 ? "Be the first developer to showcase your codebase! Submit your portfolio to receive community ratings and peer critiques."
-                : "Try choosing a different domain category, clearing your search query, or submit the first portfolio in this domain!"
+                : "Try choosing a different category or domain, clearing your search query, or submit the first portfolio in this domain!"
             }
             action={
               portfolios.length === 0
@@ -428,6 +464,7 @@ export function DiscoverApps({
                     label: "Reset Filters",
                     onClick: () => {
                       setActiveCategory("All");
+                      setActiveDomain("All");
                       setSearchQuery("");
                       setCurrentPage(1);
                     },
@@ -447,16 +484,25 @@ export function DiscoverApps({
               ) : undefined
             }
             filterBadges={
-              portfolios.length > 0 && (activeCategory !== "All" || searchQuery.trim().length > 0)
+              portfolios.length > 0 &&
+              (activeCategory !== "All" || activeDomain !== "All" || searchQuery.trim().length > 0)
                 ? [
                     ...(activeCategory !== "All"
                       ? [
                           {
-                            label: `Domain: ${activeCategory}`,
+                            label: `Category: ${activeCategory}`,
                             onRemove: () => {
                               setActiveCategory("All");
                               setCurrentPage(1);
                             },
+                          },
+                        ]
+                      : []),
+                    ...(activeDomain !== "All"
+                      ? [
+                          {
+                            label: `Domain: ${activeDomain}`,
+                            onRemove: () => handleDomainChange("All"),
                           },
                         ]
                       : []),
@@ -512,18 +558,19 @@ export function DiscoverApps({
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveCategory(domainCat);
-                      setViewMode("grid3");
-                      setCurrentPage(1);
-                    }}
-                    className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>View all in {domainCat}</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
+                  {isPortfolioDomain(domainCat) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDomainChange(domainCat);
+                        setViewMode("grid3");
+                      }}
+                      className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>View all in {domainCat}</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
 
                 {/* 3 columns showcase in domain group */}

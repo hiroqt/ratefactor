@@ -20,6 +20,7 @@ function createMockPortfolio(partial: Partial<Portfolio>): Portfolio {
     title: partial.title || "Portfolio 1",
     tagline: partial.tagline || "Tagline for developer",
     description: partial.description || "Description",
+    domains: partial.domains || [],
     portfolioUrl: partial.portfolioUrl || "https://example.com",
     githubUrl: partial.githubUrl || "https://github.com/example/repo",
     thumbnail: partial.thumbnail || "https://example.com/thumb.png",

@@ -9,7 +9,7 @@ Three files under `database/neon/` govern the schema, each with a distinct role:
 | File | Role |
 |---|---|
 | `database/neon/schema.sql` | **Canonical schema.** Idempotent, fresh-database baseline. Source of truth for what a new Neon database should contain. |
-| `database/neon/migrations/*.sql` | **Transition migrations.** Ordered, forward-only SQL to bring an *existing* database (one created before a given change) up to date. Currently: `20260915000000_add_portfolio_thumbnail_public_id.sql` (adds `portfolios.thumbnail_public_id` + its unique constraint) and `20260916000000_drop_github_cache_tables.sql` (drops the five `github_*` mirror tables). Both changes are already folded into `schema.sql`, so a fresh database never needs to run them. |
+| `database/neon/migrations/*.sql` | **Transition migrations.** Ordered, forward-only SQL to bring an *existing* database (one created before a given change) up to date. Currently: `20260915000000_add_portfolio_thumbnail_public_id.sql` (adds `portfolios.thumbnail_public_id` + its unique constraint), `20260916000000_drop_github_cache_tables.sql` (drops the five `github_*` mirror tables), and `20260916010000_add_portfolio_domains.sql` (adds `portfolios.domains text[] NOT NULL DEFAULT '{}'` + its GIN index). All changes are already folded into `schema.sql`, so a fresh database never needs to run them. |
 | `database/neon/validation.sql` | **Read-only validation.** A sequence of `information_schema`/`pg_catalog` queries with expected counts in comments (e.g. "expect 14 tables"). Safe to run at any time against any environment; it never mutates data. Run it after applying schema or migration SQL to confirm the result matches what `schema.sql` defines. |
 
 `database/neon/README.md` no longer exists as a separate document — this file is the maintained reference.
@@ -122,6 +122,7 @@ Used by Better Auth's own verification-token flows. RateFactor's own OTP challen
 | image_size_bytes | integer | NOT NULL, 1–2097152 | — | Enforces the 2 MB cover limit at the database layer too. |
 | category | portfolio_category (enum) | NOT NULL | — | |
 | tech_stack | text[] | NOT NULL | `{}` | |
+| domains | text[] | NOT NULL | `{}` | Portfolio Domains — the visual/interaction/technical experience (e.g. `Three.js`, `GSAP`), independent of `category` and `tech_stack`. Allowlist enforced at the application layer (`PORTFOLIO_DOMAINS` in `src/lib/portfolio-domains.ts`), 1–5 values on new submissions. Existing rows predating this column default to `{}` and are never inferred/backfilled. Filterable server-side via `GET /api/portfolios?domain=`, using `domains @> ARRAY[$1]`; see [api-reference.md](./api-reference.md) and [portfolio-system.md](./portfolio-system.md). |
 | rating, rating_design, rating_code_quality, rating_performance, rating_documentation | numeric(3,2) | NOT NULL | 0.00 | Maintained exclusively by `sync_ratings()`; never written directly by route handlers. |
 | rating_count | integer | NOT NULL, >=0 | 0 | |
 | likes_count | integer | NOT NULL, >=0 | 0 | Maintained by `sync_likes_count()` and re-verified by the like route. |
@@ -290,6 +291,7 @@ Beyond the primary/unique/FK-backing indexes, notable performance indexes includ
 
 - Partial indexes scoped to `status = 'published'` for the public feed's three sort orders: `idx_portfolios_all_published_recent`, `_likes`, `_rating`, plus category-scoped variants (`idx_portfolios_published_feed`, `_likes`, `_recent`).
 - `idx_portfolios_category_created` / `_likes` / `_rating` for authenticated/non-default queries that still filter by category.
+- `idx_portfolios_domains` — a GIN index over `domains`, serving the array-containment filter (`domains @> ARRAY[$1]`) used by `GET /api/portfolios?domain=`.
 - `idx_portfolios_search` — a GIN index over `to_tsvector('english', title || ' ' || tagline)` (not currently queried by `LIKE`-based search in `GET /api/portfolios`, which uses `ILIKE`/`LIKE` patterns instead of `to_tsvector`/`plainto_tsquery`).
 - `idx_portfolios_author_created` — a covering index (`INCLUDE`) for author-scoped portfolio listing.
 - `idx_ratings_portfolio_aggregate` — a covering index over the four rating criteria, supporting `sync_ratings()`'s `AVG` query without a heap fetch.
@@ -298,7 +300,7 @@ Beyond the primary/unique/FK-backing indexes, notable performance indexes includ
 
 ## Migrations vs. fresh schema
 
-`schema.sql` already contains `thumbnail_public_id` and excludes the `github_*` tables — a brand-new database only ever needs `schema.sql`. The `migrations/` directory exists purely to bring a database created *before* those two changes forward; both migration files are idempotent (`ADD COLUMN IF NOT EXISTS`, `DROP TABLE IF EXISTS`) and safe to re-run.
+`schema.sql` already contains `thumbnail_public_id`, `domains`, and excludes the `github_*` tables — a brand-new database only ever needs `schema.sql`. The `migrations/` directory exists purely to bring a database created *before* those changes forward; every migration file is idempotent (`ADD COLUMN IF NOT EXISTS`, `DROP TABLE IF EXISTS`, `CREATE INDEX IF NOT EXISTS`) and safe to re-run.
 
 ## Validation
 

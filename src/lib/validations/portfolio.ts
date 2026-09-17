@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { 
-  validateCommentContent, 
-  MAX_IMAGE_SIZE_BYTES 
+import {
+  validateCommentContent,
+  MAX_IMAGE_SIZE_BYTES
 } from "@/lib/guardrails";
+import { portfolioDomainsFieldSchema } from "@/lib/portfolio-domains";
 
 export const portfolioSubmissionSchema = z.object({
   title: z
@@ -76,6 +77,7 @@ export const portfolioSubmissionSchema = z.object({
     .array(z.string().trim().min(1))
     .min(1, "At least one technology tag is required")
     .max(15, "Cannot specify more than 15 technologies"),
+  domains: portfolioDomainsFieldSchema,
   requestCritique: z.boolean().optional().default(false),
 });
 
