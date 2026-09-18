@@ -1,3 +1,5 @@
+import type { PortfolioDomain } from "@/lib/portfolio-domains";
+
 export type PortfolioCategory =
   | "All"
   | "Developer"
@@ -90,6 +92,13 @@ export interface Portfolio {
   };
   techStack: string[];
   category: "Developer" | "Arts" | "Client" | "Frontend" | "Fullstack" | "Systems" | "Design Engineer" | "Mobile" | "AI / ML";
+  /**
+   * Portfolio Domains — the visual/interaction/technical experience of the
+   * portfolio (e.g. "Three.js", "GSAP"). Independent of `category` and
+   * `techStack`; a portfolio can have several. Existing rows created before
+   * this feature default to an empty array, never inferred/backfilled.
+   */
+  domains: PortfolioDomain[];
   rating: number;
   ratingCount: number;
   ratingBreakdown: RatingBreakdown;

@@ -15,8 +15,9 @@ SELECT table_name FROM information_schema.tables
 WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
 ORDER BY table_name;
 
--- 2. Columns — 211 migrated columns plus portfolios.thumbnail_public_id.
-\echo '=== 2. Column count (expect 156) ==='
+-- 2. Columns — 211 migrated columns plus portfolios.thumbnail_public_id and
+--    portfolios.domains.
+\echo '=== 2. Column count (expect 157) ==='
 SELECT count(*) AS column_count FROM information_schema.columns
 WHERE table_schema = 'public';
 
@@ -52,8 +53,9 @@ WHERE contype = 'f' AND connamespace = 'public'::regnamespace
   AND conrelid = 'public.auth_challenges'::regclass
   AND pg_get_constraintdef(oid) ILIKE '%auth.users%';
 
--- 7. Indexes — 86 migrated indexes plus thumbnail_public_id uniqueness.
-\echo '=== 7. Indexes (expect 75) ==='
+-- 7. Indexes — 86 migrated indexes plus thumbnail_public_id uniqueness and
+--    idx_portfolios_domains.
+\echo '=== 7. Indexes (expect 76) ==='
 SELECT count(*) AS index_count FROM pg_indexes WHERE schemaname = 'public';
 
 -- 8. Enums / custom types — expect 4.

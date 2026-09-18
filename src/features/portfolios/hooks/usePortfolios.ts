@@ -973,6 +973,7 @@ export function usePortfolios(options?: UsePortfoliosOptions) {
           imageSizeBytes: newPortfolio.imageSizeBytes || 1024 * 500,
           category: newPortfolio.category,
           techStack: newPortfolio.techStack,
+          domains: newPortfolio.domains,
           requestCritique: Boolean(newPortfolio.requestCritique),
           authorName: newPortfolio.author.name,
           authorUsername: newPortfolio.author.username,

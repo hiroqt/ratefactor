@@ -25,6 +25,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import { Portfolio, PortfolioCategory } from "@/types/portfolio";
+import { PORTFOLIO_DOMAINS, PortfolioDomain, MAX_PORTFOLIO_DOMAINS } from "@/lib/portfolio-domains";
 import { DeveloperProfile } from "@/types/profile";
 import { PortfolioCard } from "./PortfolioCard";
 import { Avatar } from "@/components/ui/Avatar";
@@ -101,6 +102,7 @@ export function SubmitPortfolioModal({
   const [thumbnail, setThumbnail] = useState(PRESET_THUMBNAILS[0].url);
   const [category, setCategory] = useState<"Developer" | "Arts" | "Client" | "Frontend" | "Fullstack" | "Systems" | "Design Engineer" | "Mobile" | "AI / ML">("Developer");
   const [techStack, setTechStack] = useState<string[]>(["TypeScript", "Next.js 15"]);
+  const [domains, setDomains] = useState<PortfolioDomain[]>([]);
   const [customTech, setCustomTech] = useState("");
   const [requestCritique, setRequestCritique] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -294,6 +296,7 @@ export function SubmitPortfolioModal({
     setFileUploadError(null);
     setCategory("Developer");
     setTechStack(["TypeScript", "Next.js 15"]);
+    setDomains([]);
     setCustomTech("");
     setRequestCritique(false);
     setError(null);
@@ -309,6 +312,14 @@ export function SubmitPortfolioModal({
 
   const handleRemoveTech = (tech: string) => {
     setTechStack(techStack.filter((t) => t !== tech));
+  };
+
+  const handleToggleDomain = (domain: PortfolioDomain) => {
+    setDomains((prev) => {
+      if (prev.includes(domain)) return prev.filter((d) => d !== domain);
+      if (prev.length >= MAX_PORTFOLIO_DOMAINS) return prev;
+      return [...prev, domain];
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -343,6 +354,10 @@ export function SubmitPortfolioModal({
     }
     if (techStack.length === 0) {
       setError("Please add at least one technology stack tag.");
+      return;
+    }
+    if (domains.length === 0) {
+      setError("Please select at least one portfolio domain.");
       return;
     }
 
@@ -397,6 +412,7 @@ export function SubmitPortfolioModal({
       },
       techStack,
       category,
+      domains,
       rating: 0,
       ratingCount: 0,
       ratingBreakdown: {
@@ -459,6 +475,7 @@ export function SubmitPortfolioModal({
     },
     techStack: techStack.length > 0 ? techStack : ["TypeScript", "Next.js"],
     category,
+    domains,
     rating: 0,
     ratingCount: 0,
     ratingBreakdown: {
@@ -963,6 +980,44 @@ export function SubmitPortfolioModal({
                     <option value="Mobile">Mobile Native</option>
                   </optgroup>
                 </select>
+              </div>
+
+              {/* Portfolio Domains — separate multi-select, distinct from Category and Tech Stack */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-medium text-slate-900 dark:text-white">
+                    Portfolio Domains *
+                  </label>
+                  <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-mono">
+                    {domains.length}/{MAX_PORTFOLIO_DOMAINS} selected
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 mb-2">
+                  Pick 1–5 tags that describe this portfolio's visual/interaction experience (e.g. Three.js, GSAP, Parallax).
+                </p>
+                <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl border border-dashed border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/40 dark:bg-indigo-950/20">
+                  {PORTFOLIO_DOMAINS.map((domain) => {
+                    const selected = domains.includes(domain);
+                    const disabled = !selected && domains.length >= MAX_PORTFOLIO_DOMAINS;
+                    return (
+                      <button
+                        key={domain}
+                        type="button"
+                        onClick={() => handleToggleDomain(domain)}
+                        disabled={disabled}
+                        aria-pressed={selected}
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-xs font-mono border transition-colors cursor-pointer disabled:opacity-30 disabled:pointer-events-none",
+                          selected
+                            ? "bg-indigo-600 border-indigo-600 text-white"
+                            : "bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:border-indigo-400"
+                        )}
+                      >
+                        {domain}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Single Image Upload (Max 2 MB, 1 Image Only) */}

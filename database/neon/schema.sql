@@ -376,6 +376,7 @@ CREATE TABLE IF NOT EXISTS public.portfolios (
     image_size_bytes integer NOT NULL,
     category public.portfolio_category NOT NULL,
     tech_stack text[] DEFAULT '{}'::text[] NOT NULL,
+    domains text[] DEFAULT '{}'::text[] NOT NULL,
     rating numeric(3,2) DEFAULT 0.00 NOT NULL,
     rating_count integer DEFAULT 0 NOT NULL,
     rating_design numeric(3,2) DEFAULT 0.00 NOT NULL,
@@ -573,6 +574,7 @@ CREATE INDEX IF NOT EXISTS idx_portfolios_all_published_rating ON public.portfol
 CREATE INDEX IF NOT EXISTS idx_portfolios_all_published_recent ON public.portfolios USING btree (created_at DESC) WHERE (status = 'published'::public.content_status);
 CREATE INDEX IF NOT EXISTS idx_portfolios_author_created ON public.portfolios USING btree (author_id, created_at DESC) INCLUDE (id, title, rating, likes_count, comments_count);
 CREATE INDEX IF NOT EXISTS idx_portfolios_author_id ON public.portfolios USING btree (author_id);
+CREATE INDEX IF NOT EXISTS idx_portfolios_domains ON public.portfolios USING gin (domains);
 CREATE INDEX IF NOT EXISTS idx_portfolios_category_created ON public.portfolios USING btree (category, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_portfolios_category_likes ON public.portfolios USING btree (category, likes_count DESC, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_portfolios_category_rating ON public.portfolios USING btree (category, rating DESC, created_at DESC);
