@@ -3,19 +3,13 @@ import { githubCache, CACHE_TTL } from "./cache";
 
 export interface GithubReadmeData { repositoryFullName: string; contentMarkdown: string; contentSha?: string; sourceUrl: string; lastSyncedAt?: string; }
 
-export function sanitizeReadmeMarkdown(raw: string) {
-  return raw
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
-    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, "")
-    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, "")
-    .replace(/<meta\b[^>]*\/?>/gi, "")
-    .replace(/<base\b[^>]*\/?>/gi, "")
-    .replace(/<link\b[^>]*\/?>/gi, "")
-    .replace(/<\/?form\b[^>]*>/gi, "")
-    .replace(/\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/(?:href|src|action|xlink:href)\s*=\s*["']?\s*(?:javascript|vbscript):[^"'>]+/gi, 'href="#"');
-}
+// contentMarkdown is untrusted, raw Markdown — it is NOT sanitized here.
+// Regex sanitization at this stage used to try (and fail) to strip dangerous
+// markup before Markdown parsing, but a Markdown parser can pass raw HTML
+// straight through, and encoded payloads only resolve to something dangerous
+// after that parse. The real security boundary is sanitizeReadmeHtml, run on
+// the HTML `marked.parse` produces, right before it reaches
+// dangerouslySetInnerHTML (see src/components/dashboard/MarkdownRenderer.tsx).
 
 export async function fetchGithubReadme(owner: string, repo: string, token?: string | null, bypassCache = false): Promise<GithubReadmeData | null> {
   const fullName = `${owner.trim()}/${repo.trim()}`;
@@ -25,7 +19,7 @@ export async function fetchGithubReadme(owner: string, repo: string, token?: str
   try {
     const data: any = await githubFetch(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/readme`);
     if (!data?.content) return null;
-    const result = { repositoryFullName: fullName, contentMarkdown: sanitizeReadmeMarkdown(Buffer.from(data.content.replace(/\s/g, ""), "base64").toString("utf8")), contentSha: data.sha, sourceUrl: data.html_url || `https://github.com/${fullName}`, lastSyncedAt: new Date().toISOString() };
+    const result = { repositoryFullName: fullName, contentMarkdown: Buffer.from(data.content.replace(/\s/g, ""), "base64").toString("utf8"), contentSha: data.sha, sourceUrl: data.html_url || `https://github.com/${fullName}`, lastSyncedAt: new Date().toISOString() };
     if (cacheKey) githubCache.set(cacheKey, result, CACHE_TTL.README);
     return result;
   } catch {
@@ -33,7 +27,7 @@ export async function fetchGithubReadme(owner: string, repo: string, token?: str
       try {
         const response = await fetch(`https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${branch}/README.md`, { next: { revalidate: 600 } });
         if (response.ok) {
-          const result = { repositoryFullName: fullName, contentMarkdown: sanitizeReadmeMarkdown(await response.text()), sourceUrl: `https://github.com/${fullName}/blob/${branch}/README.md`, lastSyncedAt: new Date().toISOString() };
+          const result = { repositoryFullName: fullName, contentMarkdown: await response.text(), sourceUrl: `https://github.com/${fullName}/blob/${branch}/README.md`, lastSyncedAt: new Date().toISOString() };
           if (cacheKey) githubCache.set(cacheKey, result, CACHE_TTL.README);
           return result;
         }
